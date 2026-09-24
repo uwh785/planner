@@ -1,0 +1,132 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  user_id       String   @id
+  email         String   @unique
+  name          String
+  password_hash String
+  role          String   @default("user")
+  status        String   @default("active")
+  created_at    BigInt   @default(now())
+
+  task_lists      TaskList[]
+  tasks           Task[]
+  subtasks        Subtask[]
+  tags            Tag[]
+  class_sessions  ClassSession[]
+
+  @@map("app_users")
+}
+
+model TaskList {
+  user_id    String
+  list_id    String   @id
+  name       String
+  color      String   @default("#0A84FF")
+  icon       String   @default("list")
+  sort_order Int      @default(0)
+  updated_at BigInt   @default(0)
+  deleted    Int      @default(0)
+
+  user  User   @relation(fields: [user_id], references: [user_id])
+  tasks Task[]
+
+  @@index([user_id])
+  @@map("task_lists")
+}
+
+model Task {
+  user_id      String
+  list_id      String?
+  task_id      String   @id
+  title        String
+  description  String   @default("")
+  priority     Int      @default(0)
+  status       String   @default("pending")
+  due_date     BigInt?
+  due_all_day  Boolean  @default(false)
+  duration_ms  BigInt?
+  started_at   BigInt?
+  completed_at BigInt?
+  sort_order   Int      @default(0)
+  updated_at   BigInt   @default(0)
+  deleted      Int      @default(0)
+
+  user     User      @relation(fields: [user_id], references: [user_id])
+  list     TaskList? @relation(fields: [list_id], references: [list_id])
+  subtasks Subtask[]
+  tags     TaskTag[]
+
+  @@index([user_id])
+  @@index([user_id, status])
+  @@index([user_id, due_date])
+  @@map("tasks")
+}
+
+model Subtask {
+  user_id    String
+  task_id    String
+  subtask_id String   @id
+  title      String
+  completed  Boolean  @default(false)
+  sort_order Int      @default(0)
+  updated_at BigInt   @default(0)
+  deleted    Int      @default(0)
+
+  user User @relation(fields: [user_id], references: [user_id])
+  task Task @relation(fields: [task_id], references: [task_id])
+
+  @@index([user_id, task_id])
+  @@map("subtasks")
+}
+
+model Tag {
+  user_id String
+  tag_id  String @id
+  name    String
+  color   String @default("#8E8E93")
+
+  user     User     @relation(fields: [user_id], references: [user_id])
+  taskTags TaskTag[]
+
+  @@index([user_id])
+  @@map("tags")
+}
+
+model TaskTag {
+  user_id String
+  task_id String
+  tag_id  String
+
+  task Task @relation(fields: [task_id], references: [task_id])
+  tag  Tag  @relation(fields: [tag_id], references: [tag_id])
+
+  @@id([user_id, task_id, tag_id])
+  @@map("task_tags")
+}
+
+model ClassSession {
+  user_id      String
+  class_id     String @id
+  subject      String
+  day_of_week  Int
+  start_minute Int
+  end_minute   Int
+  room         String @default("")
+  teacher      String @default("")
+  color        String @default("#0A84FF")
+  updated_at   BigInt @default(0)
+  deleted      Int    @default(0)
+
+  user User @relation(fields: [user_id], references: [user_id])
+
+  @@index([user_id, day_of_week])
+  @@map("class_sessions")
+}
