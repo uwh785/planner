@@ -31,18 +31,28 @@ export async function loadUser() {
   }
 }
 
+// makeError attaches the HTTP status so callers can branch on it instead of
+// pattern-matching message text. A 402 in particular means the plan is too
+// small, which is a different user-facing outcome from any other failure.
+function makeError(message, status) {
+  const err = new Error(message);
+  err.status = status;
+  return err;
+}
+
 async function request(path, { method = 'GET', body, signal } = {}) {
   const headers = { 'Content-Type': 'application/json' };
   if (A.token) headers.Authorization = 'Bearer ' + A.token;
   const res = await fetch(BASE + path, { method, headers, body: body ? JSON.stringify(body) : undefined, signal });
-  if (res.status === 401) { setToken(''); throw new Error('Invalid credentials'); }
+  if (res.status === 401) { setToken(''); throw makeError('Invalid credentials', 401); }
   const raw = await res.json().catch(() => null);
   if (!res.ok) {
     const safeMsg = res.status === 401 ? 'Invalid credentials' :
+                    res.status === 402 ? 'Plan limit reached' :
                     res.status === 409 ? 'Invalid request' :
                     res.status === 400 ? 'Invalid input' :
                     'Something went wrong';
-    throw new Error(safeMsg);
+    throw makeError(safeMsg, res.status);
   }
   return raw;
 }
