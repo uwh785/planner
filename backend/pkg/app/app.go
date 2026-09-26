@@ -396,9 +396,12 @@ func (a *App) updateTask(w http.ResponseWriter, r *http.Request) {
 	if err := a.store.UpdateTask(claims.UserID, t); taskTransitionErrResp(w, err, "failed to update task") {
 		return
 	}
+	// The update just confirmed the row exists, so a read-back failure is a
+	// server error, never a missing task.
 	updated, err := a.store.GetTaskFull(claims.UserID, taskID)
 	if err != nil {
-		errResp(w, http.StatusNotFound, "task not found")
+		log.Printf("updateTask read-back error: %v", err)
+		errResp(w, http.StatusInternalServerError, "failed to load updated task")
 		return
 	}
 	dataResp(w, http.StatusOK, updated)
