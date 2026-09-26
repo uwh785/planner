@@ -339,17 +339,29 @@ func (s *Store) CreateTask(userID string, t model.Task) (model.Task, error) {
 	return t, err
 }
 
+// UpdateTask overwrites only the user-editable fields of a task: list_id,
+// title, description, priority, due_date, due_all_day, and duration_ms.
+// Server-managed fields (status, started_at, elapsed_ms, completed_at) and
+// sort_order (never sent by the edit form) are left untouched, since a
+// caller-supplied model.Task carries no reliable value for them. It returns
+// ErrNotFound if the task does not exist (unknown ID, deleted, or belongs to
+// another user).
 func (s *Store) UpdateTask(userID string, t model.Task) error {
 	t.UpdatedAt = time.Now().UnixMilli()
-	_, err := s.pool.Exec(context.Background(),
+	tag, err := s.pool.Exec(context.Background(),
 		`UPDATE tasks SET list_id = $3, title = $4, description = $5, priority = $6,
-		        status = $7, due_date = $8, due_all_day = $9, duration_ms = $10, started_at = $11,
-		        completed_at = $12, sort_order = $13, updated_at = $14
+		        due_date = $7, due_all_day = $8, duration_ms = $9, updated_at = $10
 		 WHERE user_id = $1 AND task_id = $2 AND deleted = 0`,
-		userID, t.TaskID, t.ListID, t.Title, t.Description, t.Priority, t.Status,
-		t.DueDate, t.DueAllDay, t.DurationMs, t.StartedAt, t.CompletedAt, t.SortOrder, t.UpdatedAt,
+		userID, t.TaskID, t.ListID, t.Title, t.Description, t.Priority,
+		t.DueDate, t.DueAllDay, t.DurationMs, t.UpdatedAt,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 func (s *Store) DeleteTask(userID, taskID string) error {

@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -159,6 +160,19 @@ func TestListTasksNegativeFromReturns400(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	a.listTasks(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusBadRequest)
+	}
+}
+
+func TestUpdateTaskEmptyTitleReturns400(t *testing.T) {
+	a := &App{}
+	body := `{"title":"   ","description":"x"}`
+	req := httptest.NewRequest(http.MethodPut, "/api/tasks/tsk_1", strings.NewReader(body))
+	w := httptest.NewRecorder()
+
+	a.updateTask(w, req)
 
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", w.Code, http.StatusBadRequest)

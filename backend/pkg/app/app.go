@@ -388,12 +388,20 @@ func (a *App) updateTask(w http.ResponseWriter, r *http.Request) {
 		errResp(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	t.TaskID = taskID
-	if err := a.store.UpdateTask(claims.UserID, t); err != nil {
-		errResp(w, http.StatusInternalServerError, "failed to update task")
+	if strings.TrimSpace(t.Title) == "" {
+		errResp(w, http.StatusBadRequest, "title is required")
 		return
 	}
-	dataResp(w, http.StatusOK, t)
+	t.TaskID = taskID
+	if err := a.store.UpdateTask(claims.UserID, t); taskTransitionErrResp(w, err, "failed to update task") {
+		return
+	}
+	updated, err := a.store.GetTaskFull(claims.UserID, taskID)
+	if err != nil {
+		errResp(w, http.StatusNotFound, "task not found")
+		return
+	}
+	dataResp(w, http.StatusOK, updated)
 }
 
 func (a *App) deleteTask(w http.ResponseWriter, r *http.Request) {
