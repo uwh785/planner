@@ -88,6 +88,68 @@ func (s *Store) GetUserByID(userID string) (model.User, error) {
 	return u, err
 }
 
+// ──────────────────────────── Subscriptions ───────────────────
+
+// GetSubscription returns the stored entitlement row for a user. A user with no
+// row is entitled to the free plan, so the zero-value row is returned as-is
+// rather than an error: every account predating this table is free.
+func (s *Store) GetSubscription(userID string) (model.Subscription, error) {
+	var sub model.Subscription
+	err := s.pool.QueryRow(context.Background(),
+		`SELECT plan, status, started_at, expires_at FROM subscription WHERE user_id = $1`, userID,
+	).Scan(&sub.Plan, &sub.Status, &sub.StartedAt, &sub.ExpiresAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return model.Subscription{Plan: "free", Status: "active"}, nil
+	}
+	if err != nil {
+		return model.Subscription{}, err
+	}
+	return sub, nil
+}
+
+// SetSubscription upserts the entitlement row for a user. This is the single
+// write path for a plan change, so a payment webhook and a manual promotion
+// both go through it.
+func (s *Store) SetSubscription(userID, plan, status string, expiresAt *time.Time) error {
+	_, err := s.pool.Exec(context.Background(),
+		`INSERT INTO subscription (user_id, plan, status, started_at, expires_at, updated_at)
+		 VALUES ($1, $2, $3, now(), $4, now())
+		 ON CONFLICT (user_id) DO UPDATE
+		   SET plan = EXCLUDED.plan,
+		       status = EXCLUDED.status,
+		       expires_at = EXCLUDED.expires_at,
+		       updated_at = now()`,
+		userID, plan, status, expiresAt,
+	)
+	return err
+}
+
+// ──────────────────────────── Usage counts ────────────────────
+
+// CountActiveTasks counts the tasks a user still owns work for: anything not
+// completed and not soft-deleted. Completed tasks do not count against the cap
+// so a user is never blocked from starting new work by their own history.
+func (s *Store) CountActiveTasks(userID string) (int, error) {
+	return s.count(context.Background(),
+		`SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND status <> 'completed' AND deleted = 0`, userID)
+}
+
+func (s *Store) CountLists(userID string) (int, error) {
+	return s.count(context.Background(),
+		`SELECT COUNT(*) FROM task_lists WHERE user_id = $1 AND deleted = 0`, userID)
+}
+
+func (s *Store) CountTags(userID string) (int, error) {
+	return s.count(context.Background(),
+		`SELECT COUNT(*) FROM tags WHERE user_id = $1`, userID)
+}
+
+func (s *Store) count(ctx context.Context, q string, args ...any) (int, error) {
+	var n int
+	err := s.pool.QueryRow(ctx, q, args...).Scan(&n)
+	return n, err
+}
+
 // ──────────────────────────── Task Lists ──────────────────────
 
 func (s *Store) ListTaskLists(userID string) ([]model.TaskList, error) {

@@ -3,6 +3,7 @@ package model
 import (
 	"database/sql"
 	"encoding/json"
+	"time"
 )
 
 type User struct {
@@ -134,4 +135,34 @@ type DashboardSummary struct {
 	InProgress int `json:"in_progress"`
 	Completed  int `json:"completed"`
 	Overdue    int `json:"overdue"`
+}
+
+// Subscription is the stored entitlement row. ExpiresAt is null for a
+// subscription that does not lapse.
+type Subscription struct {
+	Plan      string     `json:"plan"`
+	Status    string     `json:"status"`
+	StartedAt time.Time  `json:"started_at"`
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+}
+
+// PlanView is the entitlement a client needs to render: the plan that actually
+// applies right now, its caps, and how much of each resource is used.
+type PlanView struct {
+	Plan     string         `json:"plan"`
+	Limits   PlanLimits     `json:"limits"`
+	Usage    PlanUsage      `json:"usage"`
+	Upgrades map[string]int `json:"remaining"`
+}
+
+type PlanLimits struct {
+	MaxTasks int `json:"max_tasks"`
+	MaxLists int `json:"max_lists"`
+	MaxTags  int `json:"max_tags"`
+}
+
+type PlanUsage struct {
+	ActiveTasks int `json:"active_tasks"`
+	Lists       int `json:"lists"`
+	Tags        int `json:"tags"`
 }

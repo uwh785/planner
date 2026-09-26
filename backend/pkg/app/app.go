@@ -13,6 +13,7 @@ import (
 
 	"planner/pkg/auth"
 	"planner/pkg/model"
+	"planner/pkg/plan"
 	"planner/pkg/store"
 
 	"github.com/go-chi/chi/v5"
@@ -40,6 +41,7 @@ func (a *App) Handler() http.Handler {
 		r.Group(func(r chi.Router) {
 			r.Use(a.auth.Middleware)
 			r.Get("/auth/me", a.me)
+			r.Get("/subscription", a.subscription)
 
 			// Lists
 			r.Get("/lists", a.listLists)
@@ -262,6 +264,127 @@ func (a *App) me(w http.ResponseWriter, r *http.Request) {
 	dataResp(w, http.StatusOK, user)
 }
 
+// enforceLimit resolves the caller's effective plan and refuses the create when
+// that plan's cap for the resource is already reached. It returns false after
+// having written the error response, so callers should `return` immediately.
+//
+// A refusal is reported as 402 Payment Required rather than a generic error:
+// the account is valid and the request is well formed, only the plan is too
+// small. That lets the client distinguish "upgrade to continue" from a bug.
+func (a *App) enforceLimit(w http.ResponseWriter, r *http.Request, resource plan.Resource) bool {
+	claims := auth.GetUser(r)
+
+	sub, err := a.store.GetSubscription(claims.UserID)
+	if err != nil {
+		log.Printf("get subscription for %s: %v", claims.UserID, err)
+		errResp(w, http.StatusInternalServerError, "failed to resolve plan")
+		return false
+	}
+
+	effective := plan.Effective(plan.Subscription{
+		Plan:      plan.Plan(sub.Plan),
+		Status:    sub.Status,
+		ExpiresAt: sub.ExpiresAt,
+	}, time.Now())
+
+	var current int
+	switch resource {
+	case plan.ResourceTask:
+		current, err = a.store.CountActiveTasks(claims.UserID)
+	case plan.ResourceList:
+		current, err = a.store.CountLists(claims.UserID)
+	case plan.ResourceTag:
+		current, err = a.store.CountTags(claims.UserID)
+	}
+	if err != nil {
+		log.Printf("count %s for %s: %v", resource, claims.UserID, err)
+		errResp(w, http.StatusInternalServerError, "failed to resolve usage")
+		return false
+	}
+
+	if err := plan.LimitsFor(effective).Check(effective, resource, current); err != nil {
+		var le *plan.LimitError
+		if errors.As(err, &le) {
+			errResp(w, http.StatusPaymentRequired, le.Error())
+			return false
+		}
+		log.Printf("check %s limit for %s: %v", resource, claims.UserID, err)
+		errResp(w, http.StatusInternalServerError, "failed to check plan limits")
+		return false
+	}
+	return true
+}
+
+// planView builds the entitlement payload the client uses to render the plan
+// badge, the caps and the remaining headroom for each resource.
+func (a *App) planView(userID string) (model.PlanView, error) {
+	sub, err := a.store.GetSubscription(userID)
+	if err != nil {
+		return model.PlanView{}, err
+	}
+	effective := plan.Effective(plan.Subscription{
+		Plan:      plan.Plan(sub.Plan),
+		Status:    sub.Status,
+		ExpiresAt: sub.ExpiresAt,
+	}, time.Now())
+	limits := plan.LimitsFor(effective)
+
+	tasks, err := a.store.CountActiveTasks(userID)
+	if err != nil {
+		return model.PlanView{}, err
+	}
+	lists, err := a.store.CountLists(userID)
+	if err != nil {
+		return model.PlanView{}, err
+	}
+	tags, err := a.store.CountTags(userID)
+	if err != nil {
+		return model.PlanView{}, err
+	}
+
+	remaining := map[string]int{
+		string(plan.ResourceTask): headroom(limits.MaxTasks, tasks),
+		string(plan.ResourceList): headroom(limits.MaxLists, lists),
+		string(plan.ResourceTag):  headroom(limits.MaxTags, tags),
+	}
+	return model.PlanView{
+		Plan: string(effective),
+		Limits: model.PlanLimits{
+			MaxTasks: limits.MaxTasks,
+			MaxLists: limits.MaxLists,
+			MaxTags:  limits.MaxTags,
+		},
+		Usage: model.PlanUsage{
+			ActiveTasks: tasks,
+			Lists:       lists,
+			Tags:        tags,
+		},
+		Upgrades: remaining,
+	}, nil
+}
+
+// headroom reports how much room is left before a cap, or -1 when uncapped.
+func headroom(limit, used int) int {
+	if limit == plan.Unlimited {
+		return plan.Unlimited
+	}
+	if remaining := limit - used; remaining > 0 {
+		return remaining
+	}
+	return 0
+}
+
+func (a *App) subscription(w http.ResponseWriter, r *http.Request) {
+	claims := auth.GetUser(r)
+	view, err := a.planView(claims.UserID)
+	if err != nil {
+		log.Printf("subscription error: %v", err)
+		errResp(w, http.StatusInternalServerError, "failed to resolve plan")
+		return
+	}
+	dataResp(w, http.StatusOK, view)
+}
+
 // --- lists ---
 
 func (a *App) listLists(w http.ResponseWriter, r *http.Request) {
@@ -286,6 +409,9 @@ func (a *App) createList(w http.ResponseWriter, r *http.Request) {
 	}
 	if strings.TrimSpace(l.Name) == "" {
 		errResp(w, http.StatusBadRequest, "name is required")
+		return
+	}
+	if !a.enforceLimit(w, r, plan.ResourceList) {
 		return
 	}
 	created, err := a.store.CreateTaskList(claims.UserID, l)
@@ -359,6 +485,9 @@ func (a *App) createTask(w http.ResponseWriter, r *http.Request) {
 	}
 	if strings.TrimSpace(t.Title) == "" {
 		errResp(w, http.StatusBadRequest, "title is required")
+		return
+	}
+	if !a.enforceLimit(w, r, plan.ResourceTask) {
 		return
 	}
 	created, err := a.store.CreateTask(claims.UserID, t)
@@ -543,6 +672,9 @@ func (a *App) createTag(w http.ResponseWriter, r *http.Request) {
 	}
 	if strings.TrimSpace(t.Name) == "" {
 		errResp(w, http.StatusBadRequest, "name is required")
+		return
+	}
+	if !a.enforceLimit(w, r, plan.ResourceTag) {
 		return
 	}
 	created, err := a.store.CreateTag(claims.UserID, t)

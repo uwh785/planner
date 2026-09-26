@@ -105,6 +105,14 @@ func main() {
 		`CREATE INDEX IF NOT EXISTS idx_class_sessions_user_day ON class_sessions(user_id, day_of_week)`,
 		`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS due_all_day BOOLEAN NOT NULL DEFAULT false`,
 		`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS elapsed_ms BIGINT NOT NULL DEFAULT 0`,
+		`CREATE TABLE IF NOT EXISTS subscription (
+			user_id    TEXT PRIMARY KEY REFERENCES app_users(user_id) ON DELETE CASCADE,
+			plan       TEXT NOT NULL DEFAULT 'free' CHECK (plan IN ('free', 'pro')),
+			status     TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'cancelled', 'expired')),
+			started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			expires_at TIMESTAMPTZ,
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+		)`,
 	}
 
 	for i, m := range migrations {
