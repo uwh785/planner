@@ -20,7 +20,12 @@
   let interval;
 
   $effect(() => {
-    if (task.status === 'in_progress' && task.started_at && task.duration_ms) {
+    if (!task.duration_ms) {
+      progress = task.status === 'completed' ? 1 : 0;
+      remaining = 0;
+      return;
+    }
+    if (task.status === 'in_progress' && task.started_at) {
       const update = () => {
         progress = getProgressPercent(task);
         remaining = getRemainingMs(task);
@@ -28,13 +33,11 @@
       update();
       interval = setInterval(update, 1000);
       return () => clearInterval(interval);
-    } else if (task.duration_ms && task.started_at) {
-      progress = getProgressPercent(task);
-      remaining = getRemainingMs(task);
-    } else {
-      progress = task.status === 'completed' ? 1 : 0;
-      remaining = task.duration_ms || 0;
     }
+    // Paused (elapsed_ms accumulated, no started_at) or never started:
+    // frozen countdown, no ticking interval.
+    progress = getProgressPercent(task);
+    remaining = getRemainingMs(task);
   });
 
   const priorityLabel = $derived(() => {

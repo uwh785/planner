@@ -245,7 +245,7 @@ func (s *Store) ListTasks(userID string, filters TaskFilters, limit, offset int)
 	selectQuery := fmt.Sprintf(`
 		SELECT t.user_id, t.list_id, t.task_id, t.title, t.description,
 		       t.priority, t.status, t.due_date, t.due_all_day, t.duration_ms, t.started_at,
-		       t.completed_at, t.sort_order, t.updated_at,
+		       t.elapsed_ms, t.completed_at, t.sort_order, t.updated_at,
 		       l.name, l.color
 		FROM tasks t
 		LEFT JOIN task_lists l ON l.user_id = t.user_id AND l.list_id = t.list_id
@@ -270,7 +270,7 @@ func (s *Store) ListTasks(userID string, filters TaskFilters, limit, offset int)
 		if err := rows.Scan(
 			&t.UserID, &t.ListID, &t.TaskID, &t.Title, &t.Description,
 			&t.Priority, &t.Status, &t.DueDate, &t.DueAllDay, &t.DurationMs, &t.StartedAt,
-			&t.CompletedAt, &t.SortOrder, &t.UpdatedAt,
+			&t.ElapsedMs, &t.CompletedAt, &t.SortOrder, &t.UpdatedAt,
 			&t.ListName, &t.ListColor,
 		); err != nil {
 			return nil, 0, err
@@ -285,7 +285,7 @@ func (s *Store) GetTask(userID, taskID string) (model.Task, error) {
 	err := s.pool.QueryRow(context.Background(),
 		`SELECT t.user_id, t.list_id, t.task_id, t.title, t.description,
 		        t.priority, t.status, t.due_date, t.due_all_day, t.duration_ms, t.started_at,
-		        t.completed_at, t.sort_order, t.updated_at,
+		        t.elapsed_ms, t.completed_at, t.sort_order, t.updated_at,
 		        l.name, l.color
 		 FROM tasks t
 		 LEFT JOIN task_lists l ON l.user_id = t.user_id AND l.list_id = t.list_id
@@ -293,7 +293,7 @@ func (s *Store) GetTask(userID, taskID string) (model.Task, error) {
 		userID, taskID,
 	).Scan(&t.UserID, &t.ListID, &t.TaskID, &t.Title, &t.Description,
 		&t.Priority, &t.Status, &t.DueDate, &t.DueAllDay, &t.DurationMs, &t.StartedAt,
-		&t.CompletedAt, &t.SortOrder, &t.UpdatedAt,
+		&t.ElapsedMs, &t.CompletedAt, &t.SortOrder, &t.UpdatedAt,
 		&t.ListName, &t.ListColor)
 	return t, err
 }
@@ -390,13 +390,18 @@ func (s *Store) StartTask(userID, taskID string) error {
 	return nil
 }
 
-// PauseTask transitions a task from in_progress back to pending. It returns
-// ErrNotFound if the task does not exist, or ErrInvalidTransition if it
-// exists but is not in_progress.
+// PauseTask transitions a task from in_progress back to pending. The
+// just-run segment (now - started_at) is added to the accumulated
+// elapsed_ms and started_at is cleared, so the paused state is unambiguous
+// and a later StartTask resumes the countdown instead of restarting it. It
+// returns ErrNotFound if the task does not exist, or ErrInvalidTransition if
+// it exists but is not in_progress.
 func (s *Store) PauseTask(userID, taskID string) error {
 	now := time.Now().UnixMilli()
 	tag, err := s.pool.Exec(context.Background(),
-		`UPDATE tasks SET status = 'pending', updated_at = $3
+		`UPDATE tasks SET status = 'pending', updated_at = $3,
+		        elapsed_ms = elapsed_ms + ($3 - COALESCE(started_at, $3)),
+		        started_at = NULL
 		 WHERE user_id = $1 AND task_id = $2 AND deleted = 0 AND status = 'in_progress'`,
 		userID, taskID, now,
 	)
@@ -410,12 +415,17 @@ func (s *Store) PauseTask(userID, taskID string) error {
 }
 
 // CompleteTask transitions a task from pending or in_progress to completed.
-// It returns ErrNotFound if the task does not exist, or
+// If it was in_progress, the just-run segment (now - started_at) is added
+// to elapsed_ms and started_at is cleared, exactly as PauseTask does; a
+// completion from pending leaves the already-accumulated elapsed_ms
+// untouched. It returns ErrNotFound if the task does not exist, or
 // ErrInvalidTransition if it exists but is already completed.
 func (s *Store) CompleteTask(userID, taskID string) error {
 	now := time.Now().UnixMilli()
 	tag, err := s.pool.Exec(context.Background(),
-		`UPDATE tasks SET status = 'completed', completed_at = $3, updated_at = $4
+		`UPDATE tasks SET status = 'completed', completed_at = $3, updated_at = $4,
+		        elapsed_ms = elapsed_ms + CASE WHEN status = 'in_progress' THEN $3 - COALESCE(started_at, $3) ELSE 0 END,
+		        started_at = NULL
 		 WHERE user_id = $1 AND task_id = $2 AND deleted = 0 AND status IN ('pending', 'in_progress')`,
 		userID, taskID, now, now,
 	)

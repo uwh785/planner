@@ -135,16 +135,28 @@ export function groupTasksByDay(tasksList, nowMs = Date.now()) {
   return groups;
 }
 
-export function getProgressPercent(task) {
-  if (!task.duration_ms || !task.started_at) return 0;
-  const elapsed = Date.now() - task.started_at;
-  return Math.min(elapsed / task.duration_ms, 1);
+// getElapsedMs returns how much of a task's countdown has run so far: the
+// accumulated elapsed_ms from previous in_progress segments (persisted by
+// the backend on pause/complete), plus the current running segment
+// (now - started_at) when the task is actively in_progress. A paused task
+// (no started_at) has no running segment, so this stays frozen at its
+// accumulated value.
+export function getElapsedMs(task, nowMs = Date.now()) {
+  const base = task.elapsed_ms || 0;
+  if (task.status === 'in_progress' && task.started_at) {
+    return base + Math.max(nowMs - task.started_at, 0);
+  }
+  return base;
 }
 
-export function getRemainingMs(task) {
-  if (!task.duration_ms || !task.started_at) return task.duration_ms || 0;
-  const elapsed = Date.now() - task.started_at;
-  return Math.max(task.duration_ms - elapsed, 0);
+export function getProgressPercent(task, nowMs = Date.now()) {
+  if (!task.duration_ms) return 0;
+  return Math.min(getElapsedMs(task, nowMs) / task.duration_ms, 1);
+}
+
+export function getRemainingMs(task, nowMs = Date.now()) {
+  if (!task.duration_ms) return 0;
+  return Math.max(task.duration_ms - getElapsedMs(task, nowMs), 0);
 }
 
 export function minutesToTime(minutes) {

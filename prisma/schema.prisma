@@ -54,6 +54,7 @@ model Task {
   due_all_day  Boolean  @default(false)
   duration_ms  BigInt?
   started_at   BigInt?
+  elapsed_ms   BigInt   @default(0)
   completed_at BigInt?
   sort_order   Int      @default(0)
   updated_at   BigInt   @default(0)

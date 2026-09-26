@@ -41,6 +41,7 @@ type Task struct {
 	DueAllDay   bool           `json:"due_all_day"`
 	DurationMs  *int64         `json:"duration_ms"`
 	StartedAt   *int64         `json:"started_at"`
+	ElapsedMs   int64          `json:"elapsed_ms"`
 	CompletedAt *int64         `json:"completed_at"`
 	SortOrder   int            `json:"sort_order"`
 	UpdatedAt   int64          `json:"updated_at"`
