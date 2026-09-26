@@ -149,12 +149,17 @@ export function getElapsedMs(task, nowMs = Date.now()) {
   return base;
 }
 
+// A completed task always shows full progress and zero remaining time,
+// regardless of duration_ms/elapsed_ms (e.g. completed straight from
+// pending, before any time elapsed).
 export function getProgressPercent(task, nowMs = Date.now()) {
+  if (task.status === 'completed') return 1;
   if (!task.duration_ms) return 0;
   return Math.min(getElapsedMs(task, nowMs) / task.duration_ms, 1);
 }
 
 export function getRemainingMs(task, nowMs = Date.now()) {
+  if (task.status === 'completed') return 0;
   if (!task.duration_ms) return 0;
   return Math.max(task.duration_ms - getElapsedMs(task, nowMs), 0);
 }

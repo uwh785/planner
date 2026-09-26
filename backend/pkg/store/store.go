@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"planner/pkg/model"
@@ -361,13 +362,18 @@ func (s *Store) DeleteTask(userID, taskID string) error {
 
 // taskTransitionError distinguishes a missing (unknown, deleted, or
 // other-user) task from an invalid state transition after a conditional
-// state-changing UPDATE affected zero rows. It mirrors how the rest of the
-// package (e.g. GetTask) treats any lookup error as "not found".
+// state-changing UPDATE affected zero rows. Only a genuine "no rows" lookup
+// becomes ErrNotFound; any other GetTask failure (e.g. a lost connection) is
+// returned as-is so the caller reports it as a server error, not a 404.
 func (s *Store) taskTransitionError(userID, taskID string) error {
-	if _, err := s.GetTask(userID, taskID); err != nil {
+	_, err := s.GetTask(userID, taskID)
+	if err == nil {
+		return ErrInvalidTransition
+	}
+	if errors.Is(err, pgx.ErrNoRows) {
 		return ErrNotFound
 	}
-	return ErrInvalidTransition
+	return err
 }
 
 // StartTask transitions a task from pending to in_progress, recording the
