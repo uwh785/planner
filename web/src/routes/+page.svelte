@@ -1,190 +1,424 @@
 <script>
   import { goto } from '$app/navigation';
-  import { A, setToken, api } from '$lib/api.svelte.js';
+  import { A } from '$lib/api.svelte.js';
   import { locale, t } from '$lib/i18n.svelte.js';
+  import { onMount } from 'svelte';
+  import { ListTodo, Timer, ListChecks, Tags, CalendarDays, LayoutDashboard, Check } from '@lucide/svelte';
 
-  let isLogin = $state(true);
-  let email = $state('');
-  let password = $state('');
-  let error = $state('');
-  let loading = $state(false);
+  let ready = $state(false);
 
-  $effect(() => {
+  onMount(() => {
     if (A.token) goto('/dashboard');
+    else ready = true;
   });
 
-  async function handleSubmit() {
-    error = '';
-    loading = true;
-    try {
-      const path = isLogin ? '/api/auth/login' : '/api/auth/register';
-      const body = { email, password };
-      const res = await api(path, { method: 'POST', body });
-      setToken(res.token);
-      A.user = res.user ?? null;
-      goto('/dashboard');
-    } catch (e) {
-      error = e.message;
-    } finally {
-      loading = false;
-    }
-  }
+  const features = [
+    { icon: ListTodo, title: 'landingFeatTasksTitle', desc: 'landingFeatTasksDesc' },
+    { icon: Timer, title: 'landingFeatTimerTitle', desc: 'landingFeatTimerDesc' },
+    { icon: ListChecks, title: 'landingFeatSubtasksTitle', desc: 'landingFeatSubtasksDesc' },
+    { icon: Tags, title: 'landingFeatTagsTitle', desc: 'landingFeatTagsDesc' },
+    { icon: CalendarDays, title: 'landingFeatCalendarTitle', desc: 'landingFeatCalendarDesc' },
+    { icon: LayoutDashboard, title: 'landingFeatDashboardTitle', desc: 'landingFeatDashboardDesc' }
+  ];
 
-  function toggleMode() {
-    isLogin = !isLogin;
-    error = '';
-  }
+  const plans = [
+    { name: 'Free', price: '$0', period: 'landingPlanFreePeriod', features: 'landingPlanFreeFeatures', cta: 'landingPlanFreeCta', primary: false },
+    { name: 'Pro', price: '$9.99', period: 'landingPlanProPeriod', features: 'landingPlanProFeatures', cta: 'landingPlanProCta', primary: true }
+  ];
 
   function toggleLang() {
     locale.value = locale.value === 'es' ? 'en' : 'es';
   }
 </script>
 
-<div class="auth-page">
-  <div class="auth-card">
-    <div class="auth-header">
-      <h1>{t('appName')}</h1>
-      <p>{isLogin ? t('loginTitle') : t('registerTitle')}</p>
-    </div>
+<svelte:head>
+  <title>{t('appName')}</title>
+  <meta name="description" content={t('landingHeroSubtitle')} />
+</svelte:head>
 
-    <form onsubmit={e => { e.preventDefault(); handleSubmit(); }}>
-      <div class="form-group">
-        <label for="email">{t('loginEmail')}</label>
-        <input id="email" type="email" bind:value={email} required />
+{#if ready}
+  <div class="landing">
+    <nav class="landing-nav">
+      <a href="/" class="brand">
+        <span class="brand-mark">P</span>
+        <span class="brand-name">{t('appName')}</span>
+      </a>
+      <div class="nav-actions">
+        <a href="#features" class="nav-link">{t('landingNavFeatures')}</a>
+        <a href="#pricing" class="nav-link">{t('landingNavPricing')}</a>
+        <button class="nav-lang" onclick={toggleLang}>{locale.value.toUpperCase()}</button>
+        <a href="/login" class="btn btn-primary nav-login">{t('loginTitle')}</a>
       </div>
+    </nav>
 
-      <div class="form-group">
-        <label for="password">{t('loginPassword')}</label>
-        <input id="password" type="password" bind:value={password} required />
+    <section class="hero">
+      <h1 class="hero-title">
+        {t('landingHeroTitle')}<br />
+        <span class="highlight">{t('landingHeroHighlight')}</span>
+      </h1>
+      <p class="hero-subtitle">{t('landingHeroSubtitle')}</p>
+      <div class="hero-actions">
+        <a href="/login" class="btn btn-primary cta">{t('landingCtaStart')}</a>
+        <a href="#features" class="btn btn-outline cta">{t('landingCtaFeatures')}</a>
       </div>
+    </section>
 
-      {#if error}
-        <p class="error">{error}</p>
-      {/if}
+    <section id="features" class="features">
+      <h2 class="section-title">{t('landingFeaturesTitle')}</h2>
+      <p class="section-subtitle">{t('landingFeaturesSubtitle')}</p>
+      <div class="feature-grid">
+        {#each features as f}
+          <article class="card feature">
+            <div class="feature-icon">
+              <f.icon size={20} />
+            </div>
+            <h3 class="feature-title">{t(f.title)}</h3>
+            <p class="feature-desc">{t(f.desc)}</p>
+          </article>
+        {/each}
+      </div>
+    </section>
 
-      <button type="submit" class="btn-primary" disabled={loading}>
-        {loading ? '...' : (isLogin ? t('loginButton') : t('registerButton'))}
-      </button>
-    </form>
+    <section id="pricing" class="pricing">
+      <h2 class="section-title">{t('landingPricingTitle')}</h2>
+      <p class="section-subtitle">{t('landingPricingSubtitle')}</p>
+      <div class="plan-grid">
+        {#each plans as plan}
+          <article class="card plan" class:plan-primary={plan.primary}>
+            {#if plan.primary}
+              <span class="plan-badge">{t('landingPlanPopular')}</span>
+            {/if}
+            <p class="plan-name">{plan.name}</p>
+            <p class="plan-price">{plan.price}</p>
+            <p class="plan-period">{t(plan.period)}</p>
+            <ul class="plan-features">
+              {#each t(plan.features) as feat}
+                <li><Check size={16} class="plan-check" /> {feat}</li>
+              {/each}
+            </ul>
+            <a href="/login" class="btn cta {plan.primary ? 'btn-primary' : 'btn-outline'}">{t(plan.cta)}</a>
+          </article>
+        {/each}
+      </div>
+    </section>
 
-    <div class="auth-footer">
-      <button class="link-btn" onclick={toggleMode}>
-        {isLogin ? t('loginNoAccount') + ' ' + t('loginRegister') : t('registerHasAccount') + ' ' + t('registerLogin')}
-      </button>
-      <button class="link-btn" onclick={toggleLang}>
-        {locale.value.toUpperCase()}
-      </button>
-    </div>
+    <section class="final">
+      <h2 class="section-title">{t('landingFinalTitle')}</h2>
+      <p class="section-subtitle">{t('landingFinalSubtitle')}</p>
+      <div class="hero-actions">
+        <a href="/login" class="btn btn-primary cta">{t('landingCtaStart')}</a>
+        <a href="#pricing" class="btn btn-outline cta">{t('landingNavPricing')}</a>
+      </div>
+    </section>
+
+    <footer class="landing-footer">
+      <p>&copy; {new Date().getFullYear()} {t('appName')}. {t('landingRights')}</p>
+    </footer>
   </div>
-</div>
+{/if}
 
 <style>
-  .auth-page {
+  .landing {
     min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .landing-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    color: var(--text);
+  }
+
+  .brand:hover { text-decoration: none; }
+
+  .brand-mark {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 20px;
-  }
-
-  .auth-card {
-    width: 100%;
-    max-width: 380px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 32px;
-  }
-
-  .auth-header {
-    text-align: center;
-    margin-bottom: 28px;
-  }
-
-  .auth-header h1 {
-    font-size: 28px;
+    font-size: 14px;
     font-weight: 700;
-    margin-bottom: 8px;
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
   }
 
-  .auth-header p {
-    color: var(--text2);
-    font-size: 15px;
+  .brand-name {
+    display: none;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
   }
 
-  .form-group {
-    margin-bottom: 16px;
-  }
-
-  label {
-    display: block;
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--text2);
-    margin-bottom: 6px;
-  }
-
-  input {
-    width: 100%;
-    padding: 10px 12px;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    color: var(--text);
-    font-size: 15px;
-    outline: none;
-  }
-
-  input:focus {
-    border-color: var(--accent);
-  }
-
-  .error {
-    color: var(--red);
-    font-size: 13px;
-    margin-bottom: 12px;
-    text-align: center;
-  }
-
-  .btn-primary {
-    width: 100%;
-    padding: 12px;
-    background: var(--accent);
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-size: 15px;
-    font-weight: 600;
-    cursor: pointer;
-    margin-top: 8px;
-  }
-
-  .btn-primary:hover {
-    opacity: 0.9;
-  }
-
-  .btn-primary:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  .auth-footer {
-    margin-top: 20px;
-    text-align: center;
+  .nav-actions {
     display: flex;
-    flex-direction: column;
+    align-items: center;
     gap: 8px;
   }
 
-  .link-btn {
-    background: none;
-    border: none;
-    color: var(--accent);
+  .nav-link {
+    display: none;
     font-size: 14px;
+    color: var(--text2);
+    text-decoration: none;
+  }
+
+  .nav-lang {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text2);
+    background: transparent;
+    border: 1px solid var(--border);
     cursor: pointer;
   }
 
-  .link-btn:hover {
-    text-decoration: underline;
+  .nav-login {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .hero {
+    text-align: center;
+    padding: 56px 16px;
+    max-width: 640px;
+    margin: 0 auto;
+  }
+
+  .hero-title {
+    font-size: 34px;
+    font-weight: 800;
+    line-height: 1.15;
+    letter-spacing: -0.8px;
+    margin-bottom: 16px;
+  }
+
+  .highlight { color: var(--accent); }
+
+  .hero-subtitle {
+    font-size: 17px;
+    color: var(--text2);
+    margin-bottom: 32px;
+  }
+
+  .hero-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .cta {
+    min-height: 48px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+  }
+
+  .cta:hover { text-decoration: none; }
+
+  .btn-outline {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+
+  .features {
+    padding: 48px 16px;
+    max-width: 1000px;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  .section-title {
+    font-size: 26px;
+    font-weight: 800;
+    text-align: center;
+    letter-spacing: -0.5px;
+    margin-bottom: 8px;
+  }
+
+  .section-subtitle {
+    text-align: center;
+    color: var(--text2);
+    margin-bottom: 32px;
+  }
+
+  .feature-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .feature { padding: 24px; }
+
+  .feature-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 16px;
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+  }
+
+  .feature-title {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  .feature-desc {
+    font-size: 14px;
+    color: var(--text2);
+  }
+
+  .pricing {
+    padding: 48px 16px;
+    max-width: 760px;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  .plan-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+
+  .plan {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    padding: 32px 24px;
+    text-align: center;
+  }
+
+  .plan-primary {
+    border-color: var(--accent);
+    background: linear-gradient(to bottom, color-mix(in srgb, var(--accent) 8%, var(--surface)), var(--surface));
+  }
+
+  .plan-badge {
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 2px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    color: white;
+    background: var(--accent);
+  }
+
+  .plan-name {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text2);
+    margin-bottom: 8px;
+  }
+
+  .plan-price {
+    font-size: 40px;
+    font-weight: 800;
+    letter-spacing: -1px;
+    line-height: 1.1;
+  }
+
+  .plan-period {
+    font-size: 14px;
+    color: var(--text2);
+    margin-bottom: 24px;
+  }
+
+  .plan-features {
+    list-style: none;
+    text-align: left;
+    font-size: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 32px;
+    flex: 1;
+  }
+
+  .plan-features li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .plan-features :global(.plan-check) {
+    color: var(--accent);
+    flex-shrink: 0;
+  }
+
+  .final {
+    padding: 48px 16px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+  }
+
+  .final .hero-actions {
+    max-width: 420px;
+    margin: 0 auto;
+  }
+
+  .landing-footer {
+    margin-top: auto;
+    text-align: center;
+    padding: 24px 16px;
+    border-top: 1px solid var(--border);
+    font-size: 13px;
+    color: var(--text2);
+  }
+
+  @media (min-width: 640px) {
+    .landing-nav { padding: 8px 24px; }
+    .brand-name { display: inline; }
+    .nav-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 44px;
+      padding: 0 8px;
+    }
+    .hero { padding: 88px 24px; }
+    .hero-title { font-size: 48px; }
+    .hero-subtitle { font-size: 19px; }
+    .hero-actions {
+      flex-direction: row;
+      justify-content: center;
+    }
+    .cta { padding: 0 28px; }
+    .feature-grid { grid-template-columns: repeat(2, 1fr); }
+    .plan-grid { grid-template-columns: repeat(2, 1fr); }
+    .section-title { font-size: 30px; }
+  }
+
+  @media (min-width: 960px) {
+    .feature-grid { grid-template-columns: repeat(3, 1fr); }
   }
 </style>

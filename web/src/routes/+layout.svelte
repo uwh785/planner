@@ -24,7 +24,9 @@
   ]);
 
   let currentPath = $derived($page.url.pathname);
-  let showNav = $derived(A.token && currentPath !== '/' && currentPath !== '/register');
+  const bareRoutes = ['/', '/login'];
+  let showNav = $derived(A.token && !bareRoutes.includes(currentPath));
+  let fullBleed = $derived(currentPath === '/');
 
   function handleLogout() {
     setToken('');
@@ -73,7 +75,7 @@
   </nav>
 {/if}
 
-<main class:has-nav={showNav}>
+<main class:has-nav={showNav} class:full={fullBleed}>
   {@render children()}
 </main>
 
@@ -210,6 +212,11 @@
   main.has-nav {
     padding-top: 76px;
     padding-bottom: calc(76px + env(safe-area-inset-bottom));
+  }
+
+  main.full {
+    max-width: none;
+    padding: 0;
   }
 
   @media (min-width: 640px) {
