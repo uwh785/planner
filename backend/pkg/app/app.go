@@ -405,10 +405,29 @@ func (a *App) deleteTask(w http.ResponseWriter, r *http.Request) {
 	dataResp(w, http.StatusOK, map[string]string{"message": "deleted"})
 }
 
+// taskTransitionErrResp maps a task state-transition error to the matching
+// HTTP response: 404 for a missing task, 409 for a valid task in the wrong
+// state to transition, 500 otherwise. It returns true if it wrote a
+// response (i.e. err was non-nil).
+func taskTransitionErrResp(w http.ResponseWriter, err error, failMsg string) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, store.ErrNotFound) {
+		errResp(w, http.StatusNotFound, "task not found")
+		return true
+	}
+	if errors.Is(err, store.ErrInvalidTransition) {
+		errResp(w, http.StatusConflict, "task cannot transition from its current status")
+		return true
+	}
+	errResp(w, http.StatusInternalServerError, failMsg)
+	return true
+}
+
 func (a *App) startTask(w http.ResponseWriter, r *http.Request) {
 	claims := auth.GetUser(r)
-	if err := a.store.StartTask(claims.UserID, chi.URLParam(r, "id")); err != nil {
-		errResp(w, http.StatusInternalServerError, "failed to start task")
+	if err := a.store.StartTask(claims.UserID, chi.URLParam(r, "id")); taskTransitionErrResp(w, err, "failed to start task") {
 		return
 	}
 	dataResp(w, http.StatusOK, map[string]string{"status": "in_progress"})
@@ -416,8 +435,7 @@ func (a *App) startTask(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) pauseTask(w http.ResponseWriter, r *http.Request) {
 	claims := auth.GetUser(r)
-	if err := a.store.PauseTask(claims.UserID, chi.URLParam(r, "id")); err != nil {
-		errResp(w, http.StatusInternalServerError, "failed to pause task")
+	if err := a.store.PauseTask(claims.UserID, chi.URLParam(r, "id")); taskTransitionErrResp(w, err, "failed to pause task") {
 		return
 	}
 	dataResp(w, http.StatusOK, map[string]string{"status": "pending"})
@@ -425,8 +443,7 @@ func (a *App) pauseTask(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) completeTask(w http.ResponseWriter, r *http.Request) {
 	claims := auth.GetUser(r)
-	if err := a.store.CompleteTask(claims.UserID, chi.URLParam(r, "id")); err != nil {
-		errResp(w, http.StatusInternalServerError, "failed to complete task")
+	if err := a.store.CompleteTask(claims.UserID, chi.URLParam(r, "id")); taskTransitionErrResp(w, err, "failed to complete task") {
 		return
 	}
 	dataResp(w, http.StatusOK, map[string]string{"status": "completed"})

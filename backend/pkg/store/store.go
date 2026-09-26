@@ -18,6 +18,11 @@ import (
 // by user_id when no matching row was affected.
 var ErrNotFound = errors.New("not found")
 
+// ErrInvalidTransition is returned by task state-transition methods
+// (StartTask, PauseTask, CompleteTask) when the task exists but is not in a
+// status the requested transition allows.
+var ErrInvalidTransition = errors.New("invalid transition")
+
 type Store struct {
 	pool *pgxpool.Pool
 }
@@ -354,34 +359,73 @@ func (s *Store) DeleteTask(userID, taskID string) error {
 	return err
 }
 
+// taskTransitionError distinguishes a missing (unknown, deleted, or
+// other-user) task from an invalid state transition after a conditional
+// state-changing UPDATE affected zero rows. It mirrors how the rest of the
+// package (e.g. GetTask) treats any lookup error as "not found".
+func (s *Store) taskTransitionError(userID, taskID string) error {
+	if _, err := s.GetTask(userID, taskID); err != nil {
+		return ErrNotFound
+	}
+	return ErrInvalidTransition
+}
+
+// StartTask transitions a task from pending to in_progress, recording the
+// current time as started_at. It returns ErrNotFound if the task does not
+// exist (unknown ID, deleted, or belongs to another user), or
+// ErrInvalidTransition if it exists but is not pending.
 func (s *Store) StartTask(userID, taskID string) error {
 	now := time.Now().UnixMilli()
-	_, err := s.pool.Exec(context.Background(),
+	tag, err := s.pool.Exec(context.Background(),
 		`UPDATE tasks SET status = 'in_progress', started_at = $3, updated_at = $4
-		 WHERE user_id = $1 AND task_id = $2 AND deleted = 0`,
+		 WHERE user_id = $1 AND task_id = $2 AND deleted = 0 AND status = 'pending'`,
 		userID, taskID, now, now,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return s.taskTransitionError(userID, taskID)
+	}
+	return nil
 }
 
+// PauseTask transitions a task from in_progress back to pending. It returns
+// ErrNotFound if the task does not exist, or ErrInvalidTransition if it
+// exists but is not in_progress.
 func (s *Store) PauseTask(userID, taskID string) error {
 	now := time.Now().UnixMilli()
-	_, err := s.pool.Exec(context.Background(),
+	tag, err := s.pool.Exec(context.Background(),
 		`UPDATE tasks SET status = 'pending', updated_at = $3
-		 WHERE user_id = $1 AND task_id = $2 AND deleted = 0`,
+		 WHERE user_id = $1 AND task_id = $2 AND deleted = 0 AND status = 'in_progress'`,
 		userID, taskID, now,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return s.taskTransitionError(userID, taskID)
+	}
+	return nil
 }
 
+// CompleteTask transitions a task from pending or in_progress to completed.
+// It returns ErrNotFound if the task does not exist, or
+// ErrInvalidTransition if it exists but is already completed.
 func (s *Store) CompleteTask(userID, taskID string) error {
 	now := time.Now().UnixMilli()
-	_, err := s.pool.Exec(context.Background(),
+	tag, err := s.pool.Exec(context.Background(),
 		`UPDATE tasks SET status = 'completed', completed_at = $3, updated_at = $4
-		 WHERE user_id = $1 AND task_id = $2 AND deleted = 0`,
+		 WHERE user_id = $1 AND task_id = $2 AND deleted = 0 AND status IN ('pending', 'in_progress')`,
 		userID, taskID, now, now,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return s.taskTransitionError(userID, taskID)
+	}
+	return nil
 }
 
 // ──────────────────────────── Subtasks ───────────────────────
