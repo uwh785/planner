@@ -197,6 +197,30 @@ export function mondayIndexToDow(index) {
   return (index + 1) % 7;
 }
 
+// Subjects are compared through this key, never displayed through it. The
+// server stores them upper-cased but keeps the accents, so folding is what
+// lets "FISICA" find "Física" and inherit its teacher and color. NFD splits
+// "Í" into "I" plus a combining acute, and those marks are then dropped --
+// NFD alone is not a fold, it only makes the string longer.
+export function normalizeSubject(subject) {
+  return (subject || '')
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+export function buildSubjectCatalog(classes) {
+  const catalog = new Map();
+  for (const c of Array.isArray(classes) ? classes : []) {
+    const key = normalizeSubject(c.subject);
+    if (key && !catalog.has(key)) {
+      catalog.set(key, { subject: c.subject, teacher: c.teacher || '', color: c.color || '' });
+    }
+  }
+  return catalog;
+}
+
 export function splitTodayClasses(classes, nowMinute) {
   const list = Array.isArray(classes) ? classes : [];
   let current = null;

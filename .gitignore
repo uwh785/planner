@@ -43,6 +43,7 @@ pnpm-debug.log*
 playwright-report/
 test-results/
 .codegraph/
+.atl/
 
 # --- Editors & OS ---
 .vscode/*

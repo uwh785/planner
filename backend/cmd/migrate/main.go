@@ -113,6 +113,50 @@ func main() {
 			expires_at TIMESTAMPTZ,
 			updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 		)`,
+		// Subjects are written upper-cased by model.ValidateClassSession, so
+		// rows written before that rule are normalized here. Both statements are
+		// written to be no-ops once the data already matches, because this file
+		// replays every statement on every run.
+		`UPDATE class_sessions
+		    SET subject = upper(btrim(subject))
+		  WHERE deleted = 0
+		    AND subject IS DISTINCT FROM upper(btrim(subject))`,
+		// Collapses accent variants of the same course ("FISICA" / "FÍSICA")
+		// into one spelling per user, preferring the accented one so the
+		// timetable keeps reading correctly. Scoped to user_id: two people may
+		// of course have subjects with the same name.
+		//
+		// normalize(..., NFKD) decomposes "Í" into "I" plus a combining acute;
+		// it does not remove it, so the marks are stripped explicitly. Postgres
+		// regexes take the \u0300 escape directly -- the U&'...' string
+		// syntax does not work inside a character class.
+		//
+		// This cannot invent a missing accent on a subject that only exists in
+		// one spelling ("MATEMATICA" stays as-is): only a variant the user
+		// actually wrote can win.
+		`WITH variants AS (
+		    SELECT user_id,
+		           subject,
+		           upper(regexp_replace(normalize(subject, NFKD), '[\u0300-\u036f]', '', 'g')) AS fold_key,
+		           (regexp_replace(normalize(subject, NFKD), '[\u0300-\u036f]', '', 'g') <> subject) AS has_diacritics,
+		           count(*) AS uses
+		      FROM class_sessions
+		     WHERE deleted = 0
+		     GROUP BY user_id, subject
+		 ),
+		 canonical AS (
+		    SELECT DISTINCT ON (user_id, fold_key)
+		           user_id, fold_key, subject AS winner
+		      FROM variants
+		     ORDER BY user_id, fold_key, has_diacritics DESC, uses DESC, subject
+		 )
+		 UPDATE class_sessions c
+		    SET subject = k.winner
+		   FROM canonical k
+		  WHERE c.user_id = k.user_id
+		    AND c.deleted = 0
+		    AND upper(regexp_replace(normalize(c.subject, NFKD), '[\u0300-\u036f]', '', 'g')) = k.fold_key
+		    AND c.subject IS DISTINCT FROM k.winner`,
 	}
 
 	for i, m := range migrations {

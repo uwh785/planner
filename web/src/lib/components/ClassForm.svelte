@@ -1,12 +1,13 @@
 <script>
   import { t } from '$lib/i18n.svelte.js';
-  import { minutesToTime, timeToMinutes } from '$lib/utils.js';
+  import { minutesToTime, timeToMinutes, normalizeSubject } from '$lib/utils.js';
   import { Trash2 } from '@lucide/svelte';
   import { untrack } from 'svelte';
 
   let {
     cls = null,
     defaultDayOfWeek = 1,
+    subjectCatalog = new Map(),
     serverError = '',
     onsubmit,
     oncancel,
@@ -24,7 +25,24 @@
   let color = $state(untrack(() => cls?.color || SWATCHES[0]));
   let clientError = $state('');
 
+  // Editing starts with the class's own teacher and color, so they count as
+  // already owned by the user and the inheritance below must not overwrite them.
+  let teacherEdited = $state(!!cls);
+  let colorEdited = $state(!!cls);
+  let inherited = $state(false);
+
   const dayOptions = $derived(t('scheduleDayNames').map((name, i) => ({ value: (i + 1) % 7, label: name })));
+  const subjectMatch = $derived(subjectCatalog.get(normalizeSubject(subject)));
+
+  $effect(() => {
+    if (!subjectMatch) {
+      inherited = false;
+      return;
+    }
+    if (!teacherEdited) teacher = subjectMatch.teacher;
+    if (!colorEdited) color = subjectMatch.color;
+    inherited = !teacherEdited && !colorEdited;
+  });
 
   function handleSubmit() {
     clientError = '';
@@ -54,7 +72,23 @@
 
   <div class="form-group">
     <label for="subject">{t('scheduleSubject')}</label>
-    <input id="subject" type="text" bind:value={subject} placeholder={t('scheduleSubject')} required />
+    <input
+      id="subject"
+      type="text"
+      bind:value={subject}
+      placeholder={t('scheduleSubject')}
+      list="subject-suggestions"
+      autocomplete="off"
+      required
+    />
+    <datalist id="subject-suggestions">
+      {#each [...subjectCatalog.values()] as known (known.subject)}
+        <option value={known.subject}></option>
+      {/each}
+    </datalist>
+    {#if inherited}
+      <p class="form-hint">{t('scheduleSubjectInherited')}</p>
+    {/if}
   </div>
 
   <div class="form-group">
@@ -84,7 +118,13 @@
     </div>
     <div class="form-group">
       <label for="teacher">{t('scheduleTeacher')}</label>
-      <input id="teacher" type="text" bind:value={teacher} placeholder={t('scheduleTeacher')} />
+      <input
+        id="teacher"
+        type="text"
+        bind:value={teacher}
+        oninput={() => teacherEdited = true}
+        placeholder={t('scheduleTeacher')}
+      />
     </div>
   </div>
 
@@ -97,11 +137,17 @@
           class="swatch"
           class:active={color === swatch}
           style="--swatch-color: {swatch}"
-          onclick={() => color = swatch}
+          onclick={() => { color = swatch; colorEdited = true; }}
           aria-label={`Select color ${swatch}`}
         ></button>
       {/each}
-      <input type="color" bind:value={color} class="swatch-custom" aria-label="Custom color" />
+      <input
+        type="color"
+        bind:value={color}
+        oninput={() => colorEdited = true}
+        class="swatch-custom"
+        aria-label="Custom color"
+      />
     </div>
   </div>
 
@@ -131,6 +177,12 @@
     padding: 10px 12px;
     background: color-mix(in srgb, var(--red) 12%, transparent);
     border-radius: 8px;
+  }
+
+  .form-hint {
+    font-size: 12px;
+    color: var(--text2);
+    opacity: 0.8;
   }
 
   .form-group {

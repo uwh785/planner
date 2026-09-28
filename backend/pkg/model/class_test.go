@@ -1,6 +1,9 @@
 package model
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestValidateClassSession(t *testing.T) {
 	valid := func() ClassSession {
@@ -105,7 +108,7 @@ func TestValidateClassSessionDefaultColor(t *testing.T) {
 	}
 }
 
-func TestValidateClassSessionTrimsSubject(t *testing.T) {
+func TestValidateClassSessionTrimsAndUppercasesSubject(t *testing.T) {
 	c := ClassSession{
 		Subject:     "  Math  ",
 		DayOfWeek:   1,
@@ -115,7 +118,43 @@ func TestValidateClassSessionTrimsSubject(t *testing.T) {
 	if err := ValidateClassSession(&c); err != nil {
 		t.Fatalf("ValidateClassSession() unexpected error: %v", err)
 	}
-	if c.Subject != "Math" {
-		t.Errorf("Subject = %q, want trimmed Math", c.Subject)
+	if c.Subject != "MATH" {
+		t.Errorf("Subject = %q, want trimmed and upper-cased MATH", c.Subject)
+	}
+}
+
+func TestValidateClassSessionPreservesAccents(t *testing.T) {
+	c := ClassSession{
+		Subject:     "física",
+		DayOfWeek:   1,
+		StartMinute: 480,
+		EndMinute:   540,
+	}
+	if err := ValidateClassSession(&c); err != nil {
+		t.Fatalf("ValidateClassSession() unexpected error: %v", err)
+	}
+	if c.Subject != "FÍSICA" {
+		t.Errorf("Subject = %q, want FÍSICA", c.Subject)
+	}
+}
+
+// Upper-casing can lengthen a string, so the limit must be enforced on the
+// normalized value rather than on what the client sent. 50 "ȿ" encode to
+// exactly 100 bytes but 150 once upper-cased, so this only fails when the
+// length check runs after normalization.
+func TestValidateClassSessionLengthCheckedAfterUppercase(t *testing.T) {
+	subject := strings.Repeat("ȿ", 50)
+	if len(subject) != classSubjectMaxLength {
+		t.Fatalf("test setup: subject is %d bytes, want exactly %d", len(subject), classSubjectMaxLength)
+	}
+
+	c := ClassSession{
+		Subject:     subject,
+		DayOfWeek:   1,
+		StartMinute: 480,
+		EndMinute:   540,
+	}
+	if err := ValidateClassSession(&c); err == nil {
+		t.Error("ValidateClassSession() err = nil, want a too-long error")
 	}
 }

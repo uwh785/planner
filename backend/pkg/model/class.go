@@ -25,11 +25,17 @@ type ClassSession struct {
 	UpdatedAt   int64  `json:"updated_at"`
 }
 
-// ValidateClassSession trims and validates c in place, returning an error
+// ValidateClassSession normalizes and validates c in place, returning an error
 // describing the first violation found. On success it also fills in the
 // default color when none was provided.
+//
+// The subject is upper-cased so the same course always lands on one canonical
+// spelling, no matter how it was typed. Upper-casing happens before the length
+// check because it can grow the encoded string (e.g. "ȿ" becomes the 3-byte
+// "Ȿ"), so a value that fits the limit when sent could overflow it once
+// normalized.
 func ValidateClassSession(c *ClassSession) error {
-	c.Subject = strings.TrimSpace(c.Subject)
+	c.Subject = strings.ToUpper(strings.TrimSpace(c.Subject))
 	if c.Subject == "" {
 		return errors.New("subject is required")
 	}

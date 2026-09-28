@@ -4,7 +4,7 @@
   import { t } from '$lib/i18n.svelte.js';
   import ClassCard from '$lib/components/ClassCard.svelte';
   import ClassForm from '$lib/components/ClassForm.svelte';
-  import { dowToMondayIndex, mondayIndexToDow } from '$lib/utils.js';
+  import { dowToMondayIndex, mondayIndexToDow, buildSubjectCatalog } from '$lib/utils.js';
   import { Plus, ArrowLeft } from '@lucide/svelte';
 
   let classes = $state([]);
@@ -86,6 +86,7 @@
 
   const dayShort = $derived(t('scheduleDayShort'));
   const dayNames = $derived(t('scheduleDayNames'));
+  const subjectCatalog = $derived(buildSubjectCatalog(classes));
   const weekIndices = [0, 1, 2, 3, 4, 5, 6];
 </script>
 
@@ -98,6 +99,7 @@
     <ClassForm
       cls={editingClass}
       defaultDayOfWeek={mondayIndexToDow(selectedDayIndex)}
+      {subjectCatalog}
       serverError={formError}
       onsubmit={handleSubmit}
       oncancel={closeForm}
