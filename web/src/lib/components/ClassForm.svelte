@@ -1,7 +1,7 @@
 <script>
   import { t } from '$lib/i18n.svelte.js';
-  import { minutesToTime, timeToMinutes, normalizeSubject } from '$lib/utils.js';
-  import { Trash2 } from '@lucide/svelte';
+  import { minutesToTime, timeToMinutes, normalizeSubject, filterSubjects } from '$lib/utils.js';
+  import { Trash2, ChevronDown } from '@lucide/svelte';
   import { untrack } from 'svelte';
 
   let {
@@ -33,6 +33,52 @@
 
   const dayOptions = $derived(t('scheduleDayNames').map((name, i) => ({ value: (i + 1) % 7, label: name })));
   const subjectMatch = $derived(subjectCatalog.get(normalizeSubject(subject)));
+
+  // The subject stays free text so a new subject can be typed; the dropdown
+  // only offers the ones already in use.
+  let subjectOpen = $state(false);
+  let activeIndex = $state(-1);
+  // An exact match lists everything so the dropdown still works as a picker
+  // once a subject has been chosen.
+  const subjectOptions = $derived(filterSubjects(subjectCatalog, subjectMatch ? '' : subject));
+  const showSubjectList = $derived(subjectOpen && subjectOptions.length > 0);
+
+  function openSubjects() {
+    subjectOpen = true;
+    activeIndex = -1;
+  }
+
+  // Read the open state before focusing: focusing fires onfocus, which opens
+  // the list, and toggling after that would close it again on the first click.
+  function toggleSubjects() {
+    const wasOpen = subjectOpen;
+    document.getElementById('subject')?.focus();
+    if (wasOpen) subjectOpen = false;
+    else openSubjects();
+  }
+
+  function pickSubject(known) {
+    subject = known.subject;
+    subjectOpen = false;
+    activeIndex = -1;
+  }
+
+  function onSubjectKeydown(e) {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!subjectOpen) openSubjects();
+      const n = subjectOptions.length;
+      if (!n) return;
+      if (activeIndex < 0) activeIndex = e.key === 'ArrowDown' ? 0 : n - 1;
+      else activeIndex = (activeIndex + (e.key === 'ArrowDown' ? 1 : -1) + n) % n;
+    } else if (e.key === 'Enter' && showSubjectList && activeIndex >= 0) {
+      e.preventDefault();
+      pickSubject(subjectOptions[activeIndex]);
+    } else if (e.key === 'Escape' && subjectOpen) {
+      e.preventDefault();
+      subjectOpen = false;
+    }
+  }
 
   $effect(() => {
     if (!subjectMatch) {
@@ -72,20 +118,56 @@
 
   <div class="form-group">
     <label for="subject">{t('scheduleSubject')}</label>
-    <input
-      id="subject"
-      type="text"
-      bind:value={subject}
-      placeholder={t('scheduleSubject')}
-      list="subject-suggestions"
-      autocomplete="off"
-      required
-    />
-    <datalist id="subject-suggestions">
-      {#each [...subjectCatalog.values()] as known (known.subject)}
-        <option value={known.subject}></option>
-      {/each}
-    </datalist>
+    <div class="combo">
+      <input
+        id="subject"
+        type="text"
+        bind:value={subject}
+        placeholder={t('scheduleSubject')}
+        autocomplete="off"
+        role="combobox"
+        aria-autocomplete="list"
+        aria-controls="subject-options"
+        aria-expanded={showSubjectList}
+        aria-activedescendant={showSubjectList && activeIndex >= 0 ? `subject-option-${activeIndex}` : undefined}
+        onfocus={openSubjects}
+        onclick={() => subjectOpen = true}
+        oninput={() => { subjectOpen = true; activeIndex = -1; }}
+        onkeydown={onSubjectKeydown}
+        onblur={() => subjectOpen = false}
+        required
+      />
+      {#if subjectCatalog.size > 0}
+        <button
+          type="button"
+          class="combo-toggle"
+          tabindex="-1"
+          aria-label={t('scheduleSubjectShowAll')}
+          onpointerdown={e => e.preventDefault()}
+          onclick={toggleSubjects}
+        >
+          <ChevronDown size={18} />
+        </button>
+      {/if}
+      {#if showSubjectList}
+        <ul id="subject-options" class="combo-list" role="listbox">
+          {#each subjectOptions as known, i (known.subject)}
+            <li
+              id="subject-option-{i}"
+              role="option"
+              aria-selected={i === activeIndex}
+              class:active={i === activeIndex}
+              onpointerdown={e => e.preventDefault()}
+              onclick={() => pickSubject(known)}
+            >
+              <span class="combo-dot" style="--swatch-color: {known.color || 'transparent'}"></span>
+              <span class="combo-name">{known.subject}</span>
+              {#if known.teacher}<span class="combo-teacher">{known.teacher}</span>{/if}
+            </li>
+          {/each}
+        </ul>
+      {/if}
+    </div>
     {#if inherited}
       <p class="form-hint">{t('scheduleSubjectInherited')}</p>
     {/if}
@@ -183,6 +265,92 @@
     font-size: 12px;
     color: var(--text2);
     opacity: 0.8;
+  }
+
+  .combo {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .combo input {
+    padding-right: 48px;
+  }
+
+  .combo-toggle {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 44px;
+    height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    color: var(--text2);
+    cursor: pointer;
+  }
+
+  .combo-list {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    z-index: 10;
+    max-height: 240px;
+    overflow-y: auto;
+    margin: 0;
+    padding: 4px;
+    list-style: none;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgb(0 0 0 / 0.25);
+  }
+
+  .combo-list li {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    color: var(--text);
+    font-size: 15px;
+  }
+
+  .combo-list li.active {
+    background: var(--surface2);
+  }
+
+  @media (hover: hover) {
+    .combo-list li:hover {
+      background: var(--surface2);
+    }
+  }
+
+  .combo-dot {
+    width: 12px;
+    height: 12px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--swatch-color);
+  }
+
+  .combo-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .combo-teacher {
+    font-size: 12px;
+    color: var(--text2);
+    white-space: nowrap;
   }
 
   .form-group {

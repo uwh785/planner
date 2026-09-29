@@ -221,6 +221,18 @@ export function buildSubjectCatalog(classes) {
   return catalog;
 }
 
+// Known subjects whose folded form contains the folded query, in catalog
+// order. An empty query lists them all, which is what opening the dropdown
+// without typing shows.
+export function filterSubjects(catalog, query) {
+  const needle = normalizeSubject(query);
+  const matches = [];
+  for (const [key, known] of catalog) {
+    if (key.includes(needle)) matches.push(known);
+  }
+  return matches;
+}
+
 export function splitTodayClasses(classes, nowMinute) {
   const list = Array.isArray(classes) ? classes : [];
   let current = null;
