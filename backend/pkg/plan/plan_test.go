@@ -130,6 +130,92 @@ func TestEffective(t *testing.T) {
 	}
 }
 
+func TestCeilingFor(t *testing.T) {
+	tests := []struct {
+		name string
+		res  Resource
+		want int
+	}{
+		{name: "tasks", res: ResourceTask, want: 5000},
+		{name: "lists", res: ResourceList, want: 100},
+		{name: "tags", res: ResourceTag, want: 200},
+		{name: "classes", res: ResourceClass, want: 100},
+		{name: "subtasks", res: ResourceSubtask, want: 50},
+		{name: "unknown resource has no ceiling", res: Resource("widgets"), want: Unlimited},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := CeilingFor(tt.res); got != tt.want {
+				t.Errorf("CeilingFor(%q) = %d, want %d", tt.res, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestCheckCeilingAppliesToEveryPlan guards the point of the ceiling: it is
+// not keyed by plan at all, so a Pro account that has no Limits.Check cap
+// still gets refused once it reaches the flat ceiling.
+func TestCheckCeilingAppliesToEveryPlan(t *testing.T) {
+	tests := []struct {
+		name    string
+		res     Resource
+		current int
+		wantErr bool
+	}{
+		{name: "tasks under ceiling", res: ResourceTask, current: 4999},
+		{name: "tasks at ceiling refused", res: ResourceTask, current: 5000, wantErr: true},
+		{name: "tasks past ceiling refused", res: ResourceTask, current: 6000, wantErr: true},
+		{name: "lists under ceiling", res: ResourceList, current: 99},
+		{name: "lists at ceiling refused", res: ResourceList, current: 100, wantErr: true},
+		{name: "tags under ceiling", res: ResourceTag, current: 199},
+		{name: "tags at ceiling refused", res: ResourceTag, current: 200, wantErr: true},
+		{name: "classes under ceiling", res: ResourceClass, current: 99},
+		{name: "classes at ceiling refused", res: ResourceClass, current: 100, wantErr: true},
+		{name: "subtasks under ceiling", res: ResourceSubtask, current: 49},
+		{name: "subtasks at ceiling refused", res: ResourceSubtask, current: 50, wantErr: true},
+		{name: "unknown resource is uncapped", res: Resource("widgets"), current: 999999},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := CheckCeiling(tt.res, tt.current)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("CheckCeiling(%s, %d) error = %v, wantErr %v", tt.res, tt.current, err, tt.wantErr)
+			}
+			if tt.wantErr {
+				var ce *CeilingError
+				if !asCeilingError(err, &ce) {
+					t.Fatalf("CheckCeiling returned %T, want *CeilingError", err)
+				}
+				if ce.Resource != tt.res {
+					t.Errorf("CeilingError.Resource = %q, want %q", ce.Resource, tt.res)
+				}
+			}
+		})
+	}
+}
+
+func asCeilingError(err error, target **CeilingError) bool {
+	ce, ok := err.(*CeilingError)
+	if ok {
+		*target = ce
+	}
+	return ok
+}
+
+// TestCeilingErrorMessage pins the wording the task asked for so a client can
+// show it directly: a ceiling refusal must read as permanent, not as
+// something upgrading would fix.
+func TestCeilingErrorMessage(t *testing.T) {
+	err := CheckCeiling(ResourceTask, 5000)
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+	want := "storage limit reached: at most 5000 tasks"
+	if err.Error() != want {
+		t.Errorf("Error() = %q, want %q", err.Error(), want)
+	}
+}
+
 // TestEffectiveNeverGrantsProFromBadData guards the security direction of the
 // fallback: no combination of a non-pro plan may ever resolve to pro.
 func TestEffectiveNeverGrantsProFromBadData(t *testing.T) {

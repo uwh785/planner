@@ -48,9 +48,11 @@ func LimitsFor(p Plan) Limits {
 type Resource string
 
 const (
-	ResourceTask Resource = "tasks"
-	ResourceList Resource = "lists"
-	ResourceTag  Resource = "tags"
+	ResourceTask    Resource = "tasks"
+	ResourceList    Resource = "lists"
+	ResourceTag     Resource = "tags"
+	ResourceClass   Resource = "classes"
+	ResourceSubtask Resource = "subtasks"
 )
 
 // LimitError reports that a plan's cap for a resource has been reached.
@@ -89,6 +91,59 @@ func (l Limits) Check(p Plan, r Resource, current int) error {
 	}
 	if current >= limit {
 		return &LimitError{Resource: r, Limit: limit, Plan: p}
+	}
+	return nil
+}
+
+// storageCeilings are hard per-resource caps that apply to every plan alike,
+// Free and Pro, and count every row the user owns -- completed and
+// soft-deleted included. They exist to bound database growth for an account
+// no per-plan Limits caps (Pro today), and to stop the Free/Pro Limits above
+// from being defeated by a create-then-complete or create-then-delete loop,
+// since those only count the rows still "active". Unlike Limits, reaching a
+// ceiling is never lifted by upgrading the plan.
+var storageCeilings = map[Resource]int{
+	ResourceTask:    5000,
+	ResourceList:    100,
+	ResourceTag:     200,
+	ResourceClass:   100,
+	ResourceSubtask: 50,
+}
+
+// CeilingFor returns the hard storage ceiling for a resource, or Unlimited if
+// the resource has none.
+func CeilingFor(r Resource) int {
+	if c, ok := storageCeilings[r]; ok {
+		return c
+	}
+	return Unlimited
+}
+
+// CeilingError reports that a resource's hard storage ceiling has been
+// reached. It is distinct from LimitError so a caller can tell the two
+// apart: a LimitError is resolved by upgrading, a CeilingError is not.
+type CeilingError struct {
+	Resource Resource
+	Ceiling  int
+}
+
+func (e *CeilingError) Error() string {
+	return fmt.Sprintf("storage limit reached: at most %d %s", e.Ceiling, e.Resource)
+}
+
+// CheckCeiling reports whether creating one more of r is allowed given the
+// total number the user (or, for a per-parent ceiling such as subtasks, the
+// parent) already owns, counting every row regardless of status or
+// soft-deletion. As with Limits.Check, the comparison is on the count before
+// the insert, so reaching the ceiling exactly is allowed and the next one is
+// refused.
+func CheckCeiling(r Resource, current int) error {
+	ceiling := CeilingFor(r)
+	if ceiling == Unlimited {
+		return nil
+	}
+	if current >= ceiling {
+		return &CeilingError{Resource: r, Ceiling: ceiling}
 	}
 	return nil
 }

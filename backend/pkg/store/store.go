@@ -139,9 +139,69 @@ func (s *Store) CountLists(userID string) (int, error) {
 		`SELECT COUNT(*) FROM task_lists WHERE user_id = $1 AND deleted = 0`, userID)
 }
 
+// CountTags counts every tag a user owns. Tags have no soft-delete flag
+// (DeleteTag is a real DELETE), so this is already the total the storage
+// ceiling needs -- there is no separate "active" count to reconcile it with.
 func (s *Store) CountTags(userID string) (int, error) {
 	return s.count(context.Background(),
 		`SELECT COUNT(*) FROM tags WHERE user_id = $1`, userID)
+}
+
+// CountClasses counts every class session a user owns, including
+// soft-deleted ones, for the flat storage ceiling. There is no per-plan
+// Limits cap on classes, so unlike tasks and lists there is no separate
+// "active" count to compute in the same round trip.
+func (s *Store) CountClasses(userID string) (int, error) {
+	return s.count(context.Background(),
+		`SELECT COUNT(*) FROM class_sessions WHERE user_id = $1`, userID)
+}
+
+// CountSubtasks counts every subtask under one task, including soft-deleted
+// ones, for the per-task storage ceiling.
+func (s *Store) CountSubtasks(userID, taskID string) (int, error) {
+	return s.count(context.Background(),
+		`SELECT COUNT(*) FROM subtasks WHERE user_id = $1 AND task_id = $2`, userID, taskID)
+}
+
+// TaskUsage is the pair of task counts a create needs: Active is what the
+// Free-plan cap compares against (CountActiveTasks' definition), Total is
+// every row the user owns, including completed and soft-deleted, which is
+// what the flat storage ceiling compares against.
+type TaskUsage struct {
+	Active int
+	Total  int
+}
+
+// CountTasksUsage reads Active and Total in one round trip via a FILTER
+// clause, since a create needs both the Free-plan check and the storage
+// ceiling check and a second full COUNT(*) query would cost the same table
+// scan twice for no benefit.
+func (s *Store) CountTasksUsage(userID string) (TaskUsage, error) {
+	var u TaskUsage
+	err := s.pool.QueryRow(context.Background(),
+		`SELECT COUNT(*) FILTER (WHERE status <> 'completed' AND deleted = 0), COUNT(*)
+		 FROM tasks WHERE user_id = $1`, userID,
+	).Scan(&u.Active, &u.Total)
+	return u, err
+}
+
+// ListUsage is the list-count analogue of TaskUsage: Active excludes
+// soft-deleted lists (CountLists' definition), Total is every row the user
+// owns.
+type ListUsage struct {
+	Active int
+	Total  int
+}
+
+// CountListsUsage reads Active and Total in one round trip, for the same
+// reason as CountTasksUsage.
+func (s *Store) CountListsUsage(userID string) (ListUsage, error) {
+	var u ListUsage
+	err := s.pool.QueryRow(context.Background(),
+		`SELECT COUNT(*) FILTER (WHERE deleted = 0), COUNT(*)
+		 FROM task_lists WHERE user_id = $1`, userID,
+	).Scan(&u.Active, &u.Total)
+	return u, err
 }
 
 func (s *Store) count(ctx context.Context, q string, args ...any) (int, error) {

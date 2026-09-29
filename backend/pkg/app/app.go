@@ -264,13 +264,18 @@ func (a *App) me(w http.ResponseWriter, r *http.Request) {
 	dataResp(w, http.StatusOK, user)
 }
 
-// enforceLimit resolves the caller's effective plan and refuses the create when
-// that plan's cap for the resource is already reached. It returns false after
-// having written the error response, so callers should `return` immediately.
+// enforceLimit resolves the caller's effective plan, refuses the create with
+// 402 if that plan's own cap for the resource is already reached, and then
+// refuses it with 409 if the resource's hard storage ceiling -- which
+// applies to every plan alike and is never lifted by upgrading -- is already
+// reached. It returns false after having written the error response, so
+// callers should `return` immediately.
 //
-// A refusal is reported as 402 Payment Required rather than a generic error:
-// the account is valid and the request is well formed, only the plan is too
-// small. That lets the client distinguish "upgrade to continue" from a bug.
+// For tasks and lists, the Free-plan cap and the ceiling compare against two
+// different counts (active vs. every row the user owns), so both are read in
+// one round trip via CountTasksUsage/CountListsUsage rather than querying
+// the same table twice. Tags have no soft-delete distinction, so CountTags'
+// single total answers both checks.
 func (a *App) enforceLimit(w http.ResponseWriter, r *http.Request, resource plan.Resource) bool {
 	claims := auth.GetUser(r)
 
@@ -287,14 +292,19 @@ func (a *App) enforceLimit(w http.ResponseWriter, r *http.Request, resource plan
 		ExpiresAt: sub.ExpiresAt,
 	}, time.Now())
 
-	var current int
+	var active, total int
 	switch resource {
 	case plan.ResourceTask:
-		current, err = a.store.CountActiveTasks(claims.UserID)
+		var usage store.TaskUsage
+		usage, err = a.store.CountTasksUsage(claims.UserID)
+		active, total = usage.Active, usage.Total
 	case plan.ResourceList:
-		current, err = a.store.CountLists(claims.UserID)
+		var usage store.ListUsage
+		usage, err = a.store.CountListsUsage(claims.UserID)
+		active, total = usage.Active, usage.Total
 	case plan.ResourceTag:
-		current, err = a.store.CountTags(claims.UserID)
+		total, err = a.store.CountTags(claims.UserID)
+		active = total
 	}
 	if err != nil {
 		log.Printf("count %s for %s: %v", resource, claims.UserID, err)
@@ -302,7 +312,7 @@ func (a *App) enforceLimit(w http.ResponseWriter, r *http.Request, resource plan
 		return false
 	}
 
-	if err := plan.LimitsFor(effective).Check(effective, resource, current); err != nil {
+	if err := plan.LimitsFor(effective).Check(effective, resource, active); err != nil {
 		var le *plan.LimitError
 		if errors.As(err, &le) {
 			errResp(w, http.StatusPaymentRequired, le.Error())
@@ -310,6 +320,31 @@ func (a *App) enforceLimit(w http.ResponseWriter, r *http.Request, resource plan
 		}
 		log.Printf("check %s limit for %s: %v", resource, claims.UserID, err)
 		errResp(w, http.StatusInternalServerError, "failed to check plan limits")
+		return false
+	}
+
+	return a.enforceCeiling(w, resource, total)
+}
+
+// enforceCeiling refuses the create with 409 Conflict if resource's hard
+// storage ceiling is already reached, given the total count of rows the
+// user (or, for a per-parent ceiling such as subtasks, the parent) already
+// owns -- callers must count every row, including completed and
+// soft-deleted ones, since the ceiling exists specifically to bound those
+// too. It returns false after writing the error response, so callers should
+// `return` immediately.
+//
+// 409 rather than 402: the account is valid and the plan may even be Pro,
+// but the ceiling is not something upgrading lifts, so it must not be
+// confused with a plan-limit refusal.
+func (a *App) enforceCeiling(w http.ResponseWriter, resource plan.Resource, total int) bool {
+	if err := plan.CheckCeiling(resource, total); err != nil {
+		var ce *plan.CeilingError
+		if errors.As(err, &ce) {
+			errResp(w, http.StatusConflict, ce.Error())
+			return false
+		}
+		errResp(w, http.StatusInternalServerError, "failed to check storage limits")
 		return false
 	}
 	return true
@@ -607,6 +642,7 @@ func (a *App) listSubtasks(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) createSubtask(w http.ResponseWriter, r *http.Request) {
 	claims := auth.GetUser(r)
+	taskID := chi.URLParam(r, "id")
 	var st model.Subtask
 	if err := decodeJSON(r, &st); err != nil {
 		errResp(w, http.StatusBadRequest, "invalid request body")
@@ -616,7 +652,16 @@ func (a *App) createSubtask(w http.ResponseWriter, r *http.Request) {
 		errResp(w, http.StatusBadRequest, "title is required")
 		return
 	}
-	created, err := a.store.CreateSubtask(claims.UserID, chi.URLParam(r, "id"), st)
+	total, err := a.store.CountSubtasks(claims.UserID, taskID)
+	if err != nil {
+		log.Printf("count subtasks for %s/%s: %v", claims.UserID, taskID, err)
+		errResp(w, http.StatusInternalServerError, "failed to resolve usage")
+		return
+	}
+	if !a.enforceCeiling(w, plan.ResourceSubtask, total) {
+		return
+	}
+	created, err := a.store.CreateSubtask(claims.UserID, taskID, st)
 	if err != nil {
 		errResp(w, http.StatusInternalServerError, "failed to create subtask")
 		return
@@ -811,6 +856,15 @@ func (a *App) createClass(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := model.ValidateClassSession(&c); err != nil {
 		errResp(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	total, err := a.store.CountClasses(claims.UserID)
+	if err != nil {
+		log.Printf("count classes for %s: %v", claims.UserID, err)
+		errResp(w, http.StatusInternalServerError, "failed to resolve usage")
+		return
+	}
+	if !a.enforceCeiling(w, plan.ResourceClass, total) {
 		return
 	}
 	created, err := a.store.CreateClass(claims.UserID, c)
