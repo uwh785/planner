@@ -43,10 +43,11 @@ The user wants Pro granted by manual DB insert to be safe to hand out, and noted
 ## Progress
 - Branch `feat/storage-caps` created from `main` (5a54f38).
 - T1 committed in 4af7780.
-- T2 verified: `go vet ./...` clean, `go test ./...` 149 passed (2026-10-09).
+- T2 verified: `go vet ./...` clean, `go test ./...` 149 passed (2026-10-09); committed in d82b62c.
+- T1+T2 fast-forwarded into local `main` at d82b62c on 2026-10-09 (not pushed). T3 left as a separate follow-up.
 
 ## Follow-ups
 - Counting soft-deleted and completed rows means a long-term heavy user eventually hits the 5000-task ceiling permanently. Consider purging soft-deleted rows after N days, or archiving.
 
 ## Next step
-T1.
+T3 (frontend ceiling error), as its own small branch off `main`.
