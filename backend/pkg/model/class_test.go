@@ -70,6 +70,26 @@ func TestValidateClassSession(t *testing.T) {
 			mutate:  func(c *ClassSession) { c.StartMinute = 1439; c.EndMinute = 1440 },
 			wantErr: false,
 		},
+		{
+			name:    "room too long",
+			mutate:  func(c *ClassSession) { c.Room = string(make([]byte, 101)) },
+			wantErr: true,
+		},
+		{
+			name:    "room at max is allowed",
+			mutate:  func(c *ClassSession) { c.Room = strings.Repeat("a", 100) },
+			wantErr: false,
+		},
+		{
+			name:    "teacher too long",
+			mutate:  func(c *ClassSession) { c.Teacher = string(make([]byte, 101)) },
+			wantErr: true,
+		},
+		{
+			name:    "teacher at max is allowed",
+			mutate:  func(c *ClassSession) { c.Teacher = strings.Repeat("a", 100) },
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {

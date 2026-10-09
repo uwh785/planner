@@ -8,6 +8,8 @@ import (
 
 const (
 	classSubjectMaxLength = 100
+	classRoomMaxLength    = 100
+	classTeacherMaxLength = 100
 	defaultClassColor     = "#0A84FF"
 )
 
@@ -47,6 +49,15 @@ func ValidateClassSession(c *ClassSession) error {
 	}
 	if c.StartMinute < 0 || c.StartMinute >= c.EndMinute || c.EndMinute > 1440 {
 		return errors.New("start_minute and end_minute must satisfy 0 <= start_minute < end_minute <= 1440")
+	}
+
+	c.Room = strings.TrimSpace(c.Room)
+	if len(c.Room) > classRoomMaxLength {
+		return fmt.Errorf("room must be %d characters or fewer", classRoomMaxLength)
+	}
+	c.Teacher = strings.TrimSpace(c.Teacher)
+	if len(c.Teacher) > classTeacherMaxLength {
+		return fmt.Errorf("teacher must be %d characters or fewer", classTeacherMaxLength)
 	}
 
 	if c.Color == "" {

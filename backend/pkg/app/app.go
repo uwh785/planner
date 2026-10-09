@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-	"strings"
 	"time"
 
 	"planner/pkg/auth"
@@ -36,6 +35,7 @@ func (a *App) Handler() http.Handler {
 	r.Use(CORS())
 
 	r.Route("/api", func(r chi.Router) {
+		r.Use(maxBodySize)
 		r.Post("/auth/register", a.register)
 		r.Post("/auth/login", a.login)
 		r.Group(func(r chi.Router) {
@@ -115,6 +115,25 @@ func decodeJSON(r *http.Request, v any) error {
 	return json.NewDecoder(r.Body).Decode(v)
 }
 
+// decodeJSONOrRespond decodes the request body as JSON into v. On failure it
+// writes the response itself and returns false, so callers should `return`
+// immediately: a body over maxRequestBodyBytes (capped by the maxBodySize
+// middleware) answers 413, since that is the client sending too much data
+// rather than sending a malformed request; any other decode failure answers
+// 400 as before.
+func decodeJSONOrRespond(w http.ResponseWriter, r *http.Request, v any) bool {
+	if err := decodeJSON(r, v); err != nil {
+		var mbErr *http.MaxBytesError
+		if errors.As(err, &mbErr) {
+			errResp(w, http.StatusRequestEntityTooLarge, "request body too large")
+			return false
+		}
+		errResp(w, http.StatusBadRequest, "invalid request body")
+		return false
+	}
+	return true
+}
+
 // parseDateRange reads the optional `from` and `to` query params as epoch-ms
 // integers. Either may be absent (nil). It rejects a non-integer value, a
 // negative value, and a `from` that is not strictly less than `to` when both
@@ -166,6 +185,22 @@ func securityHeaders(next http.Handler) http.Handler {
 	})
 }
 
+// maxRequestBodyBytes bounds how much of a request body the server will
+// read. Without it, a client could make the database (and, via decodeJSON,
+// server memory) do unbounded work from a single oversized request, no
+// matter how small the per-field length limits are.
+const maxRequestBodyBytes = 64 * 1024 // 64 KiB
+
+// maxBodySize wraps the request body so reading past maxRequestBodyBytes
+// fails with a *http.MaxBytesError, which decodeJSONOrRespond recognizes and
+// answers with 413 instead of a generic 400.
+func maxBodySize(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodyBytes)
+		next.ServeHTTP(w, r)
+	})
+}
+
 func CORS() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -189,8 +224,7 @@ func (a *App) register(w http.ResponseWriter, r *http.Request) {
 		Name     string `json:"name"`
 		Password string `json:"password"`
 	}
-	if err := decodeJSON(r, &req); err != nil {
-		errResp(w, http.StatusBadRequest, "invalid request body")
+	if !decodeJSONOrRespond(w, r, &req) {
 		return
 	}
 	if req.Email == "" || req.Password == "" {
@@ -229,8 +263,7 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 		Email    string `json:"email"`
 		Password string `json:"password"`
 	}
-	if err := decodeJSON(r, &req); err != nil {
-		errResp(w, http.StatusBadRequest, "invalid request body")
+	if !decodeJSONOrRespond(w, r, &req) {
 		return
 	}
 
@@ -438,12 +471,11 @@ func (a *App) listLists(w http.ResponseWriter, r *http.Request) {
 func (a *App) createList(w http.ResponseWriter, r *http.Request) {
 	claims := auth.GetUser(r)
 	var l model.TaskList
-	if err := decodeJSON(r, &l); err != nil {
-		errResp(w, http.StatusBadRequest, "invalid request body")
+	if !decodeJSONOrRespond(w, r, &l) {
 		return
 	}
-	if strings.TrimSpace(l.Name) == "" {
-		errResp(w, http.StatusBadRequest, "name is required")
+	if err := model.ValidateTaskList(&l); err != nil {
+		errResp(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	if !a.enforceLimit(w, r, plan.ResourceList) {
@@ -461,8 +493,11 @@ func (a *App) updateList(w http.ResponseWriter, r *http.Request) {
 	claims := auth.GetUser(r)
 	listID := chi.URLParam(r, "id")
 	var l model.TaskList
-	if err := decodeJSON(r, &l); err != nil {
-		errResp(w, http.StatusBadRequest, "invalid request body")
+	if !decodeJSONOrRespond(w, r, &l) {
+		return
+	}
+	if err := model.ValidateTaskList(&l); err != nil {
+		errResp(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	l.ListID = listID
@@ -514,12 +549,11 @@ func (a *App) listTasks(w http.ResponseWriter, r *http.Request) {
 func (a *App) createTask(w http.ResponseWriter, r *http.Request) {
 	claims := auth.GetUser(r)
 	var t model.Task
-	if err := decodeJSON(r, &t); err != nil {
-		errResp(w, http.StatusBadRequest, "invalid request body")
+	if !decodeJSONOrRespond(w, r, &t) {
 		return
 	}
-	if strings.TrimSpace(t.Title) == "" {
-		errResp(w, http.StatusBadRequest, "title is required")
+	if err := model.ValidateTask(&t); err != nil {
+		errResp(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	if !a.enforceLimit(w, r, plan.ResourceTask) {
@@ -548,12 +582,11 @@ func (a *App) updateTask(w http.ResponseWriter, r *http.Request) {
 	claims := auth.GetUser(r)
 	taskID := chi.URLParam(r, "id")
 	var t model.Task
-	if err := decodeJSON(r, &t); err != nil {
-		errResp(w, http.StatusBadRequest, "invalid request body")
+	if !decodeJSONOrRespond(w, r, &t) {
 		return
 	}
-	if strings.TrimSpace(t.Title) == "" {
-		errResp(w, http.StatusBadRequest, "title is required")
+	if err := model.ValidateTask(&t); err != nil {
+		errResp(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	t.TaskID = taskID
@@ -644,12 +677,11 @@ func (a *App) createSubtask(w http.ResponseWriter, r *http.Request) {
 	claims := auth.GetUser(r)
 	taskID := chi.URLParam(r, "id")
 	var st model.Subtask
-	if err := decodeJSON(r, &st); err != nil {
-		errResp(w, http.StatusBadRequest, "invalid request body")
+	if !decodeJSONOrRespond(w, r, &st) {
 		return
 	}
-	if strings.TrimSpace(st.Title) == "" {
-		errResp(w, http.StatusBadRequest, "title is required")
+	if err := model.ValidateSubtask(&st); err != nil {
+		errResp(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	total, err := a.store.CountSubtasks(claims.UserID, taskID)
@@ -672,8 +704,11 @@ func (a *App) createSubtask(w http.ResponseWriter, r *http.Request) {
 func (a *App) updateSubtask(w http.ResponseWriter, r *http.Request) {
 	claims := auth.GetUser(r)
 	var st model.Subtask
-	if err := decodeJSON(r, &st); err != nil {
-		errResp(w, http.StatusBadRequest, "invalid request body")
+	if !decodeJSONOrRespond(w, r, &st) {
+		return
+	}
+	if err := model.ValidateSubtask(&st); err != nil {
+		errResp(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	st.SubtaskID = chi.URLParam(r, "sid")
@@ -711,12 +746,11 @@ func (a *App) listTags(w http.ResponseWriter, r *http.Request) {
 func (a *App) createTag(w http.ResponseWriter, r *http.Request) {
 	claims := auth.GetUser(r)
 	var t model.Tag
-	if err := decodeJSON(r, &t); err != nil {
-		errResp(w, http.StatusBadRequest, "invalid request body")
+	if !decodeJSONOrRespond(w, r, &t) {
 		return
 	}
-	if strings.TrimSpace(t.Name) == "" {
-		errResp(w, http.StatusBadRequest, "name is required")
+	if err := model.ValidateTag(&t); err != nil {
+		errResp(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	if !a.enforceLimit(w, r, plan.ResourceTag) {
@@ -744,8 +778,7 @@ func (a *App) addTaskTag(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		TagID string `json:"tag_id"`
 	}
-	if err := decodeJSON(r, &req); err != nil {
-		errResp(w, http.StatusBadRequest, "invalid request body")
+	if !decodeJSONOrRespond(w, r, &req) {
 		return
 	}
 	if err := a.store.AddTaskTag(claims.UserID, chi.URLParam(r, "id"), req.TagID); err != nil {
@@ -850,8 +883,7 @@ func (a *App) listClasses(w http.ResponseWriter, r *http.Request) {
 func (a *App) createClass(w http.ResponseWriter, r *http.Request) {
 	claims := auth.GetUser(r)
 	var c model.ClassSession
-	if err := decodeJSON(r, &c); err != nil {
-		errResp(w, http.StatusBadRequest, "invalid request body")
+	if !decodeJSONOrRespond(w, r, &c) {
 		return
 	}
 	if err := model.ValidateClassSession(&c); err != nil {
@@ -879,8 +911,7 @@ func (a *App) updateClass(w http.ResponseWriter, r *http.Request) {
 	claims := auth.GetUser(r)
 	classID := chi.URLParam(r, "id")
 	var c model.ClassSession
-	if err := decodeJSON(r, &c); err != nil {
-		errResp(w, http.StatusBadRequest, "invalid request body")
+	if !decodeJSONOrRespond(w, r, &c) {
 		return
 	}
 	c.ClassID = classID
