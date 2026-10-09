@@ -22,7 +22,7 @@ The user felt events are different from tasks and only had "new task" available.
 - Free plan limit for events (only the hard ceiling).
 
 ## Constraints
-- Branch `feat/events` is stacked on `feat/storage-caps` (d82b62c) because it reuses ceilings and validation not yet on `main`.
+- Branch `feat/events` was stacked on `feat/storage-caps`; after storage-caps merged into `main` (d82b62c) it sits directly on `main`.
 - Mirror the existing class-session layering: model + Validate func, store methods, app handlers, migration in `backend/cmd/migrate/main.go`.
 - Test-first where a deterministic test exists. Runner: `go test ./...` in `backend/`; integration tests need `TEST_DATABASE_URL` (skip otherwise). Frontend check: `npm run build` in `web/`.
 - Artifacts (code, UI copy, comments) in English; Spanish UI strings go through the existing i18n file.
