@@ -156,6 +156,14 @@ func (s *Store) CountClasses(userID string) (int, error) {
 		`SELECT COUNT(*) FROM class_sessions WHERE user_id = $1`, userID)
 }
 
+// CountEvents counts every event a user owns, including soft-deleted ones,
+// for the flat storage ceiling. Like classes, events have no per-plan Limits
+// cap, so there is no separate "active" count.
+func (s *Store) CountEvents(userID string) (int, error) {
+	return s.count(context.Background(),
+		`SELECT COUNT(*) FROM events WHERE user_id = $1`, userID)
+}
+
 // CountSubtasks counts every subtask under one task, including soft-deleted
 // ones, for the per-task storage ceiling.
 func (s *Store) CountSubtasks(userID, taskID string) (int, error) {
@@ -837,6 +845,109 @@ func (s *Store) DeleteClass(userID, classID string) error {
 	tag, err := s.pool.Exec(context.Background(),
 		`UPDATE class_sessions SET deleted = 1 WHERE user_id = $1 AND class_id = $2 AND deleted = 0`,
 		userID, classID,
+	)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// ──────────────────────────── Events ─────────────────────────
+
+const eventColumns = `user_id, event_id, title, description, location, start_at, end_at,
+	all_day, color, updated_at`
+
+func scanEvent(row pgx.Row) (model.Event, error) {
+	var e model.Event
+	err := row.Scan(&e.UserID, &e.EventID, &e.Title, &e.Description, &e.Location,
+		&e.StartAt, &e.EndAt, &e.AllDay, &e.Color, &e.UpdatedAt)
+	return e, err
+}
+
+// ListEvents returns the user's events ordered by start time. When from or to
+// is given it returns only the events that overlap [from, to): an event
+// starts before to and ends (or, with no end, starts) at or after from.
+func (s *Store) ListEvents(userID string, from, to *int64) ([]model.Event, error) {
+	query := `SELECT ` + eventColumns + ` FROM events WHERE user_id = $1 AND deleted = 0`
+	args := []any{userID}
+	if to != nil {
+		args = append(args, *to)
+		query += fmt.Sprintf(` AND start_at < $%d`, len(args))
+	}
+	if from != nil {
+		args = append(args, *from)
+		query += fmt.Sprintf(` AND COALESCE(end_at, start_at) >= $%d`, len(args))
+	}
+	query += ` ORDER BY start_at, event_id`
+
+	rows, err := s.pool.Query(context.Background(), query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []model.Event
+	for rows.Next() {
+		e, err := scanEvent(rows)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, e)
+	}
+	return items, rows.Err()
+}
+
+func (s *Store) GetEvent(userID, eventID string) (model.Event, error) {
+	return scanEvent(s.pool.QueryRow(context.Background(),
+		`SELECT `+eventColumns+` FROM events WHERE user_id = $1 AND event_id = $2 AND deleted = 0`,
+		userID, eventID,
+	))
+}
+
+func (s *Store) CreateEvent(userID string, e model.Event) (model.Event, error) {
+	e.UserID = userID
+	if e.EventID == "" {
+		e.EventID = genID("evt")
+	}
+	if e.Color == "" {
+		e.Color = "#0A84FF"
+	}
+	e.UpdatedAt = time.Now().UnixMilli()
+	_, err := s.pool.Exec(context.Background(),
+		`INSERT INTO events (user_id, event_id, title, description, location, start_at, end_at,
+		        all_day, color, updated_at, deleted)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 0)`,
+		e.UserID, e.EventID, e.Title, e.Description, e.Location, e.StartAt, e.EndAt,
+		e.AllDay, e.Color, e.UpdatedAt,
+	)
+	return e, err
+}
+
+func (s *Store) UpdateEvent(userID string, e model.Event) error {
+	e.UpdatedAt = time.Now().UnixMilli()
+	tag, err := s.pool.Exec(context.Background(),
+		`UPDATE events SET title = $3, description = $4, location = $5, start_at = $6,
+		        end_at = $7, all_day = $8, color = $9, updated_at = $10
+		 WHERE user_id = $1 AND event_id = $2 AND deleted = 0`,
+		userID, e.EventID, e.Title, e.Description, e.Location, e.StartAt, e.EndAt,
+		e.AllDay, e.Color, e.UpdatedAt,
+	)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) DeleteEvent(userID, eventID string) error {
+	tag, err := s.pool.Exec(context.Background(),
+		`UPDATE events SET deleted = 1 WHERE user_id = $1 AND event_id = $2 AND deleted = 0`,
+		userID, eventID,
 	)
 	if err != nil {
 		return err

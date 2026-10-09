@@ -44,6 +44,7 @@ func TestLimitsCheck(t *testing.T) {
 		{name: "pro allows any number of tasks", limits: LimitsFor(Pro), plan: Pro, res: ResourceTask, current: 100000},
 		{name: "pro allows any number of lists", limits: LimitsFor(Pro), plan: Pro, res: ResourceList, current: 100000},
 		{name: "pro allows any number of tags", limits: LimitsFor(Pro), plan: Pro, res: ResourceTag, current: 100000},
+		{name: "free has no per-plan cap on events", limits: LimitsFor(Free), plan: Free, res: ResourceEvent, current: 100000},
 		{name: "unknown resource is uncapped", limits: Limits{MaxTasks: 1, MaxLists: 1, MaxTags: 1}, plan: Free, res: Resource("widgets"), current: 99},
 	}
 	for _, tt := range tests {
@@ -141,6 +142,7 @@ func TestCeilingFor(t *testing.T) {
 		{name: "tags", res: ResourceTag, want: 200},
 		{name: "classes", res: ResourceClass, want: 100},
 		{name: "subtasks", res: ResourceSubtask, want: 50},
+		{name: "events", res: ResourceEvent, want: 2000},
 		{name: "unknown resource has no ceiling", res: Resource("widgets"), want: Unlimited},
 	}
 	for _, tt := range tests {
@@ -173,6 +175,8 @@ func TestCheckCeilingAppliesToEveryPlan(t *testing.T) {
 		{name: "classes at ceiling refused", res: ResourceClass, current: 100, wantErr: true},
 		{name: "subtasks under ceiling", res: ResourceSubtask, current: 49},
 		{name: "subtasks at ceiling refused", res: ResourceSubtask, current: 50, wantErr: true},
+		{name: "events under ceiling", res: ResourceEvent, current: 1999},
+		{name: "events at ceiling refused", res: ResourceEvent, current: 2000, wantErr: true},
 		{name: "unknown resource is uncapped", res: Resource("widgets"), current: 999999},
 	}
 	for _, tt := range tests {

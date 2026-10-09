@@ -80,6 +80,13 @@ func (a *App) Handler() http.Handler {
 			r.Post("/classes", a.createClass)
 			r.Put("/classes/{id}", a.updateClass)
 			r.Delete("/classes/{id}", a.deleteClass)
+
+			// Events
+			r.Get("/events", a.listEvents)
+			r.Post("/events", a.createEvent)
+			r.Get("/events/{id}", a.getEvent)
+			r.Put("/events/{id}", a.updateEvent)
+			r.Delete("/events/{id}", a.deleteEvent)
 		})
 	})
 
@@ -938,6 +945,105 @@ func (a *App) deleteClass(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		errResp(w, http.StatusInternalServerError, "failed to delete class")
+		return
+	}
+	dataResp(w, http.StatusOK, map[string]string{"message": "deleted"})
+}
+
+// --- events ---
+
+func (a *App) listEvents(w http.ResponseWriter, r *http.Request) {
+	from, to, err := parseDateRange(r.URL.Query())
+	if err != nil {
+		errResp(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	claims := auth.GetUser(r)
+	items, err := a.store.ListEvents(claims.UserID, from, to)
+	if err != nil {
+		errResp(w, http.StatusInternalServerError, "failed to list events")
+		return
+	}
+	if items == nil {
+		items = []model.Event{}
+	}
+	dataResp(w, http.StatusOK, items)
+}
+
+func (a *App) getEvent(w http.ResponseWriter, r *http.Request) {
+	claims := auth.GetUser(r)
+	e, err := a.store.GetEvent(claims.UserID, chi.URLParam(r, "id"))
+	if err != nil {
+		errResp(w, http.StatusNotFound, "event not found")
+		return
+	}
+	dataResp(w, http.StatusOK, e)
+}
+
+func (a *App) createEvent(w http.ResponseWriter, r *http.Request) {
+	var e model.Event
+	if !decodeJSONOrRespond(w, r, &e) {
+		return
+	}
+	if err := model.ValidateEvent(&e); err != nil {
+		errResp(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	claims := auth.GetUser(r)
+	total, err := a.store.CountEvents(claims.UserID)
+	if err != nil {
+		log.Printf("count events for %s: %v", claims.UserID, err)
+		errResp(w, http.StatusInternalServerError, "failed to resolve usage")
+		return
+	}
+	if !a.enforceCeiling(w, plan.ResourceEvent, total) {
+		return
+	}
+	// The ID is always server-generated; a client-supplied one is ignored.
+	e.EventID = ""
+	created, err := a.store.CreateEvent(claims.UserID, e)
+	if err != nil {
+		errResp(w, http.StatusInternalServerError, "failed to create event")
+		return
+	}
+	dataResp(w, http.StatusCreated, created)
+}
+
+func (a *App) updateEvent(w http.ResponseWriter, r *http.Request) {
+	var e model.Event
+	if !decodeJSONOrRespond(w, r, &e) {
+		return
+	}
+	e.EventID = chi.URLParam(r, "id")
+	if err := model.ValidateEvent(&e); err != nil {
+		errResp(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	claims := auth.GetUser(r)
+	if err := a.store.UpdateEvent(claims.UserID, e); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			errResp(w, http.StatusNotFound, "event not found")
+			return
+		}
+		errResp(w, http.StatusInternalServerError, "failed to update event")
+		return
+	}
+	updated, err := a.store.GetEvent(claims.UserID, e.EventID)
+	if err != nil {
+		errResp(w, http.StatusInternalServerError, "failed to load updated event")
+		return
+	}
+	dataResp(w, http.StatusOK, updated)
+}
+
+func (a *App) deleteEvent(w http.ResponseWriter, r *http.Request) {
+	claims := auth.GetUser(r)
+	if err := a.store.DeleteEvent(claims.UserID, chi.URLParam(r, "id")); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			errResp(w, http.StatusNotFound, "event not found")
+			return
+		}
+		errResp(w, http.StatusInternalServerError, "failed to delete event")
 		return
 	}
 	dataResp(w, http.StatusOK, map[string]string{"message": "deleted"})

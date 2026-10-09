@@ -157,6 +157,21 @@ func main() {
 		    AND c.deleted = 0
 		    AND upper(regexp_replace(normalize(c.subject, NFKD), '[\u0300-\u036f]', '', 'g')) = k.fold_key
 		    AND c.subject IS DISTINCT FROM k.winner`,
+		`CREATE TABLE IF NOT EXISTS events (
+			user_id     TEXT NOT NULL REFERENCES app_users(user_id),
+			event_id    TEXT PRIMARY KEY,
+			title       TEXT NOT NULL,
+			description TEXT DEFAULT '',
+			location    TEXT DEFAULT '',
+			start_at    BIGINT NOT NULL,
+			end_at      BIGINT,
+			all_day     BOOLEAN NOT NULL DEFAULT false,
+			color       TEXT DEFAULT '#0A84FF',
+			updated_at  BIGINT DEFAULT 0,
+			deleted     INT DEFAULT 0,
+			CHECK (end_at IS NULL OR end_at >= start_at)
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_events_user_start ON events(user_id, start_at)`,
 	}
 
 	for i, m := range migrations {

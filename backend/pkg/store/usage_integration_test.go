@@ -161,3 +161,37 @@ func TestCountSubtasksScopedToTaskAndCountsSoftDeleted(t *testing.T) {
 		t.Errorf("CountSubtasks(taskB) = %d (err %v), want 1", n, err)
 	}
 }
+
+// TestCountEventsCountsSoftDeleted guards the point of the events ceiling:
+// deleting an event must not free up room, since deleted is soft.
+func TestCountEventsCountsSoftDeleted(t *testing.T) {
+	s, pool, user := newTestStore(t)
+	t.Cleanup(func() {
+		if _, err := pool.Exec(context.Background(), `DELETE FROM events WHERE user_id = $1`, user.UserID); err != nil {
+			t.Errorf("cleanup: delete events: %v", err)
+		}
+	})
+
+	ctx := context.Background()
+	insert := func(deleted int) {
+		t.Helper()
+		_, err := pool.Exec(ctx,
+			`INSERT INTO events (user_id, event_id, title, start_at, deleted)
+			 VALUES ($1, $2, 'Talk', 1700000000000, $3)`,
+			user.UserID, genID("evt"), deleted,
+		)
+		if err != nil {
+			t.Fatalf("insert event (deleted=%d): %v", deleted, err)
+		}
+	}
+	insert(0)
+	insert(1)
+
+	n, err := s.CountEvents(user.UserID)
+	if err != nil {
+		t.Fatalf("CountEvents: %v", err)
+	}
+	if n != 2 {
+		t.Errorf("CountEvents = %d, want 2 (soft-deleted included)", n)
+	}
+}

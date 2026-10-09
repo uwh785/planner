@@ -53,6 +53,7 @@ const (
 	ResourceTag     Resource = "tags"
 	ResourceClass   Resource = "classes"
 	ResourceSubtask Resource = "subtasks"
+	ResourceEvent   Resource = "events"
 )
 
 // LimitError reports that a plan's cap for a resource has been reached.
@@ -108,6 +109,7 @@ var storageCeilings = map[Resource]int{
 	ResourceTag:     200,
 	ResourceClass:   100,
 	ResourceSubtask: 50,
+	ResourceEvent:   2000,
 }
 
 // CeilingFor returns the hard storage ceiling for a resource, or Unlimited if
