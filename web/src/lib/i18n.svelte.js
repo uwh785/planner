@@ -195,7 +195,10 @@ const translations = {
     eventStorageLimit: 'Llegaste al máximo de eventos que se pueden guardar. Borrá alguno para crear otro.',
     eventInvalid: 'Revisá los datos del evento: hay un campo vacío o demasiado largo.',
     eventTooLarge: 'El evento es demasiado grande. Acortá las notas.',
-    eventSaveError: 'No se pudo guardar el evento. Intentá de nuevo.'
+    eventSaveError: 'No se pudo guardar el evento. Intentá de nuevo.',
+    eventsDayTitle: 'Eventos',
+    eventsUpcomingTitle: 'Próximos eventos',
+    dashboardTodayEvents: 'Eventos de hoy'
   },
   en: {
     appName: 'Planner',
@@ -391,7 +394,10 @@ const translations = {
     eventStorageLimit: 'You reached the maximum number of events that can be stored. Delete one to create another.',
     eventInvalid: 'Check the event details: a field is empty or too long.',
     eventTooLarge: 'The event is too large. Shorten the notes.',
-    eventSaveError: 'Could not save the event. Please try again.'
+    eventSaveError: 'Could not save the event. Please try again.',
+    eventsDayTitle: 'Events',
+    eventsUpcomingTitle: 'Upcoming events',
+    dashboardTodayEvents: "Today's events"
   }
 };
 

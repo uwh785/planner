@@ -268,3 +268,79 @@ export function eventErrorKey(status) {
   if (status === 400) return 'eventInvalid';
   return 'eventSaveError';
 }
+
+// --- Event display helpers ---
+
+// Local midnight of the last day an event occupies. The end is exclusive, so
+// an event ending exactly at midnight does not spill into that day; an event
+// without an end (all-day, or timed with no end time) occupies only its
+// start day.
+function eventLastDayStart(event) {
+  const start = event.start_at;
+  const end = event.end_at;
+  const last = end !== null && end !== undefined && end > start ? end - 1 : start;
+  return startOfLocalDay(last);
+}
+
+// 'YYYY-MM-DD' keys of every local day the event spans, in order. Capped so a
+// malformed range can never loop for long.
+export function eventDayKeys(event, maxDays = 366) {
+  if (!event || !event.start_at) return [];
+  const keys = [];
+  const lastDay = eventLastDayStart(event);
+  let day = startOfLocalDay(event.start_at);
+  while (day <= lastDay && keys.length < maxDays) {
+    keys.push(toDateInputValue(day));
+    day = addDays(day, 1);
+  }
+  return keys;
+}
+
+// Orders events for display: by day, all-day ones first within a day, then by
+// start time.
+export function sortEvents(events) {
+  return [...(Array.isArray(events) ? events : [])].sort((a, b) => {
+    // All-day events lead only within their own day, never across days.
+    const dayDiff = startOfLocalDay(a.start_at) - startOfLocalDay(b.start_at);
+    if (dayDiff !== 0) return dayDiff;
+    if (!!a.all_day !== !!b.all_day) return a.all_day ? -1 : 1;
+    return a.start_at - b.start_at;
+  });
+}
+
+// Events that occupy the local day starting at `dayStartMs`, sorted.
+export function eventsOnDay(events, dayStartMs) {
+  const list = Array.isArray(events) ? events : [];
+  const dayStart = startOfLocalDay(dayStartMs);
+  return sortEvents(
+    list.filter((e) => e?.start_at && startOfLocalDay(e.start_at) <= dayStart && eventLastDayStart(e) >= dayStart)
+  );
+}
+
+// Map of 'YYYY-MM-DD' -> sorted events occupying that day; multi-day events
+// appear under every day they span.
+export function groupEventsByDay(events) {
+  const map = new Map();
+  for (const event of Array.isArray(events) ? events : []) {
+    for (const key of eventDayKeys(event)) {
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(event);
+    }
+  }
+  for (const [key, list] of map) map.set(key, sortEvents(list));
+  return map;
+}
+
+// Human time label for an event: `allDayLabel` for all-day events, "HH:MM" for
+// a timed event without an end, "HH:MM – HH:MM" for a same-day range, and the
+// end date added ("HH:MM – 14 nov HH:MM") when it ends on a later day.
+export function formatEventTime(event, allDayLabel, monthNames) {
+  if (!event) return '';
+  if (event.all_day) return allDayLabel || '';
+  const start = toTimeInputValue(event.start_at);
+  const end = event.end_at;
+  if (end === null || end === undefined) return start;
+  const endTime = toTimeInputValue(end);
+  if (isSameLocalDay(event.start_at, end)) return `${start} – ${endTime}`;
+  return `${start} – ${formatShortDate(end, monthNames)} ${endTime}`;
+}

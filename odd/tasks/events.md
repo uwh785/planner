@@ -30,7 +30,7 @@ The user felt events are different from tasks and only had "new task" available.
 ## Tasks
 - [x] T1 Backend events: migration, model + validation, store CRUD + range list, handlers + routes, storage ceiling, tests - route: delegated writer (5+ non-trivial files)
 - [x] T2 Frontend create/edit: Task/Event chooser on "+", event form, `/events/new` and `/events/[id]`, i18n - route: delegated writer
-- [ ] T3 Frontend display: events in tasks day view, calendar month, dashboard today - route: delegated writer
+- [x] T3 Frontend display: events in tasks day view, calendar month, dashboard today - route: delegated writer
 
 ## Acceptance criteria
 - POST `/api/events` with a valid body returns 201; missing title, end before start, or oversized text returns 400; body over the limit returns 413.
@@ -60,5 +60,14 @@ The user felt events are different from tasks and only had "new task" available.
 - Pre-existing, out of scope: tasks list shows `msgSaving` ("Guardando...") as its loading label (already on `main`).
 - Open: `prisma/schema.prisma` has no Event model (Subscription is also absent, so it appears intentionally unsynced).
 
+- T2 committed 9726e11; review approved with 0 findings (review-dc7ce294d86ee19f). A whole-range review since 5a54f38 was also approved (review-6832e2e5527eaf2c). The selectorless base stays at the remote `main` until local `main` is pushed.
+- T3 done (delegated writer + one inline fix).
+  - New `EventCard`; events sections on the tasks page (`?date=` day, or the next 7 days without a date), calendar month bars per day (multi-day events span every day), and a dashboard "Today's events" block. All are hidden when empty, and an events error never breaks tasks.
+  - Test-first exception: there is no web test runner. Helpers in `utils.js` were checked ad hoc with node.
+  - Browser smoke test (local backend + docker Postgres) with 3 seeded events: the thesis shows on `/tasks?date=2026-11-14` with 10:00-12:00 and its location; the calendar shows the 3-day congress on 11-13 Oct and dinner on the 9th; the dashboard shows dinner under "Eventos de hoy".
+  - Bug found in the smoke test and fixed inline: `sortEvents` put all-day events first across days (11 Oct before 9 Oct). It now orders by local day, then all-day first, then start time. Re-verified with a node check and in the browser.
+  - `npm run build` ok, no warnings.
+  - Follow-ups: the events section ignores the tasks status filter and search; the "no tasks" empty state still shows under events.
+
 ## Next step
-T3.
+Feature complete. Delivery (push `main`, then stacked PRs) is the user's decision.

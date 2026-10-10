@@ -6,8 +6,9 @@
   import { t } from '$lib/i18n.svelte.js';
   import TaskCard from '$lib/components/TaskCard.svelte';
   import TaskFilters from '$lib/components/TaskFilters.svelte';
+  import EventCard from '$lib/components/EventCard.svelte';
   import { Plus, X, ListTodo, CalendarDays } from '@lucide/svelte';
-  import { groupTasksByDay, fromDateInputValue, addDays, formatShortDate } from '$lib/utils.js';
+  import { groupTasksByDay, fromDateInputValue, addDays, formatShortDate, startOfLocalDay, sortEvents } from '$lib/utils.js';
 
   let loading = $state(true);
   let filter = $state('all');
@@ -18,8 +19,35 @@
   $effect(() => {
     dateParam;
     if (!A.token) goto('/');
-    else loadTasks();
+    else {
+      loadTasks();
+      loadEvents();
+    }
   });
+
+  // Events load on their own: a failure only hides the events section and
+  // never touches the tasks list. With a date filter they are that day's
+  // events; without one, the next 7 days starting today.
+  let events = $state([]);
+  let eventsRequest = 0;
+
+  async function loadEvents() {
+    const request = ++eventsRequest;
+    let from = dateParam ? fromDateInputValue(dateParam) : startOfLocalDay(Date.now());
+    if (from === null) from = startOfLocalDay(Date.now());
+    const to = addDays(from, dateParam ? 1 : 7);
+    try {
+      const res = await api(`/api/events?from=${from}&to=${to}`);
+      if (request === eventsRequest) events = sortEvents(res || []);
+    } catch (e) {
+      console.error(e);
+      if (request === eventsRequest) events = [];
+    }
+  }
+
+  function goToEvent(event) {
+    goto(`/events/${event.event_id}`);
+  }
 
   async function loadTasks() {
     loading = true;
@@ -160,6 +188,20 @@
     />
     <TaskFilters activeFilter={filter} onfilter={handleFilter} />
   </div>
+
+  {#if events.length > 0}
+    <section class="task-group event-group">
+      <h2 class="group-title">
+        {dateParam ? t('eventsDayTitle') : t('eventsUpcomingTitle')}
+        <span class="group-count">{events.length}</span>
+      </h2>
+      <div class="task-list">
+        {#each events as event (event.event_id)}
+          <EventCard {event} showDate={!dateParam} onclick={goToEvent} />
+        {/each}
+      </div>
+    </section>
+  {/if}
 
   {#if loading}
     <p class="loading">{t('msgSaving')}</p>

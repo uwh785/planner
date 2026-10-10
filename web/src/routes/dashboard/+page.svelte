@@ -4,14 +4,16 @@
   import { dashboard } from '$lib/stores.svelte.js';
   import { t } from '$lib/i18n.svelte.js';
   import TaskCard from '$lib/components/TaskCard.svelte';
+  import EventCard from '$lib/components/EventCard.svelte';
   import CountdownRing from '$lib/components/CountdownRing.svelte';
-  import { splitTodayClasses, formatMinuteDuration, formatTimeRange, startOfLocalDay, addDays } from '$lib/utils.js';
+  import { splitTodayClasses, formatMinuteDuration, formatTimeRange, startOfLocalDay, addDays, sortEvents } from '$lib/utils.js';
 
   let loading = $state(true);
   let error = $state('');
   let todayClasses = $state([]);
   let todayTasks = $state([]);
   let todayTasksLoading = $state(true);
+  let todayEvents = $state([]);
 
   function currentMinuteOfDay() {
     const d = new Date();
@@ -25,8 +27,24 @@
     else {
       loadDashboard();
       loadTodayTasks();
+      loadTodayEvents();
     }
   });
+
+  // Independent of the tasks requests: on failure the block simply stays hidden.
+  async function loadTodayEvents() {
+    try {
+      const from = startOfLocalDay(Date.now());
+      const to = addDays(from, 1);
+      todayEvents = sortEvents(await api(`/api/events?from=${from}&to=${to}`));
+    } catch {
+      todayEvents = [];
+    }
+  }
+
+  function goToEvent(event) {
+    goto(`/events/${event.event_id}`);
+  }
 
   $effect(() => {
     if (!A.token) return;
@@ -106,6 +124,17 @@
 
 <div class="dashboard">
   <h1>{t('dashboardTitle')}</h1>
+
+  {#if todayEvents.length > 0}
+    <section class="today-events">
+      <h2>{t('dashboardTodayEvents')}</h2>
+      <div class="task-list">
+        {#each todayEvents as event (event.event_id)}
+          <EventCard {event} onclick={goToEvent} />
+        {/each}
+      </div>
+    </section>
+  {/if}
 
   {#if todayClasses.length > 0}
     <section class="today-classes">

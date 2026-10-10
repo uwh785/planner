@@ -2,11 +2,12 @@
   import { goto } from '$app/navigation';
   import { A, api } from '$lib/api.svelte.js';
   import { t, locale } from '$lib/i18n.svelte.js';
-  import { toDateInputValue } from '$lib/utils.js';
+  import { toDateInputValue, groupEventsByDay } from '$lib/utils.js';
   import { ChevronLeft, ChevronRight } from '@lucide/svelte';
 
   let currentDate = $state(new Date());
   let tasks = $state([]);
+  let events = $state([]);
   let loading = $state(true);
 
   const year = $derived(currentDate.getFullYear());
@@ -24,9 +25,10 @@
 
   async function loadMonth() {
     loading = true;
+    const from = new Date(year, month, 1).getTime();
+    const to = new Date(year, month + 1, 1).getTime();
+    loadMonthEvents(from, to);
     try {
-      const from = new Date(year, month, 1).getTime();
-      const to = new Date(year, month + 1, 1).getTime();
       const params = new URLSearchParams({ from: String(from), to: String(to), limit: '100' });
       const res = await api(`/api/tasks?${params.toString()}`);
       tasks = res || [];
@@ -35,6 +37,26 @@
     } finally {
       loading = false;
     }
+  }
+
+  // Events load separately so a failure only drops the event chips; the
+  // request counter discards answers for a month the user already left.
+  let eventsRequest = 0;
+
+  async function loadMonthEvents(from, to) {
+    const request = ++eventsRequest;
+    try {
+      const res = await api(`/api/events?from=${from}&to=${to}`);
+      if (request === eventsRequest) events = res || [];
+    } catch {
+      if (request === eventsRequest) events = [];
+    }
+  }
+
+  const eventsByDay = $derived(groupEventsByDay(events));
+
+  function getEventsForDay(day) {
+    return eventsByDay.get(toDateInputValue(new Date(year, month, day).getTime())) || [];
   }
 
   function getTasksForDay(day) {
@@ -88,12 +110,24 @@
         <div class="day-cell empty"></div>
       {:else}
         {@const dayTasks = getTasksForDay(day)}
+        {@const dayEvents = getEventsForDay(day)}
         <button
           class="day-cell"
           class:has-tasks={dayTasks.length > 0}
+          class:has-events={dayEvents.length > 0}
           onclick={() => goToDay(day)}
         >
           <span class="day-number">{day}</span>
+          {#if dayEvents.length > 0}
+            <div class="day-events" title={dayEvents.map((e) => e.title).join(', ')}>
+              {#each dayEvents.slice(0, 3) as ev (ev.event_id)}
+                <span class="event-chip" style="--chip-color: {ev.color || 'var(--accent)'}"></span>
+              {/each}
+              {#if dayEvents.length > 3}
+                <span class="more">+{dayEvents.length - 3}</span>
+              {/if}
+            </div>
+          {/if}
           {#if dayTasks.length > 0}
             <div class="day-dots">
               {#each dayTasks.slice(0, 3) as _}
@@ -188,6 +222,23 @@
 
   .day-cell.has-tasks {
     border-color: var(--accent);
+  }
+
+  .day-cell.has-events {
+    background: var(--surface2);
+  }
+
+  .day-events {
+    display: flex;
+    gap: 3px;
+    align-items: center;
+  }
+
+  .event-chip {
+    width: 10px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--chip-color);
   }
 
   .day-number {
