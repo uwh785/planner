@@ -237,3 +237,34 @@ export function splitTodayClasses(classes, nowMinute) {
   const upcoming = future.slice(1);
   return { current, next, upcoming };
 }
+
+// Builds an event's start_at/end_at (epoch ms) from the form inputs. An
+// all-day event starts at local midnight of its date and has no end; a timed
+// event without an end time also has no end. Returns null when the date or
+// start time is missing or malformed.
+export function eventTimesFromInputs(dateStr, allDay, startTime, endTime) {
+  if (allDay) {
+    const start = fromDateInputValue(dateStr);
+    return start === null ? null : { start_at: start, end_at: null };
+  }
+  if (!startTime) return null;
+  const start = combineLocalDateTime(dateStr, startTime);
+  if (start === null) return null;
+  const end = endTime ? combineLocalDateTime(dateStr, endTime) : null;
+  return { start_at: start, end_at: end };
+}
+
+// Mirrors the backend rule: an event may end when it starts, never before.
+export function isEventEndValid(times) {
+  return !times || times.end_at === null || times.end_at >= times.start_at;
+}
+
+// Maps a failed event save to the i18n key of the message to show. The api
+// helper hides the backend's message, so the status is all there is to go on:
+// 409 is the storage ceiling (not a plan limit), 413 an oversized body.
+export function eventErrorKey(status) {
+  if (status === 409) return 'eventStorageLimit';
+  if (status === 413) return 'eventTooLarge';
+  if (status === 400) return 'eventInvalid';
+  return 'eventSaveError';
+}

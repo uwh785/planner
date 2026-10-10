@@ -29,7 +29,7 @@ The user felt events are different from tasks and only had "new task" available.
 
 ## Tasks
 - [x] T1 Backend events: migration, model + validation, store CRUD + range list, handlers + routes, storage ceiling, tests - route: delegated writer (5+ non-trivial files)
-- [ ] T2 Frontend create/edit: Task/Event chooser on "+", event form, `/events/new` and `/events/[id]`, i18n - route: delegated writer
+- [x] T2 Frontend create/edit: Task/Event chooser on "+", event form, `/events/new` and `/events/[id]`, i18n - route: delegated writer
 - [ ] T3 Frontend display: events in tasks day view, calendar month, dashboard today - route: delegated writer
 
 ## Acceptance criteria
@@ -41,10 +41,24 @@ The user felt events are different from tasks and only had "new task" available.
 - `go test ./...` passes; `npm run build` passes.
 
 ## Delivery
-- Strategy: ask-on-risk. Forecast ~900 authored lines across 3 tasks (exceeds ~400): ask for chain strategy before the second work-unit commit.
+- Strategy: ask-on-risk. Forecast ~900 authored lines across 3 tasks (exceeds ~400).
+- Chain strategy (user, 2026-10-09): `stacked-to-main`.
+- Slices: PR1 = T1 backend (`4440576` + docs), PR2 = T2 create/edit UI, PR3 = T3 display. Each PR targets `main` and is based on the previous slice. Push and PR creation remain the user's decision.
 
 ## Progress
 - Branch `feat/events` created on top of `feat/storage-caps` (d82b62c).
+- T1 done (delegated writer), committed 398a888, rebased to 4440576 (same content).
+  - RED: build failures (undefined model.Event, plan.ResourceEvent, store/app methods).
+  - GREEN: `gofmt -l .` empty, `go vet ./...` clean, `go test ./...` 194 passed; store integration against local docker Postgres (port 5434, migrations 1-21) `go test ./pkg/store/` ok, 27 PASS, 0 skipped.
+  - Decisions: `event_id TEXT PRIMARY KEY` like every table; DB CHECK end_at >= start_at; ceiling via enforceCeiling returns 409; updateEvent returns the stored row; server always generates event_id.
+  - RDD: medium, consent granted, reliability lens approved with 0 findings, acknowledged (review-23e82f1b428b9a1a). A consolidated review of the whole range since 5a54f38 (storage-caps + events T1) was also granted and approved with 0 findings (review-09d266819ddc723d).
+- `feat/storage-caps` fast-forwarded into local `main` (46b270d), not pushed; `feat/events` rebased onto it.
+- T2 done (delegated writer).
+  - Test-first exception: `web/` has no test runner; logic kept in pure helpers in `utils.js` (`eventTimesFromInputs`, `isEventEndValid`, `eventErrorKey`).
+  - Checks: `npm run build` ok, no warnings. Browser smoke test against local backend + docker Postgres: "+" opens a Task/Event menu; Event keeps `?date=`; end-before-start shows a client error; create stored 10:00-12:00 with location; edit to all-day stored start at local midnight and `end_at` null; delete with confirm, then GET returned 404.
+  - Known limits: `api()` drops the backend error text, so pages map status codes to i18n messages; `/events/[id]` opens straight into the edit form, like classes.
+- Pre-existing, out of scope: tasks list shows `msgSaving` ("Guardando...") as its loading label (already on `main`).
+- Open: `prisma/schema.prisma` has no Event model (Subscription is also absent, so it appears intentionally unsynced).
 
 ## Next step
-T1.
+T3.

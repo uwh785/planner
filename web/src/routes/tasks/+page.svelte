@@ -6,7 +6,7 @@
   import { t } from '$lib/i18n.svelte.js';
   import TaskCard from '$lib/components/TaskCard.svelte';
   import TaskFilters from '$lib/components/TaskFilters.svelte';
-  import { Plus, X } from '@lucide/svelte';
+  import { Plus, X, ListTodo, CalendarDays } from '@lucide/svelte';
   import { groupTasksByDay, fromDateInputValue, addDays, formatShortDate } from '$lib/utils.js';
 
   let loading = $state(true);
@@ -80,8 +80,23 @@
     goto('/tasks');
   }
 
-  function goToNewTask() {
-    goto(dateParam ? `/tasks/new?date=${dateParam}` : '/tasks/new');
+  // The "+" opens a small menu so the user picks what to create; both targets
+  // keep the day being viewed as their default date.
+  let newMenuOpen = $state(false);
+  let newMenuEl = $state(null);
+
+  function goToNew(kind) {
+    newMenuOpen = false;
+    const base = kind === 'event' ? '/events/new' : '/tasks/new';
+    goto(dateParam ? `${base}?date=${dateParam}` : base);
+  }
+
+  function handleWindowClick(e) {
+    if (newMenuOpen && newMenuEl && !newMenuEl.contains(e.target)) newMenuOpen = false;
+  }
+
+  function handleWindowKeydown(e) {
+    if (newMenuOpen && e.key === 'Escape') newMenuOpen = false;
   }
 
   const grouped = $derived(groupTasksByDay(tasks.value, Date.now()));
@@ -102,10 +117,32 @@
   ]);
 </script>
 
+<svelte:window onclick={handleWindowClick} onkeydown={handleWindowKeydown} />
+
 <div class="tasks-page">
   <div class="tasks-header">
     <h1>{t('tasksTitle')}</h1>
-    <button class="btn-add" onclick={goToNewTask} aria-label="New task"><Plus size={20} /></button>
+    <div class="new-menu" bind:this={newMenuEl}>
+      <button
+        class="btn-add"
+        onclick={() => newMenuOpen = !newMenuOpen}
+        aria-label={t('newChooserLabel')}
+        aria-haspopup="menu"
+        aria-expanded={newMenuOpen}
+      ><Plus size={20} /></button>
+      {#if newMenuOpen}
+        <div class="new-menu-list" role="menu">
+          <button class="new-menu-item" role="menuitem" onclick={() => goToNew('task')}>
+            <ListTodo size={18} />
+            {t('newChooserTask')}
+          </button>
+          <button class="new-menu-item" role="menuitem" onclick={() => goToNew('event')}>
+            <CalendarDays size={18} />
+            {t('newChooserEvent')}
+          </button>
+        </div>
+      {/if}
+    </div>
   </div>
 
   {#if dateParam}
@@ -203,6 +240,44 @@
 
   .btn-add:hover {
     opacity: 0.9;
+  }
+
+  .new-menu {
+    position: relative;
+  }
+
+  .new-menu-list {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    z-index: 10;
+    min-width: 160px;
+    display: flex;
+    flex-direction: column;
+    padding: 6px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  }
+
+  .new-menu-item {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 12px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text);
+    font-size: 15px;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .new-menu-item:hover, .new-menu-item:focus-visible {
+    background: var(--surface2);
   }
 
   .date-filter-banner {

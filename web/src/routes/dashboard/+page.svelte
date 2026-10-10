@@ -160,7 +160,10 @@
     {:else if todayTasks.length === 0}
       <div class="empty-state">
         <p>{t('dashboardNothingToday')}</p>
-        <a href="/tasks/new" class="today-tasks-link">{t('taskNew')}</a>
+        <div class="today-tasks-links">
+          <a href="/tasks/new" class="today-tasks-link">{t('taskNew')}</a>
+          <a href="/events/new" class="today-tasks-link">{t('eventNew')}</a>
+        </div>
       </div>
     {:else}
       <div class="task-list">
@@ -407,6 +410,12 @@
 
   .section {
     margin-top: 8px;
+  }
+
+  .today-tasks-links {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
   }
 
   .today-tasks-link {
