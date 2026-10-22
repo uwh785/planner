@@ -108,6 +108,7 @@ func (a *App) Handler() http.Handler {
 
 			// Sync
 			r.Get("/sync", a.syncPull)
+			r.Post("/sync/push", a.syncPush)
 
 			// Dashboard
 			r.Get("/dashboard", a.dashboard)
