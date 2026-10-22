@@ -72,10 +72,10 @@ Auth is the backend's own: `register`, `login`, `refresh`, `logout` under `/api/
 
 The API origin is chosen in `src/infrastructure/config/apiConfig.ts`:
 
-- Debug (`__DEV__`): `http://10.0.2.2:8080`, the Android emulator's alias for the host. Start the backend with `JWT_SECRET=... go run ./cmd/server` in the `planner` repository. On a physical device use `adb reverse tcp:8080 tcp:8080` and change `DEV_API_BASE_URL`.
+- Debug (`__DEV__`): `http://10.0.2.2:8080`, the Android emulator's alias for the host. Start the backend with `JWT_SECRET=... go run ./cmd/server` from the repository's `backend/` directory. On a physical device use `adb reverse tcp:8080 tcp:8080` and change `DEV_API_BASE_URL`.
 - Release: set `RELEASE_API_BASE_URL` (an `https://` origin) before building. It is `null` by default and a release build refuses to start without it; it never falls back to the dev URL.
 - Cleartext HTTP is allowed in debug builds only: React Native's Gradle plugin sets the `usesCleartextTraffic` manifest placeholder to `true` for debug and `false` for release (checked in the merged release manifest).
 
 ## Backend
 
-Talks to the Planner backend (separate repository, `planner`) through `/api/auth/*` and `/api/sync*`. See `PRODUCT.md` for product context.
+Talks to the Planner backend (the sibling `backend/` directory of this repository) through `/api/auth/*` and `/api/sync*`. See `PRODUCT.md` for product context.

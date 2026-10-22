@@ -8,7 +8,7 @@ The Planner web app needs a network. The user wants the same data on a phone, re
 
 ## Scope
 - Android only (the dev machine is Linux; iOS cannot be built here). Dev target: emulator `Pixel_10_Pro`.
-- Backend contract (already implemented in `/home/kv/Projects/programming/planner`, branch `feat/offline-sync-schema`): `POST /api/auth/register|login|refresh|logout`, `GET /api/sync?since=`, `POST /api/sync/push` (batch, `change_id` for timer ops), client-generated IDs, timer transitions with client `at`.
+- Backend contract (already implemented in `../backend` of this repository (the app lives in `native-client/`)): `POST /api/auth/register|login|refresh|logout`, `GET /api/sync?since=`, `POST /api/sync/push` (batch, `change_id` for timer ops), client-generated IDs, timer transitions with client `at`.
 - Out of scope: iOS, push notifications from the server, web changes.
 
 ## Constraints
