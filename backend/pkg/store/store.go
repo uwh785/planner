@@ -810,6 +810,24 @@ func (s *Store) ReplayTag(userID, tagID string) (model.Tag, error) {
 	return t, err
 }
 
+// UpdateTag overwrites a live tag's name and color (an empty color keeps the
+// stored one). It returns ErrNotFound if the tag does not exist (unknown ID,
+// deleted, or belongs to another user).
+func (s *Store) UpdateTag(userID string, t model.Tag) error {
+	tag, err := s.pool.Exec(context.Background(),
+		`UPDATE tags SET name = $3, color = COALESCE(NULLIF($4, ''), color), updated_at = $5
+		 WHERE user_id = $1 AND tag_id = $2 AND deleted = 0`,
+		userID, t.TagID, t.Name, t.Color, time.Now().UnixMilli(),
+	)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // DeleteTag soft-deletes the tag and tombstones every task link to it, so a
 // delta pull sees both the tag and its links disappear.
 func (s *Store) DeleteTag(userID, tagID string) error {

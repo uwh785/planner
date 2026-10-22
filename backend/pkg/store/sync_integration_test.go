@@ -13,6 +13,25 @@ import (
 	"planner/pkg/model"
 )
 
+// TestSyncCursorOverlap needs no database: the cursor handed to the client
+// trails the capture time by SyncCursorOverlapMs, so a writer that stamped an
+// earlier updated_at but commits after the snapshot is delivered by the next
+// pull instead of being skipped forever. It never goes below 0.
+func TestSyncCursorOverlap(t *testing.T) {
+	now := time.UnixMilli(1_700_000_000_000)
+	if got, want := syncCursor(now), int64(1_700_000_000_000)-SyncCursorOverlapMs; got != want {
+		t.Errorf("syncCursor = %d, want capture time minus the %d ms margin = %d", got, SyncCursorOverlapMs, want)
+	}
+	if SyncCursorOverlapMs != 5000 {
+		t.Errorf("SyncCursorOverlapMs = %d, want 5000", SyncCursorOverlapMs)
+	}
+	for _, ms := range []int64{0, 1, SyncCursorOverlapMs - 1} {
+		if got := syncCursor(time.UnixMilli(ms)); got != 0 {
+			t.Errorf("syncCursor(%d ms) = %d, want 0 (floored)", ms, got)
+		}
+	}
+}
+
 // TestSyncChangesIntegration checks the pull side of delta sync: every entity
 // kind comes back, tombstones included, filtered by user and by the inclusive
 // updated_at cursor, with non-nil slices even when nothing changed. It is
@@ -118,8 +137,9 @@ func TestSyncChangesIntegration(t *testing.T) {
 		t.Fatalf("SyncChanges(0): %v", err)
 	}
 	after := time.Now().UnixMilli()
-	if got.Cursor < before || got.Cursor > after {
-		t.Errorf("cursor = %d, want within [%d, %d]", got.Cursor, before, after)
+	// The cursor trails the server clock by the overlap margin (see syncCursor).
+	if got.Cursor < before-SyncCursorOverlapMs || got.Cursor > after-SyncCursorOverlapMs {
+		t.Errorf("cursor = %d, want within [%d, %d]", got.Cursor, before-SyncCursorOverlapMs, after-SyncCursorOverlapMs)
 	}
 	if len(got.Lists) != 1 || got.Lists[0].Row.ListID != list.ListID || got.Lists[0].Row.UserID != owner.UserID || got.Lists[0].Deleted {
 		t.Errorf("lists = %+v, want only the owner's live list", got.Lists)

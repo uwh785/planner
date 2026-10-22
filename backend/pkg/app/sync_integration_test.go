@@ -132,8 +132,9 @@ func TestSyncPullIntegration(t *testing.T) {
 	if err := json.Unmarshal([]byte(body), &out); err != nil {
 		t.Fatalf("decode %q: %v", body, err)
 	}
-	if out.Data.Cursor < before-1000 || out.Data.Cursor > time.Now().UnixMilli() {
-		t.Errorf("cursor = %d, want a recent server time in ms", out.Data.Cursor)
+	// The cursor trails the server clock by the store's overlap margin.
+	if out.Data.Cursor < before-store.SyncCursorOverlapMs-1000 || out.Data.Cursor > time.Now().UnixMilli()-store.SyncCursorOverlapMs {
+		t.Errorf("cursor = %d, want a recent server time in ms minus the overlap margin", out.Data.Cursor)
 	}
 	if !strings.Contains(body, `"list_id":null`) {
 		t.Errorf("body %s: want list_id serialized as null for a task without a list", body)

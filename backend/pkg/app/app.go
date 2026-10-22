@@ -393,6 +393,41 @@ func (a *App) enforceCeiling(w http.ResponseWriter, resource plan.Resource, tota
 	return true
 }
 
+// guardSubtask, guardClass and guardEvent are the create guards for the
+// resources that only have a storage ceiling (no plan cap): they count what
+// the user (or parent task) owns and refuse with 409 at the ceiling. Like
+// enforceCeiling they write the error response and return false. Shared by the
+// create handlers and sync push.
+func (a *App) guardSubtask(w http.ResponseWriter, userID, taskID string) bool {
+	total, err := a.store.CountSubtasks(userID, taskID)
+	if err != nil {
+		log.Printf("count subtasks for %s/%s: %v", userID, taskID, err)
+		errResp(w, http.StatusInternalServerError, "failed to resolve usage")
+		return false
+	}
+	return a.enforceCeiling(w, plan.ResourceSubtask, total)
+}
+
+func (a *App) guardClass(w http.ResponseWriter, userID string) bool {
+	total, err := a.store.CountClasses(userID)
+	if err != nil {
+		log.Printf("count classes for %s: %v", userID, err)
+		errResp(w, http.StatusInternalServerError, "failed to resolve usage")
+		return false
+	}
+	return a.enforceCeiling(w, plan.ResourceClass, total)
+}
+
+func (a *App) guardEvent(w http.ResponseWriter, userID string) bool {
+	total, err := a.store.CountEvents(userID)
+	if err != nil {
+		log.Printf("count events for %s: %v", userID, err)
+		errResp(w, http.StatusInternalServerError, "failed to resolve usage")
+		return false
+	}
+	return a.enforceCeiling(w, plan.ResourceEvent, total)
+}
+
 // createIdempotent runs a create so an offline client can replay it safely.
 // With a client-supplied id it first looks the row up: the caller's own live
 // row is returned as 200 without touching the stored data, and an id owned by

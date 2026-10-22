@@ -28,7 +28,7 @@ ask-on-risk. Forecast ~350 authored changed lines across the feature.
 - [x] T2 Store: soft-delete tags/task_tags, bump `updated_at` on task/subtask delete, filter `deleted` in reads and counts. Route: delegated writer (2+ non-trivial files).
 - [x] T3 Idempotent creates: same-user duplicate ID returns the existing row; cross-user collision returns 409. Route: delegated writer (2+ non-trivial files).
 - [x] T4a Sync pull: `GET /api/sync?since=` returns every row changed since the cursor, tombstones included, plus a new cursor.
-- [ ] T4b Sync push: `POST /api/sync/push` applies a batch of upserts/deletes with per-item results (incl. 402/409), reusing the T3 idempotent creates.
+- [x] T4b Sync push: `POST /api/sync/push` applies a batch of upserts/deletes with per-item results (incl. 402/409), reusing the T3 idempotent creates.
 - [ ] T5 Client-supplied timestamps for start/pause/complete so offline timer segments replay faithfully.
 - [ ] T6 Auth: longer-lived or refreshable token for long offline periods.
 
@@ -53,5 +53,9 @@ T4a: RED observed first (both new test files failed to compile: `Store.SyncChang
 
 Follow-up (non-blocking review advisory): soft-deleted tags are never purged and count toward the tag storage ceiling (`CountTagsUsage.Total`); decide a purge policy later.
 
+T4b: RED observed first (store and app test packages failed to compile: `syncCursor`, `store.SyncCursorOverlapMs`, `App.syncPush` undefined). GREEN after implementing `backend/pkg/app/sync_push.go` (`POST /api/sync/push`: max 200 changes, whole-batch 400 for bad JSON/empty/oversized/unknown entity or op, otherwise 200 with per-item `applied|exists|not_found|conflict|limit|invalid|error` plus the single-endpoint `http_status`; non-atomic, upserts in dependency order then deletes in reverse, results in request order; create guards reuse `enforceLimit`/`enforceCeiling` through a response recorder, with the subtask/class/event guards extracted into `guardSubtask`/`guardClass`/`guardEvent` shared with the create handlers), `store.UpdateTag`, `store.EntityState` (own-live / own-deleted / foreign / absent for idempotent deletes), `store.TaskTagLive`, and the route in `app.go`. Task upsert decodes `list_id` through a shadowing `*string` because `model.Task.ListID` is a `sql.NullString` that cannot decode a plain JSON string. New `backend/pkg/app/sync_push_integration_test.go`. Cursor-margin fix for the T4a review advisory: `SyncChanges` now returns capture time minus `SyncCursorOverlapMs` (5000, floored at 0) via `syncCursor`; new `TestSyncCursorOverlap` and the existing cursor assertions updated. Timer replay (start/pause/complete) is deliberately left to T5.
+
+Note: the T4a review advisory (pull cursor commit race: a writer stamping `updated_at` below the cursor but committing after the snapshot was invisible forever) was fixed here with the overlap margin.
+
 ## Next step
-T4b.
+T5.

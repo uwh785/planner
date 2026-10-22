@@ -3,6 +3,8 @@ package store
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -48,7 +50,7 @@ type SyncTaskTag struct {
 }
 
 // SyncChanges is everything one user changed since a cursor. Cursor is the
-// server time to send as `since` next time. Every slice is non-nil.
+// value to send as `since` next time (server time minus SyncCursorOverlapMs). Every slice is non-nil.
 type SyncChanges struct {
 	Cursor   int64                         `json:"cursor"`
 	Lists    []SyncRow[model.TaskList]     `json:"lists"`
@@ -82,16 +84,32 @@ func syncRows[T any](ctx context.Context, tx pgx.Tx, query string, userID string
 	return items, rows.Err()
 }
 
+// SyncCursorOverlapMs is how far behind the capture time the returned cursor
+// trails. A writer stamps updated_at with its own clock before it commits, so a
+// row can commit after our snapshot yet carry an updated_at below the capture
+// time; with a cursor equal to the capture time that row would be invisible now
+// and in every later pull. Backing the cursor off by a margin longer than any
+// realistic write-to-commit gap re-delivers such rows next time. The client
+// upserts idempotently, so seeing a row twice is harmless.
+const SyncCursorOverlapMs int64 = 5000
+
+// syncCursor is the cursor to hand out for a snapshot captured at now: the
+// capture time minus SyncCursorOverlapMs, never below 0.
+func syncCursor(now time.Time) int64 {
+	return max(now.UnixMilli()-SyncCursorOverlapMs, 0)
+}
+
 // SyncChanges returns every row the user owns with updated_at >= since,
 // soft-deleted ones included. The bound is inclusive so a row written in the
 // same millisecond as the previous cursor is never missed; the client upserts
-// idempotently. The cursor is read before the queries run, so a write that
-// lands during the read is delivered again next time rather than lost. All
-// tables are read in one read-only REPEATABLE READ transaction so related rows
-// agree with each other.
+// idempotently. The capture time is read before the queries run and the cursor
+// trails it by SyncCursorOverlapMs, so a write that lands during or just after
+// the read is delivered again next time rather than lost. All tables are read
+// in one read-only REPEATABLE READ transaction so related rows agree with each
+// other.
 func (s *Store) SyncChanges(userID string, since int64) (SyncChanges, error) {
 	ctx := context.Background()
-	out := SyncChanges{Cursor: time.Now().UnixMilli()}
+	out := SyncChanges{Cursor: syncCursor(time.Now())}
 
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
 	if err != nil {
@@ -171,4 +189,77 @@ func (s *Store) SyncChanges(userID string, since int64) (SyncChanges, error) {
 		return SyncChanges{}, err
 	}
 	return out, nil
+}
+
+// Entity names a synced row kind in the push API.
+type Entity string
+
+const (
+	EntityList    Entity = "list"
+	EntityTask    Entity = "task"
+	EntitySubtask Entity = "subtask"
+	EntityTag     Entity = "tag"
+	EntityTaskTag Entity = "task_tag"
+	EntityClass   Entity = "class"
+	EntityEvent   Entity = "event"
+)
+
+// entityKeys maps each entity with a single-column ID to its table and ID
+// column. task_tag is keyed by (task, tag) and is not in it.
+var entityKeys = map[Entity][2]string{
+	EntityList:    {"task_lists", "list_id"},
+	EntityTask:    {"tasks", "task_id"},
+	EntitySubtask: {"subtasks", "subtask_id"},
+	EntityTag:     {"tags", "tag_id"},
+	EntityClass:   {"class_sessions", "class_id"},
+	EntityEvent:   {"events", "event_id"},
+}
+
+// RowState is how an ID looks from one user's point of view.
+type RowState int
+
+const (
+	RowAbsent  RowState = iota // no row has this ID
+	RowLive                    // the user's own live row
+	RowDeleted                 // the user's own soft-deleted row
+	RowForeign                 // another user's row, live or not
+)
+
+// EntityState classifies an entity ID for a user. Unlike the Replay* lookups it
+// tells a soft-deleted own row from another user's row, which a delete needs
+// (the first is a no-op, the second must be refused). It returns nothing but
+// the verdict, so a foreign row is never exposed.
+func (s *Store) EntityState(entity Entity, userID, id string) (RowState, error) {
+	key, ok := entityKeys[entity]
+	if !ok {
+		return RowAbsent, fmt.Errorf("entity %q has no single-column ID", entity)
+	}
+	var owner string
+	var deleted int
+	err := s.pool.QueryRow(context.Background(),
+		`SELECT user_id, COALESCE(deleted, 0) FROM `+key[0]+` WHERE `+key[1]+` = $1`, id,
+	).Scan(&owner, &deleted)
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		return RowAbsent, nil
+	case err != nil:
+		return RowAbsent, err
+	case owner != userID:
+		return RowForeign, nil
+	case deleted != 0:
+		return RowDeleted, nil
+	}
+	return RowLive, nil
+}
+
+// TaskTagLive reports whether the user has a live (not tombstoned) link
+// between the task and the tag.
+func (s *Store) TaskTagLive(userID, taskID, tagID string) (bool, error) {
+	var live bool
+	err := s.pool.QueryRow(context.Background(),
+		`SELECT EXISTS (SELECT 1 FROM task_tags
+		 WHERE user_id = $1 AND task_id = $2 AND tag_id = $3 AND COALESCE(deleted, 0) = 0)`,
+		userID, taskID, tagID,
+	).Scan(&live)
+	return live, err
 }
