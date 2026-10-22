@@ -9,21 +9,30 @@
 import 'react-native-get-random-values';
 import React from 'react';
 import { AppRegistry } from 'react-native';
-import { ContainerManager } from '@/application/container';
-import { createContainer } from '@/infrastructure/composition/createContainer';
+import { createAppServices } from '@/infrastructure/composition/createAppServices';
+import { runAuthSmoke } from '@/infrastructure/composition/devAuthSmoke';
 import { runRepoSmoke } from '@/infrastructure/composition/devSmoke';
 import App from '@/presentation/App';
 import { name as appName } from './app.json';
 
-// The per-user database name arrives with auth (M3); until then a local one.
-const containers = new ContainerManager(() =>
-  createContainer({ userId: 'local' }),
-);
+// Restores the stored session (no network) and opens that user's database.
+const services = createAppServices();
+services.ready.then(() => {
+  if (__DEV__) {
+    const session = services.session.current();
+    console.log(
+      session
+        ? `session restored (${session.refreshToken ? 'active' : 'expired'})`
+        : 'session restored (none)',
+    );
+  }
+});
 
 if (__DEV__) {
   runRepoSmoke().catch(error => console.error('repo smoke failed', error));
+  runAuthSmoke().catch(error => console.error('auth smoke failed', error));
 }
 
 AppRegistry.registerComponent(appName, () => () => (
-  <App containers={containers} />
+  <App containers={services.containers} />
 ));

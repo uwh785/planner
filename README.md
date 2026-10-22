@@ -26,7 +26,8 @@ Source lives in `src/`; the `@/*` alias maps to `src/*`.
 - `infrastructure`: implements ports (SQLite, HTTP, secure storage, notifications).
   - `infrastructure/db`: op-sqlite adapter, ordered migrations (`PRAGMA user_version`; never edit a shipped one, add the next number), one database file per user (`planner_<userId>.db`). `NodeSqliteDatabase` (`node:sqlite`) is for Jest only.
   - `infrastructure/db/repositories`: SQLite implementations of the repository ports. Every mutation writes the row and its `outbox` entry in one transaction. `infrastructure/system` holds the id generator (needs `crypto.getRandomValues`, installed by `react-native-get-random-values` in `index.js`) and the clock.
-  - `infrastructure/composition`: builds the container (database + repositories). Only `index.js` calls it.
+  - `infrastructure/composition`: `createAppServices` wires HTTP, the Keychain session and the per-user database; `createContainer` builds one user's repositories. Only `index.js` calls them.
+  - `infrastructure/http`: `FetchHttpClient` (global `fetch`, JSON, timeout) and `HttpAuthGateway` (the backend's own `/api/auth/*`). `infrastructure/security`: `KeychainSessionStore` (`react-native-keychain`, Android Keystore-backed).
 - `presentation`: screens and atomic components, talks to application only; it never imports `infrastructure` (enforced by a Jest test). It receives the container through the `containers` prop of `App`.
 
 ### Local-first writes and the outbox
@@ -38,6 +39,24 @@ The UI only talks to the repositories. A create, update or delete changes the lo
 - Coalescing: at most one pending upsert per entity (updated in place, so its `id` ordering key and `change_id` stay). Deleting an entity created offline and never pushed (`origin = 'create'`) drops its entries and hard-deletes the row; deleting a known entity keeps a tombstone and one delete entry.
 - Deletes mirror the backend: deleting a task leaves subtasks and links alone, deleting a tag tombstones its links locally (the server cascades). Deleting a list moves its tasks to "no list" (the backend would leave them pointing at a deleted list, which then fails to push).
 - `applyRemoteChanges(pullResponse)` applies a `GET /api/sync` payload in one transaction and skips rows that have a pending outbox entry.
+
+## Auth and session
+
+Auth is the backend's own: `register`, `login`, `refresh`, `logout` under `/api/auth/*`. The device keeps one session (user identity, access token, refresh token) as a single JSON entry in the Android Keystore-backed Keychain.
+
+- `restoreSession` reads it with no network, so the app opens offline, on that user's own database `planner_<userId>.db`.
+- `AuthenticatedHttp` adds the bearer token. On a 401 it refreshes once (concurrent 401s share one refresh), saves the rotated refresh token before retrying, then retries the request once. If the server refuses the refresh, the tokens are cleared, the identity is kept and `SessionExpiredError` is raised; the local database and outbox stay. A network failure during refresh keeps the session.
+- `logout` calls the server best-effort (short timeout) and always clears the Keychain; it never deletes the local database or the outbox.
+- Switching user or logging out closes the previous database handle (`UserContainers`).
+- In development, `runAuthSmoke` (`devAuthSmoke.ts`, started from `index.js`) runs register, authenticated call, forced refresh and logout against the real backend using its own Keychain entry and throwaway database, and logs `auth smoke ok`.
+
+## Configuration
+
+The API origin is chosen in `src/infrastructure/config/apiConfig.ts`:
+
+- Debug (`__DEV__`): `http://10.0.2.2:8080`, the Android emulator's alias for the host. Start the backend with `JWT_SECRET=... go run ./cmd/server` in the `planner` repository. On a physical device use `adb reverse tcp:8080 tcp:8080` and change `DEV_API_BASE_URL`.
+- Release: set `RELEASE_API_BASE_URL` (an `https://` origin) before building. It is `null` by default and a release build refuses to start without it; it never falls back to the dev URL.
+- Cleartext HTTP is allowed in debug builds only: React Native's Gradle plugin sets the `usesCleartextTraffic` manifest placeholder to `true` for debug and `false` for release (checked in the merged release manifest).
 
 ## Backend
 

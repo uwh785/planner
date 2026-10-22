@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react';
+import { NotSignedInError } from '@/application/auth/errors';
 import type { AppContainer, ContainerSource } from '@/application/container';
 
 const ContainerContext = createContext<AppContainer | null>(null);
@@ -32,7 +33,8 @@ export function useAcquiredContainer(
         }
       })
       .catch(error => {
-        if (active) {
+        // Signed out: there is no database to open yet (auth screens: M3b).
+        if (active && !(error instanceof NotSignedInError)) {
           console.error('db init failed', error);
         }
       });
