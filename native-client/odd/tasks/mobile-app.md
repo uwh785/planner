@@ -1,0 +1,93 @@
+# Planner mobile app
+
+## Objective
+A bare React Native (no Expo) Android app for the Planner backend: fully usable offline, multi-user (register and login), syncing with the backend when a connection returns.
+
+## Problem
+The Planner web app needs a network. The user wants the same data on a phone, readable and editable offline, with offline changes uploaded later without loss or duplication. Calm, minimal, light personality (see `PRODUCT.md`).
+
+## Scope
+- Android only (the dev machine is Linux; iOS cannot be built here). Dev target: emulator `Pixel_10_Pro`.
+- Backend contract (already implemented in `/home/kv/Projects/programming/planner`, branch `feat/offline-sync-schema`): `POST /api/auth/register|login|refresh|logout`, `GET /api/sync?since=`, `POST /api/sync/push` (batch, `change_id` for timer ops), client-generated IDs, timer transitions with client `at`.
+- Out of scope: iOS, push notifications from the server, web changes.
+
+## Constraints
+- TypeScript strict. Hexagonal layout: `domain` (entities, rules), `application` (use cases, ports), `infrastructure` (SQLite, HTTP, secure storage, notifications), `presentation` (container/presentational components, atomic design).
+- Local source of truth is SQLite; the UI never waits for the network.
+- No secrets in the repo. Tokens in Android Keystore-backed storage.
+- Artifacts (code, comments, UI copy) in English. Conventional Commits, no AI attribution.
+- `src/domain` and `src/application` are framework-agnostic TypeScript (no React Native, no Android APIs) so they can be shared later with the Tauri desktop clients.
+- Planning heuristic: about 400 authored changed lines per task.
+
+## Delivery strategy
+ask-on-risk. Branch per work unit group; push, PR and merge stay with the user.
+
+## Tasks
+- [x] M1 Scaffold bare RN 0.88 + TypeScript app, tooling (eslint, prettier, jest, tsc), hexagonal folders, runs on the emulator.
+- [x] M2a Local database foundation: `op-sqlite`, a `SqlDatabase` port with an op-sqlite adapter and a `node:sqlite` adapter for Jest, versioned migrations (`PRAGMA user_version`), schema mirroring backend entities (tombstones, `updated_at`, sync state, outbox tables), domain entity types.
+- [x] M2b Repositories behind application ports: local-first mutations that write the row and enqueue the outbox entry in one transaction, reads that hide tombstones, `applyRemoteChanges` for pull that does not overwrite rows with pending outbox entries, ID generation.
+- [x] M3a API client and session (uses the backend's own auth endpoints, no separate auth system): HTTP client port with a fetch adapter, auth gateway for register/login/refresh/logout, secure token storage in the Android Keystore, session use cases (register, login, logout, restore) and single-flight automatic refresh on 401, per-user container wiring. Verified against the real backend from the emulator.
+- [x] M3b Auth screens: minimal accessible login and register forms and session gating (signed out vs signed in); real visual design lands in M5.
+- [x] M4a Sync engine core (framework-free application layer): single-flight sync that pushes the outbox in batches with `change_id` and then pulls with the cursor; per-item result handling (applied/exists clear the entry, retryable errors back off, permanent ones park as `rejected`/`blocked` and stay visible); exponential backoff with jitter; observable sync status.
+- [x] M4b Sync triggers and wiring: connectivity regained (NetInfo), app foreground, local change (debounced) and a periodic timer, bound to the signed-in user's container; discreet status line on the signed-in home; end-to-end proof from the emulator against the real backend, including offline edits that reach the server exactly once.
+- [ ] M5 Design seed (`DESIGN.md`) and core screens: auth, lists, tasks, task detail with subtasks and tags.
+- [ ] M6 Timer (start/pause/complete with real timestamps) and local reminders (notifications).
+- [ ] M7 Hardening: offline end-to-end scenarios on the emulator, accessibility pass, error and empty states. Also from the M1 review (non-blocking): the release build type is signed with the debug keystore (template default), so add a real release signing config read from untracked properties and make release fail without it; test dark mode in the App smoke test.
+- [ ] M8 Plan (no code) the Linux and Windows desktop clients with Tauri after the mobile app: offline is mandatory, so decide local storage and sync engine, how much of `domain`/`application` is shared (shared package or monorepo), and where the project lives (likely the `planner/web` repo). Linux builds natively; Windows NSIS installers can be cross-built with `cargo-xwin` (needs `rustup` and the `x86_64-pc-windows-msvc` target; `.msi` only on Windows).
+
+## Acceptance criteria
+- App builds and launches on the emulator from a clean checkout.
+- With airplane mode on, every screen works against local data; changes made offline appear on the server after reconnecting, exactly once.
+- Register, login, token refresh and logout work against the real backend.
+
+## Checks
+- `tsc --noEmit`, eslint, jest per task. Android build via Gradle. Emulator verification for UI tasks.
+
+## Progress
+M1 done: bare RN 0.88.0 + TS scaffold at repo root, hexagonal `src/` layout, placeholder screen, runs on emulator-5554.
+M2a done: `@op-engineering/op-sqlite` 18.2.5 (autolinked, no native edits), `SqlDatabase` port, op-sqlite and `node:sqlite` adapters sharing `BaseSqlDatabase` (FIFO queue, BEGIN/COMMIT, savepoints for nesting), `PRAGMA user_version` migration runner, schema v1 mirroring the backend sync schema (no `user_id`, no FKs, no server-only tables), domain types, row mappers, `initDatabase` called from App on mount.
+
+M2b done: application ports (repositories, outbox, sync state, id generator, clock, `ApplyRemoteChanges`), SQLite repositories where each mutation writes the row and its outbox entry in one transaction with coalescing (migration 002 adds `outbox.origin`: `create` = never pushed), `applyRemoteChanges` (one transaction, skips rows with pending entries, tolerant parser), `RandomIdGenerator` over `crypto.getRandomValues` (`react-native-get-random-values` imported once in `index.js`), composition root `createContainer` + `ContainerManager` (ref-counted, serialized open/close) with presentation receiving the container by prop/context and no infrastructure import. Deletes mirror the backend (task: no cascade; tag: links tombstoned locally; list: tasks detached, a deliberate deviation so tasks stay pushable).
+
+M3a done: `react-native-keychain` 10.0.0 (autolinked), ports `HttpClient`/`SessionStore`/`AuthGateway`, session types in `domain/auth`, typed errors, use cases `register`/`login`/`logout`/`restoreSession`, `AuthenticatedHttp` (single-flight refresh, rotated token persisted before the retry), `SessionService`, `UserContainers` (per-user database, closes the old handle on switch or logout, FIFO acquire/release pairing), `FetchHttpClient`, `HttpAuthGateway`, `KeychainSessionStore`, `apiConfig` (dev `http://10.0.2.2:8080`, release URL must be set and HTTPS), `createAppServices`, dev-only `runAuthSmoke`. Cleartext HTTP was already debug-only through React Native's Gradle plugin placeholder (the merged release manifest shows `false`). The old `planner_local.db` from M2b is no longer opened. `index.js` repo smoke note (reserved `devsmoke` name) is still open.
+
+M4a done: `SyncEngine` (single flight with one coalesced follow-up; push in batches of at most 200 with `change_id`, per-item result handling, pull with cursor), outbox statuses `pending`/`blocked`/`rejected` (no migration needed: the v1 `status` column already existed) with `park`, `recordAttempt`, `countByStatus`, `listParked`, `retryParked`, pure `backoffDelayMs`, observable `SyncStatus`. A pull now skips rows with any outbox entry, parked included; an edit revives a parked upsert.
+
+M4b done: `SyncScheduler`, `SyncCoordinator` (engine and scheduler per signed-in user, torn down on sign-out/expiry/switch), ports `Connectivity`/`AppLifecycle`/`Timer`/`ChangeNotifier` with NetInfo/AppState/setTimeout adapters, `NotifyingDatabase` (notifies after commit), `useSyncStatus` and one polite status line on the home, dev-only `runSyncSmoke` and an "Add sample task (dev)" button. `@react-native-community/netinfo` 12.0.1 autolinks on RN 0.88 (no native edits).
+
+## Verification evidence
+- M1: `npm run typecheck` clean; `npm run lint` clean; `npm test` 1/1 pass (RED observed first: module missing). Gradle debug build + install OK; `mCurrentFocus` = app.planner.mobile/.MainActivity; no FATAL EXCEPTION; screenshot shows 'Planner' + tagline on light background. Needed `adb reverse tcp:8081 tcp:8081` and allowing a nearby-devices permission dialog.
+- M2a: RED first (adapter, migration, schema, mapper, App tests failed on missing modules). `npm run typecheck` clean; `npm run lint` clean; `npm test` 6 suites, 37/37 pass. Gradle `app:installDebug` OK (op-sqlite built via autolinking); on emulator-5554 logcat shows `db ready (schema v1)` on first launch and again after force-stop relaunch, no FATAL EXCEPTION. The op-sqlite adapter itself is verified only through this migration run (BEGIN/COMMIT path); the shared contract suite runs against the Node adapter.
+- M2b: RED first (14 suites failed on missing modules; boundary test failed on App importing infrastructure). `npm run typecheck` clean; `npm run lint` clean; `npm test` 20 suites, 169/169 pass. Gradle `app:installDebug` OK; on emulator-5554 logcat shows `db ready (schema v2)` (v1 database upgraded by migration 002) and `repo smoke ok (outbox=2)` on first launch and again after force-stop relaunch, device ids like `lst_e95256b539c37e51` / `tsk_46adca56c77ec037` match `<prefix>_<16 hex>`, no FATAL EXCEPTION, `mCurrentFocus` = app.planner.mobile/.MainActivity. Hermes has no `crypto.getRandomValues` in RN's JS sources, so `react-native-get-random-values` 2.0.0 (autolinked TurboModule) provides it.
+- M3a: RED first (8 suites failed on missing modules). `npm run typecheck` clean; `npm run lint` clean; `npm test` 29 suites, 224/224 pass. Gradle `app:installDebug` OK (react-native-keychain autolinked); `processReleaseManifest` shows `usesCleartextTraffic="false"` for release, `true` for debug. Against the real backend (go run, port 8080, via 10.0.2.2) on emulator-5554, logcat shows `register ok`, `user database ok`, `authenticated call status=200`, `forced refresh ok status=200`, `session persisted in keychain`, `logout ok (local data kept)` and `auth smoke ok` on first launch and again after force-stop relaunch; the relaunch logs `restore at start: found relaunch-probe` (the Keychain entry survived the process restart); no FATAL EXCEPTION; `mCurrentFocus` = app.planner.mobile/.MainActivity. Smoke users and refresh tokens were deleted from the dev database and the backend, Metro and the Gradle daemon were stopped.
+- M3a fixes (from the native reviews): RED first (new `sessionRace`, `bootstrapApp`, `devAuthSmoke` suites failed on missing modules; SessionService state and Keychain tests failed). Fixed with `SessionEpoch` (logout and sign-in bump it, refresh persists only under an unchanged epoch inside a serialized section, else `SignedOutError`), `SessionStoreUnreadableError` and the `unreadable` session state, `bootstrapApp` (fatal startup state instead of an import-time throw), `handleExpired` wired and tested through `createAppServices`. `npm run typecheck` clean; `npm run lint` clean; `npm test` all green (see M3b line for counts).
+- M3b: RED first (`sessionGate` suite 14 failing, `authMessages` suite missing module). `@testing-library/react-native` 13.3.3 works with React 19.3 / RN 0.88. `npm run typecheck` clean; `npm run lint` clean; `npm test` 36 suites, 290 tests pass (includes a WCAG AA contrast test of the theme tokens in light and dark). Gradle debug build + install OK on emulator-5554 against the real backend (go run, port 8080): Sign in screen, register -> signed-in home (the Android password manager offered to save the credentials, so autofill hints work), force-stop relaunch restores the session, relaunch with the backend stopped still opens signed in, sign out returns to Sign in, wrong password shows "Email or password is incorrect.", sign in with the backend down shows "No connection. Signing in needs the internet the first time.", sign in again works. Logcat: `session restored (signedIn)` / `db ready (schema v2)`, no FATAL EXCEPTION from the app (one unrelated app crashed earlier in the log), no tokens or passwords logged. In dev the smoke run raises a LogBox toast when the backend is down. Throwaway users and refresh tokens deleted; backend, Metro and Gradle daemon stopped.
+- M4a/M4b: RED first (outbox parking 9/9 failing on the old code; engine, backoff, scheduler and coordinator suites failed on missing modules). `npm run typecheck` clean; `npm run lint` clean; `npm test` 47 suites, 403 tests pass. Gradle `app:installDebug` OK (netinfo autolinked). On emulator-5554 against the real backend: dev `sync smoke` logged every step and `sync smoke ok` (6 changes queued offline, offline sync kept the outbox, online sync drained it, server held exactly 1 list, 2 tasks, 1 subtask, 1 tag, 1 link, a second sync added nothing, an offline delete became a tombstone, pull brought server creates/edits down and applied a server-side delete). Real connectivity loss (`svc wifi/data disable`): the home showed "Offline. 2 changes waiting."; after re-enabling, logcat showed `push: sent=2` within seconds and psql counted exactly 2 rows. Backend stopped: backoff attempts 1.6 s, 4.5 s, 13 s, 66 s; after restart the pending task was pushed once (3 rows total). Throwaway users and rows deleted, backend, Metro and Gradle daemon stopped, emulator network enabled. BLOCKER found: `POST /api/sync/push` is not routed in `backend/pkg/app/app.go` on `feat/offline-sync-schema` (404); the walkthrough ran against a patched copy of the backend built outside the repo with `r.Post("/sync/push", a.syncPush)` added.
+
+## Review follow-ups (non-blocking)
+M2b was reviewed as three native candidates (one commit exceeded the reviewer budget and was split into four: `d40bdd2`, `bae6bd0`, `5cca6c0`, `62ed0c9`). All approved. Open advisories:
+- `index.js`: the dev repo smoke deletes rows in the `devsmoke` database file; scope it so it can never collide with a real user id (reserve the name or use a path no user id can produce), and give it a test.
+- Add a ContainerManager-backed test for a late-resolving acquire after unmount (React StrictMode double effect), so leak safety is proved at the integration level.
+- Add direct unit tests for the `normalize*` validators in `src/domain/validation.ts`.
+- Backend (planner repo): `DeleteTaskList` leaves tasks pointing at a tombstoned list and `pushUpsert` then rejects later edits of those tasks; the client detaches tasks locally as a workaround.
+
+M3a was reviewed as two native candidates (`ff3286d`; `968034b` + `8a24421`), both approved. The refresh-after-logout race, the Keychain read failure, the release startup crash, the `handleExpired` wiring and the small items (smoke `__DEV__` guard and `asserts`, timeout constant, pre-aborted signal and malformed refresh tests) were fixed after M3b started (see the M3a fixes evidence). Still open:
+- A refresh that times out after the server rotated the token leaves a stale refresh token on the device (the server grace window covers a retry).
+- A corrupt Keychain entry is treated as absent and left in place; a later sign-in overwrites it. Decide in M7 whether to surface that.
+
+The M3 fixes (`a91e139`) and the auth screens (`5246b70`) were reviewed as two native candidates, both approved. Open advisories, in priority order:
+- `SessionService.restore()` publishes `restoring` and adopts whatever the store returns without checking the session epoch, so a restore overlapping a login or logout (more plausible now that "Try again" exists) can overwrite newer state; and `login`/`register` advance the epoch only after the network call returns. Guard both and add race tests.
+- The `epoch` dependency defaults to a private `SessionEpoch` in `adoptSession`, `logout`, `AuthenticatedHttp` and `SessionService`; a wiring mistake would silently drop the race protection. Make it required in production wiring.
+- `restore()` maps every error to `unreadable` and `createAppServices` no longer logs the cause; narrow the catch to `SessionStoreUnreadableError` or log the reason code.
+- `SignedInHomeScreen`: if `logout()` throws, `setLeaving(false)` is never called and the Sign out button stays disabled; reset it and show feedback, with a test for a rejecting logout.
+- Tests: the schema-version log test awaits a no-op (use `waitFor`); the path that selects `StartupErrorScreen` from `bootstrapApp` in `index.js` is untested.
+
+M4 was reviewed as three native candidates (`788cdd2`, `e504216`, `3aadc2e`), all approved. Open advisories, in priority order:
+- `SyncEngine`: a whole-request HTTP 400 parks EVERY entry of the batch (up to 200) as `rejected`, including valid ones, so one malformed change or a proxy-generated 400 strands many good changes until a manual `retryParked`. Bisect the batch to isolate the offender and add a test that valid siblings survive.
+- `SyncEngine.loop()` clears `inflight` only on normal completion; if `runOnce` rejects (for example a status subscriber throws), later `sync()` calls return the rejected promise forever. Wrap in try/finally.
+- `SyncCoordinator.setup()` returns silently if `containers.acquire()` rejects while the user is still signed in: no sync, no status, no retry. Surface an error status, retry, and test the path.
+- Minor: the relative-time refresh interval also runs in `idle` with pending changes; a future `lastSyncAt` shows "Synced just now" until the clock catches up; `DevTaskButton` does not catch a synchronous throw from `tasks.create`.
+- A local-change burst has a debounce but no maximum wait.
+
+## Next step
+M5: design seed (`DESIGN.md`) and core screens. The missing `POST /api/sync/push` route was fixed in the planner repo (`b93f832`, with a router-level test); the M4 walkthrough should be repeated once against the unpatched backend as a final check.
