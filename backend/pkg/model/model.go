@@ -65,6 +65,25 @@ func (t Task) MarshalJSON() ([]byte, error) {
 	})
 }
 
+// UnmarshalJSON accepts list_id as a plain string, which sql.NullString cannot
+// decode on its own. null and an empty string both mean no list; an absent
+// list_id leaves the field as it was.
+func (t *Task) UnmarshalJSON(data []byte) error {
+	type Alias Task
+	aux := struct {
+		*Alias
+		ListID *string `json:"list_id"`
+	}{Alias: (*Alias)(t), ListID: nullStrPtr(t.ListID)}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	t.ListID = sql.NullString{}
+	if aux.ListID != nil && *aux.ListID != "" {
+		t.ListID = sql.NullString{String: *aux.ListID, Valid: true}
+	}
+	return nil
+}
+
 func nullStrPtr(ns sql.NullString) *string {
 	if ns.Valid {
 		return &ns.String
@@ -128,6 +147,23 @@ func (f TaskFull) MarshalJSON() ([]byte, error) {
 		return nil, err
 	}
 	return json.Marshal(fields)
+}
+
+// UnmarshalJSON is required for the same reason as MarshalJSON: the embedded
+// Task's UnmarshalJSON would be promoted and ignore subtasks and tags.
+func (f *TaskFull) UnmarshalJSON(data []byte) error {
+	if err := json.Unmarshal(data, &f.Task); err != nil {
+		return err
+	}
+	var extra struct {
+		Subtasks []Subtask `json:"subtasks"`
+		Tags     []Tag     `json:"tags"`
+	}
+	if err := json.Unmarshal(data, &extra); err != nil {
+		return err
+	}
+	f.Subtasks, f.Tags = extra.Subtasks, extra.Tags
+	return nil
 }
 
 type DashboardSummary struct {

@@ -2,7 +2,6 @@ package app
 
 import (
 	"bytes"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -292,18 +291,9 @@ func (a *App) pushUpsert(r *http.Request, userID string, c pushChange) (string, 
 			func() error { _, err := a.store.CreateTag(userID, t); return err })
 
 	case store.EntityTask:
-		// model.Task.ListID is a sql.NullString, which cannot decode a plain JSON
-		// string, so read list_id into a pointer that shadows the embedded field.
-		var in struct {
-			model.Task
-			ListID *string `json:"list_id"`
-		}
-		if err := decodeData(c.Data, &in); err != nil {
+		var t model.Task
+		if err := decodeData(c.Data, &t); err != nil {
 			return invalid(c.ID, "invalid data")
-		}
-		t := in.Task
-		if in.ListID != nil && *in.ListID != "" {
-			t.ListID = sql.NullString{String: *in.ListID, Valid: true}
 		}
 		t.TaskID = firstNonEmpty(c.ID, t.TaskID)
 		if t.TaskID == "" {
@@ -422,7 +412,8 @@ func (a *App) pushUpsert(r *http.Request, userID string, c pushChange) (string, 
 
 // pushDelete applies one delete and returns the entity ID it resolved to. A
 // delete is idempotent: an ID that is already deleted, or that this user never
-// had, is applied. Another user's ID is refused as not_found and never touched.
+// had, is applied. Another user's ID, or a subtask under the wrong task, is
+// refused as not_found and never touched.
 func (a *App) pushDelete(userID string, c pushChange) (string, pushOutcome) {
 	invalid := func(msg string) (string, pushOutcome) {
 		return c.ID, pushFail(pushInvalid, http.StatusBadRequest, msg)
@@ -465,6 +456,17 @@ func (a *App) pushDelete(userID string, c pushChange) (string, pushOutcome) {
 		return c.ID, pushFail(pushNotFound, http.StatusNotFound, "not found")
 	case store.RowAbsent, store.RowDeleted:
 		return c.ID, pushOK(http.StatusOK)
+	}
+
+	// DeleteSubtask matches on the parent too and affects nothing when task_id is
+	// wrong, which would read as a delete that never happened. Refuse a mismatch.
+	if entity == store.EntitySubtask {
+		switch _, err := a.store.ReplaySubtask(userID, d.TaskID, c.ID); {
+		case errors.Is(err, store.ErrConflict):
+			return c.ID, pushFail(pushNotFound, http.StatusNotFound, "subtask not found for this task")
+		case err != nil && !errors.Is(err, store.ErrNotFound):
+			return c.ID, pushServerError("look up subtask", err)
+		}
 	}
 
 	switch entity {

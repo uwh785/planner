@@ -11,9 +11,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"planner/pkg/auth"
+	"planner/pkg/model"
+	"planner/pkg/plan"
 	"planner/pkg/store"
 )
 
@@ -284,4 +287,229 @@ func TestSyncPushIntegration(t *testing.T) {
 		}
 	}
 	expect(results[4], "event", "applied", http.StatusCreated)
+}
+
+// TestSyncPushGuardPaths covers the refusals that keep a push from touching
+// rows it must not: a task pointing at a foreign or missing list, a task_tag
+// pointing at a foreign or missing task or tag, the storage ceilings behind
+// guardSubtask/guardClass/guardEvent (409 "limit", reached by inserting rows
+// directly), and a subtask delete whose task_id is not the real parent (404,
+// never a silent "applied" that deletes nothing). It is skipped unless
+// TEST_DATABASE_URL is set and cleans up after itself.
+func TestSyncPushGuardPaths(t *testing.T) {
+	dbURL := os.Getenv("TEST_DATABASE_URL")
+	if dbURL == "" {
+		t.Skip("TEST_DATABASE_URL not set, skipping integration test")
+	}
+
+	pool, err := pgxpool.New(context.Background(), dbURL)
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	t.Cleanup(pool.Close)
+
+	s := store.New(pool)
+	a := New(s, nil)
+
+	stamp := time.Now().UnixNano()
+	owner, err := s.Register(fmt.Sprintf("guard-owner-%d@example.com", stamp), "Owner", "hash")
+	if err != nil {
+		t.Fatalf("register owner: %v", err)
+	}
+	other, err := s.Register(fmt.Sprintf("guard-other-%d@example.com", stamp), "Other", "hash")
+	if err != nil {
+		t.Fatalf("register other: %v", err)
+	}
+	t.Cleanup(func() {
+		for _, u := range []string{owner.UserID, other.UserID} {
+			for _, table := range []string{"task_tags", "tags", "subtasks", "tasks", "task_lists", "class_sessions", "events"} {
+				if _, err := pool.Exec(context.Background(), `DELETE FROM `+table+` WHERE user_id = $1`, u); err != nil {
+					t.Errorf("cleanup: delete %s: %v", table, err)
+				}
+			}
+			if _, err := pool.Exec(context.Background(), `DELETE FROM app_users WHERE user_id = $1`, u); err != nil {
+				t.Errorf("cleanup: delete app_users: %v", err)
+			}
+		}
+	})
+
+	id := func(prefix string) string { return fmt.Sprintf("%s_guard_%d", prefix, stamp) }
+	push := func(userID, change string) pushTestResult {
+		t.Helper()
+		code, results, raw := syncPushAs(t, a, userID, `{"changes":[`+change+`]}`)
+		if code != http.StatusOK || len(results) != 1 {
+			t.Fatalf("push: status %d, results %d, body %s", code, len(results), raw)
+		}
+		return results[0]
+	}
+	expect := func(r pushTestResult, status string, httpStatus int) {
+		t.Helper()
+		if r.Status != status || r.HTTPStatus != httpStatus {
+			t.Errorf("result = %+v, want %s %d", r, status, httpStatus)
+		}
+	}
+	exec := func(query string, args ...any) {
+		t.Helper()
+		if _, err := pool.Exec(context.Background(), query, args...); err != nil {
+			t.Fatalf("exec %q: %v", query, err)
+		}
+	}
+
+	// The other user's list, task and tag exist; the owner's own parents too.
+	foreignList, foreignTask, foreignTag := id("lst_f"), id("tsk_f"), id("tag_f")
+	push(other.UserID, fmt.Sprintf(`{"entity":"list","op":"upsert","id":%q,"data":{"name":"theirs"}}`, foreignList))
+	push(other.UserID, fmt.Sprintf(`{"entity":"task","op":"upsert","id":%q,"data":{"title":"theirs"}}`, foreignTask))
+	push(other.UserID, fmt.Sprintf(`{"entity":"tag","op":"upsert","id":%q,"data":{"name":"theirs"}}`, foreignTag))
+	ownTask, ownTag := id("tsk"), id("tag")
+	push(owner.UserID, fmt.Sprintf(`{"entity":"task","op":"upsert","id":%q,"data":{"title":"mine"}}`, ownTask))
+	push(owner.UserID, fmt.Sprintf(`{"entity":"tag","op":"upsert","id":%q,"data":{"name":"mine"}}`, ownTag))
+
+	// A task cannot be placed in another user's list, nor in one that does not
+	// exist, and nothing is created.
+	r := push(owner.UserID, fmt.Sprintf(`{"entity":"task","op":"upsert","id":%q,"data":{"title":"x","list_id":%q}}`, id("tsk_a"), foreignList))
+	expect(r, "conflict", http.StatusConflict)
+	r = push(owner.UserID, fmt.Sprintf(`{"entity":"task","op":"upsert","id":%q,"data":{"title":"x","list_id":%q}}`, id("tsk_b"), id("lst_none")))
+	expect(r, "not_found", http.StatusNotFound)
+	for _, tid := range []string{id("tsk_a"), id("tsk_b")} {
+		if _, err := s.GetTask(owner.UserID, tid); err == nil {
+			t.Errorf("task %s was created despite its list being refused", tid)
+		}
+	}
+
+	// A link needs both ends to be the caller's live rows, and none is made.
+	link := func(task, tag string) string {
+		return fmt.Sprintf(`{"entity":"task_tag","op":"upsert","data":{"task_id":%q,"tag_id":%q}}`, task, tag)
+	}
+	expect(push(owner.UserID, link(foreignTask, ownTag)), "conflict", http.StatusConflict)
+	expect(push(owner.UserID, link(id("tsk_none"), ownTag)), "not_found", http.StatusNotFound)
+	expect(push(owner.UserID, link(ownTask, foreignTag)), "conflict", http.StatusConflict)
+	expect(push(owner.UserID, link(ownTask, id("tag_none"))), "not_found", http.StatusNotFound)
+	var links int
+	if err := pool.QueryRow(context.Background(), `SELECT count(*) FROM task_tags WHERE user_id = $1`, owner.UserID).Scan(&links); err != nil || links != 0 {
+		t.Errorf("task_tags rows = %d, err %v, want none", links, err)
+	}
+
+	// Storage ceilings: fill each resource straight in the table, then a new
+	// row is refused with 409 "limit".
+	exec(`INSERT INTO subtasks (user_id, task_id, subtask_id, title, updated_at, deleted)
+	      SELECT $1, $2, $3::text || g, 's', 0, 0 FROM generate_series(1, $4) g`,
+		owner.UserID, ownTask, id("sub_fill"), plan.CeilingFor(plan.ResourceSubtask))
+	exec(`INSERT INTO class_sessions (user_id, class_id, subject, day_of_week, start_minute, end_minute, updated_at, deleted)
+	      SELECT $1, $2::text || g, 'c', 1, 0, 60, 0, 0 FROM generate_series(1, $3) g`,
+		owner.UserID, id("cls_fill"), plan.CeilingFor(plan.ResourceClass))
+	exec(`INSERT INTO events (user_id, event_id, title, start_at, updated_at, deleted)
+	      SELECT $1, $2::text || g, 'e', 1, 0, 0 FROM generate_series(1, $3) g`,
+		owner.UserID, id("evt_fill"), plan.CeilingFor(plan.ResourceEvent))
+
+	r = push(owner.UserID, fmt.Sprintf(`{"entity":"subtask","op":"upsert","id":%q,"data":{"task_id":%q,"title":"over"}}`, id("sub_over"), ownTask))
+	expect(r, "limit", http.StatusConflict)
+	r = push(owner.UserID, fmt.Sprintf(`{"entity":"class","op":"upsert","id":%q,"data":{"subject":"over","day_of_week":1,"start_minute":480,"end_minute":540}}`, id("cls_over")))
+	expect(r, "limit", http.StatusConflict)
+	r = push(owner.UserID, fmt.Sprintf(`{"entity":"event","op":"upsert","id":%q,"data":{"title":"over","start_at":1}}`, id("evt_over")))
+	expect(r, "limit", http.StatusConflict)
+	if r.Error == "" {
+		t.Errorf("limit result has no error message: %+v", r)
+	}
+	// A replay of a row already stored is an update, not a refusal, even at the
+	// ceiling.
+	r = push(owner.UserID, fmt.Sprintf(`{"entity":"subtask","op":"upsert","id":%q,"data":{"task_id":%q,"title":"renamed"}}`, id("sub_fill")+"1", ownTask))
+	expect(r, "applied", http.StatusOK)
+
+	// A subtask delete naming the wrong parent task is refused and deletes
+	// nothing; the right parent deletes it.
+	otherTask, sub := id("tsk_o"), id("sub_del")
+	push(owner.UserID, fmt.Sprintf(`{"entity":"task","op":"upsert","id":%q,"data":{"title":"other parent"}}`, otherTask))
+	exec(`DELETE FROM subtasks WHERE user_id = $1 AND task_id = $2`, owner.UserID, ownTask) // below the ceiling again
+	push(owner.UserID, fmt.Sprintf(`{"entity":"subtask","op":"upsert","id":%q,"data":{"task_id":%q,"title":"s"}}`, sub, ownTask))
+	subDeleted := func() int {
+		t.Helper()
+		var d int
+		if err := pool.QueryRow(context.Background(), `SELECT deleted FROM subtasks WHERE subtask_id = $1`, sub).Scan(&d); err != nil {
+			t.Fatalf("read subtask: %v", err)
+		}
+		return d
+	}
+	r = push(owner.UserID, fmt.Sprintf(`{"entity":"subtask","op":"delete","id":%q,"data":{"task_id":%q}}`, sub, otherTask))
+	expect(r, "not_found", http.StatusNotFound)
+	if subDeleted() != 0 {
+		t.Error("a mismatched delete tombstoned the subtask")
+	}
+	r = push(owner.UserID, fmt.Sprintf(`{"entity":"subtask","op":"delete","id":%q,"data":{"task_id":%q}}`, sub, ownTask))
+	expect(r, "applied", http.StatusOK)
+	if subDeleted() != 1 {
+		t.Error("the matching delete did not tombstone the subtask")
+	}
+}
+
+// TestTaskHandlersPersistListID checks that POST/PUT /api/tasks decode a plain
+// list_id string and store it. Skipped unless TEST_DATABASE_URL is set.
+func TestTaskHandlersPersistListID(t *testing.T) {
+	dbURL := os.Getenv("TEST_DATABASE_URL")
+	if dbURL == "" {
+		t.Skip("TEST_DATABASE_URL not set, skipping integration test")
+	}
+	pool, err := pgxpool.New(context.Background(), dbURL)
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	t.Cleanup(pool.Close)
+	s := store.New(pool)
+	a := New(s, nil)
+
+	stamp := time.Now().UnixNano()
+	user, err := s.Register(fmt.Sprintf("listid-%d@example.com", stamp), "User", "hash")
+	if err != nil {
+		t.Fatalf("register: %v", err)
+	}
+	t.Cleanup(func() {
+		for _, table := range []string{"tasks", "task_lists"} {
+			if _, err := pool.Exec(context.Background(), `DELETE FROM `+table+` WHERE user_id = $1`, user.UserID); err != nil {
+				t.Errorf("cleanup: delete %s: %v", table, err)
+			}
+		}
+		if _, err := pool.Exec(context.Background(), `DELETE FROM app_users WHERE user_id = $1`, user.UserID); err != nil {
+			t.Errorf("cleanup: delete app_users: %v", err)
+		}
+	})
+	list, err := s.CreateTaskList(user.UserID, model.TaskList{Name: "L"})
+	if err != nil {
+		t.Fatalf("create list: %v", err)
+	}
+
+	call := func(h http.HandlerFunc, method, body, taskID string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(method, "/api/tasks", strings.NewReader(body))
+		req = req.WithContext(context.WithValue(req.Context(), auth.UserKey, &auth.Claims{UserID: user.UserID}))
+		if taskID != "" {
+			rctx := chi.NewRouteContext()
+			rctx.URLParams.Add("id", taskID)
+			req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+		}
+		rec := httptest.NewRecorder()
+		h(rec, req)
+		return rec
+	}
+
+	tid := fmt.Sprintf("tsk_listid_%d", stamp)
+	rec := call(a.createTask, http.MethodPost, fmt.Sprintf(`{"task_id":%q,"title":"t","list_id":%q}`, tid, list.ListID), "")
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create: status %d, body %s", rec.Code, rec.Body.String())
+	}
+	if got, err := s.GetTask(user.UserID, tid); err != nil || got.ListID.String != list.ListID || !got.ListID.Valid {
+		t.Errorf("created task list = %+v, err %v, want %s", got.ListID, err, list.ListID)
+	}
+
+	rec = call(a.updateTask, http.MethodPut, `{"title":"t","list_id":""}`, tid)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("update: status %d, body %s", rec.Code, rec.Body.String())
+	}
+	if got, err := s.GetTask(user.UserID, tid); err != nil || got.ListID.Valid {
+		t.Errorf("task after clearing list = %+v, err %v, want no list", got.ListID, err)
+	}
+	rec = call(a.updateTask, http.MethodPut, fmt.Sprintf(`{"title":"t","list_id":%q}`, list.ListID), tid)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("update: status %d, body %s", rec.Code, rec.Body.String())
+	}
+	if got, err := s.GetTask(user.UserID, tid); err != nil || got.ListID.String != list.ListID {
+		t.Errorf("task after setting list = %+v, err %v, want %s", got.ListID, err, list.ListID)
+	}
 }
