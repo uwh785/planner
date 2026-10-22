@@ -166,3 +166,16 @@ it('refuses to send without a session', async () => {
   );
   expect(http.calls).toEqual([]);
 });
+
+it('keeps the stored session when the refresh answers 2xx with a malformed body', async () => {
+  const { authed, gateway, store, onSessionExpired } = setup();
+  gateway.refresh.mockRejectedValue(
+    new HttpError(200, 'Malformed authentication response'),
+  );
+  await expect(authed.request('GET', '/api/x')).rejects.toMatchObject({
+    status: 200,
+  });
+  expect(store.value).toMatchObject({ refreshToken: 'refresh-1' });
+  expect(store.log).toEqual([]);
+  expect(onSessionExpired).not.toHaveBeenCalled();
+});

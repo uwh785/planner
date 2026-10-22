@@ -5,49 +5,51 @@ import type {
 } from '../ports/AuthGateway';
 import type { SessionStore } from '../ports/SessionStore';
 import type { AuthSession } from '@/domain/auth';
-import { ValidationError } from '@/domain/validation';
+import { credentials } from './credentials';
+import { SessionEpoch } from './SessionEpoch';
 
 interface AuthDeps {
   gateway: AuthGateway;
   store: SessionStore;
+  /** Shared with AuthenticatedHttp so stale refreshes are discarded. */
+  epoch?: SessionEpoch;
+}
+
+/** Persists a freshly issued session, invalidating work of the old identity. */
+async function adoptSession(
+  { store, epoch = new SessionEpoch() }: AuthDeps,
+  session: AuthSession,
+): Promise<void> {
+  epoch.advance();
+  await epoch.exclusive(() => store.save(session));
 }
 
 /** Server-side logout is best effort: it never delays leaving the account. */
 const LOGOUT_TIMEOUT_MS = 3000;
 
-/** Client-side basics only; the server stays the authority. */
-function credentials(email: string, password: string): { email: string } {
-  const trimmed = email.trim();
-  if (trimmed === '') {
-    throw new ValidationError('Email is required');
-  }
-  if (password === '') {
-    throw new ValidationError('Password is required');
-  }
-  return { email: trimmed };
-}
-
 export async function register(
-  { gateway, store }: AuthDeps,
+  deps: AuthDeps,
   input: RegisterInput,
 ): Promise<AuthSession> {
+  const { gateway } = deps;
   const { email } = credentials(input.email, input.password);
   const session = await gateway.register({
     email,
     password: input.password,
     name: input.name?.trim() ?? '',
   });
-  await store.save(session);
+  await adoptSession(deps, session);
   return session;
 }
 
 export async function login(
-  { gateway, store }: AuthDeps,
+  deps: AuthDeps,
   input: LoginInput,
 ): Promise<AuthSession> {
+  const { gateway } = deps;
   const { email } = credentials(input.email, input.password);
   const session = await gateway.login({ email, password: input.password });
-  await store.save(session);
+  await adoptSession(deps, session);
   return session;
 }
 
@@ -59,8 +61,11 @@ export async function login(
 export async function logout({
   gateway,
   store,
+  epoch = new SessionEpoch(),
   serverTimeoutMs = LOGOUT_TIMEOUT_MS,
 }: AuthDeps & { serverTimeoutMs?: number }): Promise<void> {
+  // First, so a refresh still in flight cannot write tokens back.
+  epoch.advance();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), serverTimeoutMs);
   try {
@@ -72,11 +77,15 @@ export async function logout({
     // Best effort: the refresh token also expires on its own.
   } finally {
     clearTimeout(timer);
-    await store.clear();
+    await epoch.exclusive(() => store.clear());
   }
 }
 
-/** Reads the persisted session. No network, so the app opens offline. */
+/**
+ * Reads the persisted session. No network, so the app opens offline. Throws
+ * `SessionStoreUnreadableError` when secure storage cannot answer: that is
+ * different from `null` (nobody is signed in).
+ */
 export function restoreSession({
   store,
 }: {

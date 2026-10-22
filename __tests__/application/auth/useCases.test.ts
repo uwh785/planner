@@ -8,6 +8,7 @@ import {
   register,
   restoreSession,
 } from '@/application/auth/useCases';
+import { validateCredentials } from '@/application/auth/credentials';
 import { ValidationError } from '@/domain/validation';
 import {
   active,
@@ -133,5 +134,18 @@ describe('restoreSession', () => {
     expect(
       await restoreSession({ store: new InMemorySessionStore() }),
     ).toBeNull();
+  });
+});
+
+describe('validateCredentials', () => {
+  it('reports each missing field and nothing for a valid pair', () => {
+    expect(validateCredentials('', '')).toEqual({
+      email: 'Email is required',
+      password: 'Password is required',
+    });
+    expect(validateCredentials('  ', 'pw')).toEqual({
+      email: 'Email is required',
+    });
+    expect(validateCredentials('a@b.co', 'pw')).toEqual({});
   });
 });

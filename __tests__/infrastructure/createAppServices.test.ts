@@ -1,4 +1,8 @@
-import { NotSignedInError } from '@/application/auth/errors';
+import {
+  NotSignedInError,
+  SessionExpiredError,
+  SignedOutError,
+} from '@/application/auth/errors';
 import type { AppContainer } from '@/application/container';
 import { createAppServices } from '@/infrastructure/composition/createAppServices';
 import { active, InMemorySessionStore } from '../helpers/authFakes';
@@ -61,4 +65,61 @@ it('opens the new user database after login and refuses after logout', async () 
   await expect(services.containers.acquire()).rejects.toBeInstanceOf(
     NotSignedInError,
   );
+});
+
+it('marks the session expired in the app state when a refresh is refused', async () => {
+  // Every call is refused, including the refresh itself.
+  jest.spyOn(globalThis, 'fetch').mockImplementation((async () => ({
+    status: 401,
+    ok: false,
+    text: async () => JSON.stringify({ error: 'refused' }),
+  })) as never);
+  const services = createAppServices({
+    apiBaseUrl: 'http://api.test',
+    sessionStore: new InMemorySessionStore(active()),
+    openContainer: async () => fakeContainer(),
+  });
+  await services.ready;
+  expect(services.session.state().status).toBe('signedIn');
+  await expect(services.http.request('GET', '/api/x')).rejects.toBeInstanceOf(
+    SessionExpiredError,
+  );
+  expect(services.session.state()).toMatchObject({ status: 'expired' });
+});
+
+it('does not resurrect the session when logout races an in-flight refresh', async () => {
+  let releaseRefresh!: () => void;
+  const gate = new Promise<void>(resolve => (releaseRefresh = resolve));
+  jest.spyOn(globalThis, 'fetch').mockImplementation((async (url: string) => {
+    const path = String(url);
+    if (path.endsWith('/api/auth/refresh')) {
+      await gate;
+      return {
+        status: 200,
+        ok: true,
+        text: async () => JSON.stringify(authBody),
+      };
+    }
+    if (path.endsWith('/api/auth/logout')) {
+      return { status: 204, ok: true, text: async () => '' };
+    }
+    return { status: 401, ok: false, text: async () => '' };
+  }) as never);
+  const store = new InMemorySessionStore(active());
+  const services = createAppServices({
+    apiBaseUrl: 'http://api.test',
+    sessionStore: store,
+    openContainer: async () => fakeContainer(),
+  });
+  await services.ready;
+  const outcome = services.http.request('GET', '/api/x').then(
+    () => null,
+    (error: unknown) => error,
+  );
+  await new Promise(resolve => setImmediate(resolve));
+  await services.session.logout();
+  releaseRefresh();
+  expect(await outcome).toBeInstanceOf(SignedOutError);
+  expect(store.value).toBeNull();
+  expect(services.session.state()).toEqual({ status: 'signedOut' });
 });

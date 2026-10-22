@@ -91,3 +91,13 @@ it('logs out with the refresh token and the abort signal', async () => {
     signal: controller.signal,
   });
 });
+
+it('rejects a malformed 2xx refresh body as a server fault, not an expired session', async () => {
+  const http = new FakeHttpClient(async () => ({
+    status: 200,
+    json: { data: { token: 'jwt' } },
+  }));
+  const failure = await new HttpAuthGateway(http).refresh('rt').catch(e => e);
+  expect(failure).toBeInstanceOf(HttpError);
+  expect(failure).not.toBeInstanceOf(SessionExpiredError);
+});

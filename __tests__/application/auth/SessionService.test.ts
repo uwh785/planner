@@ -1,3 +1,4 @@
+import { SessionStoreUnreadableError } from '@/application/auth/errors';
 import { SessionService } from '@/application/auth/SessionService';
 import {
   active,
@@ -64,4 +65,80 @@ it('restores nothing when signed out and notifies on expiry', async () => {
   off();
   service.handleExpired();
   expect(listener).toHaveBeenCalledTimes(1);
+});
+
+describe('session state', () => {
+  const expired = {
+    userId: 'usr_1',
+    email: 'a@b.co',
+    name: 'Ann',
+    accessToken: null,
+    refreshToken: null,
+  };
+
+  it('starts restoring, then reports signed out, signed in or expired', async () => {
+    const out = setup();
+    expect(out.service.state()).toEqual({ status: 'restoring' });
+    await out.service.restore();
+    expect(out.service.state()).toEqual({ status: 'signedOut' });
+
+    const signedIn = setup(active());
+    await signedIn.service.restore();
+    expect(signedIn.service.state()).toEqual({
+      status: 'signedIn',
+      user: { userId: 'usr_1', email: 'a@b.co', name: 'Ann' },
+    });
+
+    const lapsed = setup(expired as never);
+    await lapsed.service.restore();
+    expect(lapsed.service.state().status).toBe('expired');
+  });
+
+  it('reports unreadable (not signed out) when the store cannot be read', async () => {
+    const { service, store, users } = setup();
+    store.get = async () => {
+      throw new SessionStoreUnreadableError();
+    };
+    expect(await service.restore()).toBeNull();
+    expect(service.state()).toEqual({ status: 'unreadable' });
+    expect(users.setUser).toHaveBeenLastCalledWith(null);
+  });
+
+  it('can retry restoring after an unreadable store', async () => {
+    const { service, store } = setup(active());
+    const read = store.get.bind(store);
+    store.get = async () => {
+      throw new SessionStoreUnreadableError();
+    };
+    await service.restore();
+    store.get = read;
+    await service.restore();
+    expect(service.state().status).toBe('signedIn');
+  });
+
+  it('notifies subscribers on every change and stops after unsubscribe', async () => {
+    const { service } = setup();
+    const listener = jest.fn();
+    const off = service.subscribe(listener);
+    await service.login({ email: 'a@b.co', password: 'pw' });
+    expect(service.state().status).toBe('signedIn');
+    service.handleExpired();
+    expect(service.state()).toMatchObject({
+      status: 'expired',
+      user: { userId: 'usr_1' },
+    });
+    await service.logout();
+    expect(service.state()).toEqual({ status: 'signedOut' });
+    const calls = listener.mock.calls.length;
+    expect(calls).toBeGreaterThanOrEqual(3);
+    off();
+    await service.login({ email: 'a@b.co', password: 'pw' });
+    expect(listener).toHaveBeenCalledTimes(calls);
+  });
+
+  it('keeps the same snapshot object while nothing changes', async () => {
+    const { service } = setup(active());
+    await service.restore();
+    expect(service.state()).toBe(service.state());
+  });
 });

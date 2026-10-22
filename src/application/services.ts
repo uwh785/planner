@@ -12,3 +12,12 @@ export interface AppServices {
   /** Settles once the stored session has been restored (never rejects). */
   ready: Promise<void>;
 }
+
+/**
+ * Result of building the services at startup. A build that cannot start
+ * (e.g. a release without an API URL) is `fatal` with a plain, secret-free
+ * message, so the app can still register and explain instead of crashing.
+ */
+export type AppBoot =
+  | { kind: 'ready'; services: AppServices }
+  | { kind: 'fatal'; message: string };

@@ -118,3 +118,20 @@ it('honors a caller abort signal', async () => {
   controller.abort();
   await expect(pending).rejects.toBeInstanceOf(NetworkError);
 });
+
+it('does not send a request whose caller signal is already aborted', async () => {
+  const f = jest.fn(
+    (_url: string, init: RequestInit) =>
+      new Promise((_, reject) => {
+        if (init.signal?.aborted) {
+          reject(new Error('aborted'));
+        }
+      }),
+  );
+  const controller = new AbortController();
+  controller.abort();
+  await expect(
+    client(f as never).request('GET', '/x', { signal: controller.signal }),
+  ).rejects.toBeInstanceOf(NetworkError);
+  expect((f.mock.calls[0]?.[1] as RequestInit).signal?.aborted).toBe(true);
+});

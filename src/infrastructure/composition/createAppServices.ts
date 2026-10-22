@@ -1,4 +1,5 @@
 import { AuthenticatedHttp } from '@/application/auth/AuthenticatedHttp';
+import { SessionEpoch } from '@/application/auth/SessionEpoch';
 import { SessionService } from '@/application/auth/SessionService';
 import type { AppContainer } from '@/application/container';
 import type { SessionStore } from '@/application/ports/SessionStore';
@@ -20,7 +21,8 @@ export interface AppServicesOptions {
 /**
  * Wires HTTP, the Keychain session and the per-user database. The stored
  * session is restored right away (no network), which opens its database, so
- * the app works offline from the first frame.
+ * the app works offline from the first frame. Throws when the build is not
+ * configured (see `bootstrapApp` for the handled version).
  */
 export function createAppServices(
   options: AppServicesOptions = {},
@@ -35,19 +37,24 @@ export function createAppServices(
     open: options.openContainer ?? (userId => createContainer({ userId })),
     whenReady: () => restoring,
   });
-  const session = new SessionService({ gateway, store, users: containers });
+  // One epoch for both, so a refresh finishing after logout is discarded.
+  const epoch = new SessionEpoch();
+  const session = new SessionService({
+    gateway,
+    store,
+    users: containers,
+    epoch,
+  });
   const authenticated = new AuthenticatedHttp({
     http,
     gateway,
     store,
+    epoch,
+    // Moves the session state to `expired` (see SessionService.handleExpired).
     onSessionExpired: () => session.handleExpired(),
   });
 
-  restoring = session.restore().then(
-    () => undefined,
-    error => {
-      console.error('session restore failed', error);
-    },
-  );
+  // restore() never rejects: a storage failure becomes the `unreadable` state.
+  restoring = session.restore().then(() => undefined);
   return { session, http: authenticated, containers, ready: restoring };
 }

@@ -5,6 +5,13 @@ import type {
   HttpResponse,
 } from '@/application/ports/HttpClient';
 
+/**
+ * Default per-request limit. Long enough for a slow mobile connection to
+ * finish a small JSON exchange, short enough that a dead link fails the
+ * request (and releases the UI) instead of hanging.
+ */
+export const DEFAULT_REQUEST_TIMEOUT_MS = 15000;
+
 interface Options {
   baseUrl: string;
   /** Per-request limit covering connect, headers and body. */
@@ -41,7 +48,7 @@ export class FetchHttpClient implements HttpClient {
 
   constructor(options: Options) {
     this.baseUrl = options.baseUrl.replace(/\/+$/, '');
-    this.timeoutMs = options.timeoutMs ?? 15000;
+    this.timeoutMs = options.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
     this.fetchImpl = options.fetchImpl ?? ((...args) => fetch(...args));
   }
 

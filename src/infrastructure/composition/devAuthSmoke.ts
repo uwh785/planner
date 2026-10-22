@@ -11,7 +11,7 @@ const SMOKE_SERVICE = 'planner.devsmoke';
 const SMOKE_DB_USER = 'authsmoke';
 const PROBE_USER_ID = 'relaunch-probe';
 
-function assert(condition: boolean, what: string): void {
+function assert(condition: boolean, what: string): asserts condition {
   if (!condition) {
     throw new Error(`auth smoke failed: ${what}`);
   }
@@ -40,6 +40,9 @@ async function rejectsWith(
  * finding it, which shows the stored session survives a process restart.
  */
 export async function runAuthSmoke(apiBaseUrl?: string): Promise<void> {
+  if (!__DEV__) {
+    return;
+  }
   const store = new KeychainSessionStore(SMOKE_SERVICE);
   const openSmokeDb = () => createContainer({ userId: SMOKE_DB_USER });
   const services = createAppServices({
@@ -75,12 +78,11 @@ export async function runAuthSmoke(apiBaseUrl?: string): Promise<void> {
   // Make the access token invalid; the 401 must trigger one refresh + retry.
   const before = await store.get();
   assert(before !== null, 'session stored');
-  await store.save({ ...before!, accessToken: 'expired.invalid.token' });
+  await store.save({ ...before, accessToken: 'expired.invalid.token' });
   const retried = await services.http.request('GET', '/api/auth/me');
   const after = await store.get();
   assert(
-    after?.refreshToken !== null &&
-      after?.refreshToken !== before!.refreshToken,
+    after?.refreshToken !== null && after?.refreshToken !== before.refreshToken,
     'refresh token rotated and persisted',
   );
   assert(after?.accessToken !== 'expired.invalid.token', 'access replaced');

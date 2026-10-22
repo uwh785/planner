@@ -37,3 +37,25 @@ export class NotSignedInError extends Error {
     this.name = 'NotSignedInError';
   }
 }
+
+/**
+ * The user signed out (or another user signed in) while a request was in
+ * flight, so it was dropped instead of acting on a session that is gone.
+ */
+export class SignedOutError extends Error {
+  constructor(message = 'Signed out') {
+    super(message);
+    this.name = 'SignedOutError';
+  }
+}
+
+/**
+ * Secure storage failed to answer (e.g. a Keystore error). Unlike an empty
+ * store this does not mean "signed out", so nothing may overwrite it.
+ */
+export class SessionStoreUnreadableError extends Error {
+  constructor(message = 'The saved session could not be read') {
+    super(message);
+    this.name = 'SessionStoreUnreadableError';
+  }
+}
