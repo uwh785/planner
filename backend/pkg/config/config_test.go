@@ -32,3 +32,27 @@ func TestLoadJWTTTLHoursUnchanged(t *testing.T) {
 		t.Fatalf("JWTTLHours = %d, want 72", cfg.JWTTLHours)
 	}
 }
+
+func TestLoadRefreshGraceSeconds(t *testing.T) {
+	for _, tc := range []struct {
+		name, env string
+		want      int
+	}{
+		{"default", "", 300},
+		{"override", "60", 60},
+		{"zero disables", "0", 0},
+		{"negative keeps default", "-5", 300},
+		{"invalid keeps default", "abc", 300},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("REFRESH_GRACE_SECONDS", tc.env)
+			cfg, err := Load(false)
+			if err != nil {
+				t.Fatalf("Load: %v", err)
+			}
+			if cfg.RefreshGraceSeconds != tc.want {
+				t.Fatalf("RefreshGraceSeconds = %d, want %d", cfg.RefreshGraceSeconds, tc.want)
+			}
+		})
+	}
+}

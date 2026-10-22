@@ -34,6 +34,7 @@ model RefreshToken {
   created_at BigInt
   expires_at BigInt
   revoked_at BigInt?
+  rotated_at BigInt?
 
   user User @relation(fields: [user_id], references: [user_id])
 

@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -39,6 +41,7 @@ func TestRefreshTokenHandlersIntegration(t *testing.T) {
 	s := store.New(pool)
 	mgr := auth.NewManager("test-secret", 72)
 	a := New(s, mgr)
+	a.refreshGrace = 0 // strict reuse detection; the grace window has its own test
 
 	email := fmt.Sprintf("refresh-app-%d@example.com", time.Now().UnixNano())
 	t.Cleanup(func() {
@@ -212,5 +215,121 @@ func TestRefreshTokenHandlersIntegration(t *testing.T) {
 	}
 	if code, out = refresh(disabledTok); code != http.StatusUnauthorized || out["data"] != nil {
 		t.Fatalf("disabled user refresh: status %d body %v, want 401 without data", code, out)
+	}
+}
+
+// TestRefreshGraceHandlerIntegration checks the retry grace window through the
+// HTTP handler: a retried (already rotated) token gets a normal login-shaped
+// response with a working access token and the earlier successor stops being
+// the live token, every refusal stays the same 401, and a zero grace restores
+// strict reuse detection. Skipped unless TEST_DATABASE_URL is set.
+func TestRefreshGraceHandlerIntegration(t *testing.T) {
+	dbURL := os.Getenv("TEST_DATABASE_URL")
+	if dbURL == "" {
+		t.Skip("TEST_DATABASE_URL not set, skipping integration test")
+	}
+
+	pool, err := pgxpool.New(context.Background(), dbURL)
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+	t.Cleanup(pool.Close)
+
+	s := store.New(pool)
+	mgr := auth.NewManager("test-secret", 72)
+	a := New(s, mgr)
+	a.refreshGrace = 5 * time.Minute
+
+	email := fmt.Sprintf("refresh-grace-%d@example.com", time.Now().UnixNano())
+	t.Cleanup(func() {
+		ctx := context.Background()
+		if _, err := pool.Exec(ctx, `DELETE FROM refresh_tokens WHERE user_id IN (SELECT user_id FROM app_users WHERE email = $1)`, email); err != nil {
+			t.Errorf("cleanup: delete refresh_tokens: %v", err)
+		}
+		if _, err := pool.Exec(ctx, `DELETE FROM app_users WHERE email = $1`, email); err != nil {
+			t.Errorf("cleanup: delete app_users: %v", err)
+		}
+	})
+
+	post := func(h http.HandlerFunc, body string) (int, map[string]any) {
+		t.Helper()
+		req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(body))
+		rec := httptest.NewRecorder()
+		h(rec, req)
+		var out map[string]any
+		if rec.Body.Len() > 0 {
+			if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+				t.Fatalf("decode response %q: %v", rec.Body.String(), err)
+			}
+		}
+		return rec.Code, out
+	}
+	refresh := func(tok string) (int, map[string]any) {
+		return post(a.refresh, fmt.Sprintf(`{"refresh_token":%q}`, tok))
+	}
+	refreshToken := func(out map[string]any) string {
+		t.Helper()
+		d, _ := out["data"].(map[string]any)
+		tok, _ := d["refresh_token"].(string)
+		if tok == "" {
+			t.Fatalf("response has no refresh_token: %v", out)
+		}
+		return tok
+	}
+	// liveTokens counts the unrevoked tokens in the family of the given token.
+	liveTokens := func(tok string) int {
+		t.Helper()
+		sum := sha256.Sum256([]byte(tok))
+		var n int
+		if err := pool.QueryRow(context.Background(),
+			`SELECT count(*) FROM refresh_tokens WHERE revoked_at IS NULL
+			  AND family_id = (SELECT family_id FROM refresh_tokens WHERE token_hash = $1)`, hex.EncodeToString(sum[:])).Scan(&n); err != nil {
+			t.Fatalf("count live tokens: %v", err)
+		}
+		return n
+	}
+	login := func() string {
+		t.Helper()
+		code, out := post(a.login, fmt.Sprintf(`{"email":%q,"password":"pw-123456"}`, email))
+		if code != http.StatusOK {
+			t.Fatalf("login: status %d body %v", code, out)
+		}
+		return refreshToken(out)
+	}
+
+	if code, out := post(a.register, fmt.Sprintf(`{"email":%q,"name":"G","password":"pw-123456"}`, email)); code != http.StatusCreated {
+		t.Fatalf("register: status %d body %v", code, out)
+	}
+
+	// A lost response: the client retries with the token it still holds.
+	first := login()
+	if code, _ := refresh(first); code != http.StatusOK {
+		t.Fatalf("refresh: status %d, want 200", code)
+	}
+	code, out := refresh(first)
+	if code != http.StatusOK {
+		t.Fatalf("retry within grace: status %d body %v, want 200", code, out)
+	}
+	d, _ := out["data"].(map[string]any)
+	access, _ := d["token"].(string)
+	if _, err := mgr.Verify(access); err != nil || d["user"] == nil {
+		t.Fatalf("retry response is not login-shaped: %v (verify err %v)", d, err)
+	}
+	retried := refreshToken(out)
+	if n := liveTokens(first); n != 1 {
+		t.Fatalf("live tokens after retry = %d, want 1", n)
+	}
+	if code, _ = refresh(retried); code != http.StatusOK {
+		t.Fatalf("retry successor: status %d, want 200", code)
+	}
+
+	// Grace 0 restores strict reuse detection with the same generic 401.
+	a.refreshGrace = 0
+	strict := login()
+	if code, _ = refresh(strict); code != http.StatusOK {
+		t.Fatalf("refresh: status %d, want 200", code)
+	}
+	if code, out = refresh(strict); code != http.StatusUnauthorized || out["data"] != nil {
+		t.Fatalf("replay with grace 0: status %d body %v, want 401 without data", code, out)
 	}
 }

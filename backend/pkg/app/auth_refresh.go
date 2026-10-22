@@ -26,7 +26,7 @@ func (a *App) refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, next, err := a.store.RotateRefreshToken(req.RefreshToken, a.refreshTTL)
+	user, next, err := a.store.RotateRefreshToken(req.RefreshToken, a.refreshTTL, a.refreshGrace)
 	if errors.Is(err, store.ErrInvalidRefreshToken) {
 		errResp(w, http.StatusUnauthorized, "invalid refresh token")
 		return

@@ -57,7 +57,10 @@ The app will be available at http://localhost:5173.
 | `JWT_SECRET` | Secret key for JWT signing | - |
 | `JWT_TTL_HOURS` | JWT token lifetime in hours | `72` |
 | `REFRESH_TTL_DAYS` | Refresh token lifetime in days | `90` |
+| `REFRESH_GRACE_SECONDS` | Window after a refresh token is rotated in which presenting it again counts as a client retry (lost response), not theft; `0` disables it | `300` |
 | `PORT` | Server port | `8080` |
+
+Security note on `REFRESH_GRACE_SECONDS`: refresh tokens rotate on every use. If the response is lost, the client retries with a token that was just rotated; inside the grace window the server accepts that once more, revokes the other live tokens of the family and issues a fresh one. The tradeoff is that a stolen token replayed inside the window is also accepted, so keep it short. After the window, reuse of a rotated token revokes the whole family. Tokens revoked by logout, reuse detection or a disabled user are never retried.
 
 ### Frontend
 

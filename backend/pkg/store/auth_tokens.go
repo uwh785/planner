@@ -81,11 +81,17 @@ func (s *Store) IssueRefreshToken(userID string, ttl time.Duration) (string, err
 }
 
 // RotateRefreshToken atomically revokes the presented token and issues a
-// successor in the same family. A single conditional UPDATE decides the race
-// between concurrent presentations of one token: only one gets a row back.
+// successor in the same family. Every rotation in a family is serialized by a
+// transaction-scoped advisory lock, and a single conditional UPDATE decides the
+// race between concurrent presentations of one token.
+//
 // Presenting an already-revoked token is treated as theft and revokes the
-// whole family. Any failure is ErrInvalidRefreshToken.
-func (s *Store) RotateRefreshToken(raw string, ttl time.Duration) (model.User, string, error) {
+// whole family, unless it is a retry after a lost response: the token was
+// rotated at most grace ago (grace 0 disables this), the family was not burned
+// by logout or reuse detection, and the user is active. A retry revokes every
+// still-live token of the family and issues one fresh successor, so exactly one
+// token stays live. Any failure is ErrInvalidRefreshToken.
+func (s *Store) RotateRefreshToken(raw string, ttl, grace time.Duration) (model.User, string, error) {
 	ctx := context.Background()
 	var user model.User
 	if raw == "" {
@@ -101,30 +107,66 @@ func (s *Store) RotateRefreshToken(raw string, ttl time.Duration) (model.User, s
 	hash := hashRefreshToken(raw)
 	var userID, familyID string
 	err = tx.QueryRow(ctx,
-		`UPDATE refresh_tokens SET revoked_at = $2
-		  WHERE token_hash = $1 AND revoked_at IS NULL AND expires_at > $2
-		RETURNING user_id, family_id`, hash, now.UnixMilli(),
+		`SELECT user_id, family_id FROM refresh_tokens WHERE token_hash = $1`, hash,
 	).Scan(&userID, &familyID)
 	if errors.Is(err, pgx.ErrNoRows) {
-		// Not rotatable. A revoked row means the token was already used (or its
-		// family logged out): revoke the family and commit that before refusing.
-		var revoked bool
-		err = tx.QueryRow(ctx,
-			`SELECT family_id, revoked_at IS NOT NULL FROM refresh_tokens WHERE token_hash = $1`, hash,
-		).Scan(&familyID, &revoked)
-		if err == nil && revoked {
-			if err = revokeFamily(ctx, tx, familyID, now); err == nil {
-				err = tx.Commit(ctx)
-			}
-			if err != nil {
-				return user, "", err
-			}
-		} else if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-			return user, "", err
-		}
 		return user, "", ErrInvalidRefreshToken
 	}
 	if err != nil {
+		return user, "", err
+	}
+	// Serialize rotations and retries of one family so the single-live-token
+	// invariant cannot be broken by interleaved transactions.
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, familyID); err != nil {
+		return user, "", err
+	}
+
+	retry := false
+	var rotatedUser string
+	err = tx.QueryRow(ctx,
+		`UPDATE refresh_tokens SET revoked_at = $2, rotated_at = $2
+		  WHERE token_hash = $1 AND revoked_at IS NULL AND expires_at > $2
+		RETURNING user_id`, hash, now.UnixMilli(),
+	).Scan(&rotatedUser)
+	if errors.Is(err, pgx.ErrNoRows) {
+		// Not rotatable. A revoked row means the token was already used (or its
+		// family logged out): a recent rotation in an intact family is a retry,
+		// anything else revokes the family and commits that before refusing.
+		var revoked bool
+		var rotatedAt *int64
+		var expiresAt int64
+		if err := tx.QueryRow(ctx,
+			`SELECT revoked_at IS NOT NULL, rotated_at, expires_at FROM refresh_tokens WHERE token_hash = $1`, hash,
+		).Scan(&revoked, &rotatedAt, &expiresAt); err != nil {
+			return user, "", err
+		}
+		if !revoked {
+			return user, "", ErrInvalidRefreshToken // expired
+		}
+		retry = grace > 0 && rotatedAt != nil && expiresAt > now.UnixMilli() &&
+			now.UnixMilli()-*rotatedAt <= grace.Milliseconds()
+		if retry {
+			// A token revoked without being rotated (logout, reuse detection,
+			// disabled user) marks the family as burned.
+			var burned bool
+			if err := tx.QueryRow(ctx,
+				`SELECT EXISTS (SELECT 1 FROM refresh_tokens
+				  WHERE family_id = $1 AND revoked_at IS NOT NULL AND rotated_at IS NULL)`, familyID,
+			).Scan(&burned); err != nil {
+				return user, "", err
+			}
+			retry = !burned
+		}
+		if !retry {
+			if err := revokeFamily(ctx, tx, familyID, now); err != nil {
+				return user, "", err
+			}
+			if err := tx.Commit(ctx); err != nil {
+				return user, "", err
+			}
+			return user, "", ErrInvalidRefreshToken
+		}
+	} else if err != nil {
 		return user, "", err
 	}
 
@@ -145,6 +187,16 @@ func (s *Store) RotateRefreshToken(raw string, ttl time.Duration) (model.User, s
 		return model.User{}, "", err
 	}
 
+	if retry {
+		// Supersede the live successor(s) of the earlier attempts. They count as
+		// rotated, not burned, so further retries of the same token keep working
+		// for the rest of the window.
+		if _, err := tx.Exec(ctx,
+			`UPDATE refresh_tokens SET revoked_at = $2, rotated_at = $2
+			  WHERE family_id = $1 AND revoked_at IS NULL`, familyID, now.UnixMilli()); err != nil {
+			return model.User{}, "", err
+		}
+	}
 	if err := purgeExpiredRefreshTokens(ctx, tx, userID, now); err != nil {
 		return model.User{}, "", err
 	}

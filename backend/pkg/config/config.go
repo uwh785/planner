@@ -14,8 +14,11 @@ type Config struct {
 	JWTTLHours  int
 	// RefreshTTLDays is the lifetime of a refresh token (REFRESH_TTL_DAYS).
 	RefreshTTLDays int
-	DBMaxConns     int32
-	DBMinConns     int32
+	// RefreshGraceSeconds is how long after rotation a refresh token may be
+	// presented again as a retry (REFRESH_GRACE_SECONDS); 0 disables it.
+	RefreshGraceSeconds int
+	DBMaxConns          int32
+	DBMinConns          int32
 }
 
 func Load(required bool) (Config, error) {
@@ -28,7 +31,8 @@ func Load(required bool) (Config, error) {
 		DBMaxConns:  10,
 		DBMinConns:  2,
 
-		RefreshTTLDays: 90,
+		RefreshTTLDays:      90,
+		RefreshGraceSeconds: 300,
 	}
 
 	if v := os.Getenv("JWT_TTL_HOURS"); v != "" {
@@ -40,6 +44,12 @@ func Load(required bool) (Config, error) {
 	if v := os.Getenv("REFRESH_TTL_DAYS"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 {
 			cfg.RefreshTTLDays = n
+		}
+	}
+
+	if v := os.Getenv("REFRESH_GRACE_SECONDS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			cfg.RefreshGraceSeconds = n
 		}
 	}
 

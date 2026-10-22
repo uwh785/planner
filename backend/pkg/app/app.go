@@ -27,12 +27,37 @@ type App struct {
 
 	// refreshTTL is the lifetime of newly issued refresh tokens.
 	refreshTTL time.Duration
+	// refreshGrace is how long a rotated refresh token may still be presented
+	// as a retry after a lost response; 0 means strict reuse detection.
+	refreshGrace time.Duration
 }
 
-func New(s *store.Store, a *auth.Manager) *App {
-	// Load(false) never fails; it only reads REFRESH_TTL_DAYS (default 90).
+// Option customises an App built by New.
+type Option func(*App)
+
+// WithRefreshTokens overrides the refresh token lifetime and retry grace
+// window that New otherwise reads from the environment.
+func WithRefreshTokens(ttl, grace time.Duration) Option {
+	return func(a *App) {
+		a.refreshTTL = ttl
+		a.refreshGrace = grace
+	}
+}
+
+func New(s *store.Store, a *auth.Manager, opts ...Option) *App {
+	// Load(false) never fails; it only reads REFRESH_TTL_DAYS (default 90) and
+	// REFRESH_GRACE_SECONDS (default 300) as defaults for callers without options.
 	cfg, _ := config.Load(false)
-	return &App{store: s, auth: a, refreshTTL: time.Duration(cfg.RefreshTTLDays) * 24 * time.Hour}
+	app := &App{
+		store:        s,
+		auth:         a,
+		refreshTTL:   time.Duration(cfg.RefreshTTLDays) * 24 * time.Hour,
+		refreshGrace: time.Duration(cfg.RefreshGraceSeconds) * time.Second,
+	}
+	for _, o := range opts {
+		o(app)
+	}
+	return app
 }
 
 func (a *App) Handler() http.Handler {

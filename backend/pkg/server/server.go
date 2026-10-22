@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -30,5 +31,8 @@ func HandlerOrFatal() http.Handler {
 
 	s := store.New(pool)
 	a := auth.NewManager(cfg.JWTSecret, cfg.JWTTLHours)
-	return app.New(s, a).Handler()
+	return app.New(s, a, app.WithRefreshTokens(
+		time.Duration(cfg.RefreshTTLDays)*24*time.Hour,
+		time.Duration(cfg.RefreshGraceSeconds)*time.Second,
+	)).Handler()
 }

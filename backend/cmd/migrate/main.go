@@ -211,6 +211,10 @@ func main() {
 			PRIMARY KEY (user_id, change_id)
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_sync_changes_applied ON sync_changes(applied_at)`,
+		// Rotation time of a refresh token (NULL = never rotated). Together with
+		// revoked_at it tells a rotated token (retry grace window) from one killed
+		// by logout or reuse detection.
+		`ALTER TABLE refresh_tokens ADD COLUMN IF NOT EXISTS rotated_at BIGINT`,
 	}
 
 	for i, m := range migrations {
