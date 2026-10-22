@@ -22,9 +22,9 @@ import { upsertRow } from './sqlHelpers';
 import { CURSOR_KEY, writeSyncState } from './SyncStateSqlRepository';
 
 /**
- * Applies a pull in one transaction. A row with a pending outbox entry is
- * skipped: the local edit wins until it is pushed and the next pull
- * reconciles. There are no foreign keys, so rows may arrive children first.
+ * Applies a pull in one transaction. A row with an outbox entry (pending or
+ * parked) is skipped: the local edit wins until it is pushed and the next
+ * pull reconciles. There are no foreign keys, so rows may arrive children first.
  */
 export class RemoteChangesApplier implements ApplyRemoteChanges {
   constructor(private readonly db: SqlDatabase) {}
@@ -46,10 +46,11 @@ export class RemoteChangesApplier implements ApplyRemoteChanges {
         if (parsed.rows.length === 0) {
           return;
         }
+        // Parked (blocked or rejected) entries protect their row too.
         const pending = new Set(
           (
             await tx.query<{ entity_id: string }>(
-              "SELECT entity_id FROM outbox WHERE entity = ? AND status = 'pending'",
+              'SELECT entity_id FROM outbox WHERE entity = ?',
               [entity],
             )
           ).map(r => r.entity_id),

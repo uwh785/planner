@@ -42,8 +42,8 @@ describe('OutboxRepository', () => {
   it('records a failure without losing the entry', async () => {
     await w.tasks.create({ title: 'a' });
     const [entry] = await w.outbox.peekPending(1);
-    await w.outbox.markFailed(entry!.id, 'HTTP 500');
-    await w.outbox.markFailed(entry!.id, 'HTTP 503');
+    await w.outbox.recordAttempt(entry!.id, 'HTTP 500');
+    await w.outbox.recordAttempt(entry!.id, 'HTTP 503');
     const [again] = await w.outbox.peekPending(1);
     expect(again).toMatchObject({ attempts: 2, lastError: 'HTTP 503' });
     expect(await w.outbox.pendingCount()).toBe(1);
