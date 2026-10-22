@@ -52,5 +52,12 @@ M2b done: application ports (repositories, outbox, sync state, id generator, clo
 - M2a: RED first (adapter, migration, schema, mapper, App tests failed on missing modules). `npm run typecheck` clean; `npm run lint` clean; `npm test` 6 suites, 37/37 pass. Gradle `app:installDebug` OK (op-sqlite built via autolinking); on emulator-5554 logcat shows `db ready (schema v1)` on first launch and again after force-stop relaunch, no FATAL EXCEPTION. The op-sqlite adapter itself is verified only through this migration run (BEGIN/COMMIT path); the shared contract suite runs against the Node adapter.
 - M2b: RED first (14 suites failed on missing modules; boundary test failed on App importing infrastructure). `npm run typecheck` clean; `npm run lint` clean; `npm test` 20 suites, 169/169 pass. Gradle `app:installDebug` OK; on emulator-5554 logcat shows `db ready (schema v2)` (v1 database upgraded by migration 002) and `repo smoke ok (outbox=2)` on first launch and again after force-stop relaunch, device ids like `lst_e95256b539c37e51` / `tsk_46adca56c77ec037` match `<prefix>_<16 hex>`, no FATAL EXCEPTION, `mCurrentFocus` = app.planner.mobile/.MainActivity. Hermes has no `crypto.getRandomValues` in RN's JS sources, so `react-native-get-random-values` 2.0.0 (autolinked TurboModule) provides it.
 
+## Review follow-ups (non-blocking)
+M2b was reviewed as three native candidates (one commit exceeded the reviewer budget and was split into four: `d40bdd2`, `bae6bd0`, `5cca6c0`, `62ed0c9`). All approved. Open advisories:
+- `index.js`: the dev repo smoke deletes rows in the `devsmoke` database file; scope it so it can never collide with a real user id (reserve the name or use a path no user id can produce), and give it a test.
+- Add a ContainerManager-backed test for a late-resolving acquire after unmount (React StrictMode double effect), so leak safety is proved at the integration level.
+- Add direct unit tests for the `normalize*` validators in `src/domain/validation.ts`.
+- Backend (planner repo): `DeleteTaskList` leaves tasks pointing at a tombstoned list and `pushUpsert` then rejects later edits of those tasks; the client detaches tasks locally as a workaround.
+
 ## Next step
 M3.
