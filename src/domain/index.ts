@@ -18,3 +18,4 @@ export {
   normalizeTask,
   normalizeTaskList,
 } from './validation';
+export type { ActiveSession, AuthSession, AuthUser } from './auth';

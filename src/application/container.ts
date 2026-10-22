@@ -69,8 +69,23 @@ export class ContainerManager implements ContainerSource {
       return;
     }
     this.refs -= 1;
-    if (this.refs > 0 || this.current === null) {
-      return;
+    if (this.refs === 0) {
+      this.closeCurrent();
+    }
+  }
+
+  /**
+   * Closes the container now, whatever still holds it (user switch, logout).
+   * Later release() calls of those holders are no-ops. Resolves once closed.
+   */
+  forceClose(): Promise<void> {
+    this.refs = 0;
+    return this.closeCurrent();
+  }
+
+  private closeCurrent(): Promise<void> {
+    if (this.current === null) {
+      return this.tail.then(() => undefined);
     }
     const closing = this.current;
     this.current = null;
@@ -81,5 +96,6 @@ export class ContainerManager implements ContainerSource {
         () => undefined,
       )
       .catch(() => undefined);
+    return this.tail.then(() => undefined);
   }
 }

@@ -23,6 +23,7 @@ function importsOf(file: string): string[] {
 
 const isFramework = (spec: string) =>
   /^(react|react-native|@react-native|@op-engineering)(\/|$)/.test(spec) ||
+  /^react-native-/.test(spec) ||
   /^node:/.test(spec) ||
   ['fs', 'path', 'os', 'crypto'].includes(spec);
 
