@@ -4,3 +4,4 @@ Screens are containers that wire application use cases to presentational compone
 - `AuthScreen` validates, calls `login`/`register` and maps typed errors to short messages (`authMessages.ts`).
 - `SignedInHomeScreen` is a placeholder until M5; it holds the user's database open and signs out.
 - `StartupErrorScreen` explains a misconfigured build instead of crashing.
+- `SyncStatusLine` reads the sync status (`useSyncStatus`) and shows one polite line on the signed-in home; `DevTaskButton` (development builds only) queues a sample task for manual sync tests.

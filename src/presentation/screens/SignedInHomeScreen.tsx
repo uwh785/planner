@@ -7,6 +7,8 @@ import { Screen } from '../components/atoms/Screen';
 import { ContainerProvider, useAcquiredContainer } from '../containerContext';
 import { useSession } from '../sessionContext';
 import { useStyles } from '../theme';
+import { DevTaskButton } from './DevTaskButton';
+import { SyncStatusLine } from './SyncStatusLine';
 import type { Theme } from '../theme';
 
 const makeStyles = (t: Theme) => ({
@@ -70,6 +72,7 @@ export function SignedInHomeScreen({
         <Text style={styles.name}>{user.name}</Text>
         <Text style={styles.email}>{user.email}</Text>
         <Text style={styles.hint}>Your tasks will live here.</Text>
+        <SyncStatusLine />
         <View style={styles.actions}>
           <Button
             variant="secondary"
@@ -79,6 +82,7 @@ export function SignedInHomeScreen({
             onPress={signOut}
           />
         </View>
+        <DevTaskButton />
       </Screen>
     </ContainerProvider>
   );

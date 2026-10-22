@@ -34,13 +34,26 @@ Source lives in `src/`; the `@/*` alias maps to `src/*`.
 
 ### Local-first writes and the outbox
 
-The UI only talks to the repositories. A create, update or delete changes the local row (deletes are tombstones: `deleted = 1`) and queues one `outbox` entry `{entity, op, entity_id, payload, change_id, origin}` in the same transaction; the sync engine (M4) drains it through `POST /api/sync/push`.
+The UI only talks to the repositories. A create, update or delete changes the local row (deletes are tombstones: `deleted = 1`) and queues one `outbox` entry `{entity, op, entity_id, payload, change_id, origin}` in the same transaction; the sync engine drains it through `POST /api/sync/push` (see Sync below).
 
 - `payload` is the snake_case `data` the backend decodes (full current body for upserts; `{task_id}` for a subtask delete; `{task_id, tag_id}` for task/tag links). Server-managed fields are never sent.
 - A task/tag link has no id: its outbox `entity_id` is `<task_id>:<tag_id>`.
 - Coalescing: at most one pending upsert per entity (updated in place, so its `id` ordering key and `change_id` stay). Deleting an entity created offline and never pushed (`origin = 'create'`) drops its entries and hard-deletes the row; deleting a known entity keeps a tombstone and one delete entry.
 - Deletes mirror the backend: deleting a task leaves subtasks and links alone, deleting a tag tombstones its links locally (the server cascades). Deleting a list moves its tasks to "no list" (the backend would leave them pointing at a deleted list, which then fails to push).
-- `applyRemoteChanges(pullResponse)` applies a `GET /api/sync` payload in one transaction and skips rows that have a pending outbox entry.
+- `applyRemoteChanges(pullResponse)` applies a `GET /api/sync` payload in one transaction and skips rows that have an outbox entry (pending or parked).
+
+## Sync
+
+`application/sync` is framework-free; platform pieces sit behind ports (`Connectivity`, `AppLifecycle`, `Timer`, `ChangeNotifier`) with adapters in `infrastructure/sync` (NetInfo, AppState, setTimeout).
+
+- `SyncEngine.sync()` is single flight (a call during a run shares it and asks for at most one follow-up). It pushes first, then pulls. Push sends pending outbox entries in id order, at most 200 per request, with their `change_id`; entries are removed only after the response, so a crash re-sends the same ids and the server answers `exists`. Per-item results: `applied`/`exists` clear the entry (so does a delete's `not_found`); an upsert's `not_found` (missing parent) is retried and parked as `blocked` after 5 attempts; `limit` parks as `blocked`; `conflict`/`invalid` park as `rejected` (message kept, local row kept); `error` or an unknown status retries with backoff. A network failure leaves the outbox untouched; a whole-batch 400 parks that batch as `rejected` once; a lost session pauses without backoff.
+- Parked entries are never pushed automatically. Editing the entity revives its parked upsert as pending; deleting it drops a parked create or replaces a parked update with one delete; `retryParked()` is for a future attention screen. A pull never overwrites a row that has any outbox entry.
+- Backoff is a pure function (2 s, 5 s, 15 s, 60 s, 5 min, then 15 min, +/-20% jitter). The engine exposes `nextRetryAt`; it owns no timers.
+- `SyncStatus` (`getSnapshot`/`subscribe`): `idle | syncing | offline | error | paused` plus pending/blocked/rejected counts, `lastSyncAt`, `lastError`, `nextRetryAt`.
+- `SyncScheduler` runs the engine on start, when connectivity returns, on foreground, 2 s after the last local change, every 5 min while on screen and when `nextRetryAt` arrives; never while offline or paused. `SyncCoordinator` builds one engine and scheduler per signed-in user from the session state, tears them down on sign-out, expiry or user switch, and is the status source for the UI (`useSyncStatus`, one polite status line on the home). `index.js` calls `services.sync.start()`.
+- Local writes notify the scheduler after commit: the repositories write through `NotifyingDatabase`, which fires `ChangeNotifier` after each top-level transaction.
+- Dev only: `runSyncSmoke` registers a throwaway user, works offline, syncs, checks the server through the real API and pulls server-side changes, logging `sync smoke ok`; the home shows an "Add sample task (dev)" button.
+- Backend note: sync push needs the planner backend at commit `b93f832` or later on `feat/offline-sync-schema`; earlier commits had the handler but never mounted `POST /api/sync/push` (it answered 404).
 
 ## Auth and session
 
