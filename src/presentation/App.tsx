@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   StatusBar,
   StyleSheet,
@@ -7,6 +7,8 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { databaseFileName } from '@/infrastructure/db/databaseName';
+import { initDatabase } from '@/infrastructure/db/initDatabase';
 
 const palettes = {
   light: { background: '#FAFAF7', title: '#1F2933', subtitle: '#52606D' },
@@ -16,6 +18,18 @@ const palettes = {
 function App() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const colors = palettes[scheme];
+
+  // Open and migrate the local database without blocking the first render.
+  // The per-user file name arrives with auth (M3); until then a local one.
+  useEffect(() => {
+    initDatabase(databaseFileName('local'))
+      .then(({ schemaVersion }) => {
+        if (__DEV__) {
+          console.log(`db ready (schema v${schemaVersion})`);
+        }
+      })
+      .catch(error => console.error('db init failed', error));
+  }, []);
 
   return (
     <SafeAreaProvider>

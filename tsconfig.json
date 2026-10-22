@@ -2,6 +2,7 @@
   "extends": "@react-native/typescript-config",
   "compilerOptions": {
     "noUncheckedIndexedAccess": true,
+    "types": ["jest", "node"],
     "paths": {
       "@/*": ["./src/*"]
     }

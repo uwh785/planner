@@ -24,6 +24,7 @@ Source lives in `src/`; the `@/*` alias maps to `src/*`.
 - `domain`: entities and rules, no framework imports.
 - `application`: use cases and ports, depends only on domain.
 - `infrastructure`: implements ports (SQLite, HTTP, secure storage, notifications).
+  - `infrastructure/db`: op-sqlite adapter, ordered migrations (`PRAGMA user_version`; never edit a shipped one, add the next number), one database file per user (`planner_<userId>.db`). `NodeSqliteDatabase` (`node:sqlite`) is for Jest only.
 - `presentation`: screens and atomic components, talks to application only.
 
 ## Backend
