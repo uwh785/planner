@@ -63,5 +63,12 @@ M2b was reviewed as three native candidates (one commit exceeded the reviewer bu
 - Add direct unit tests for the `normalize*` validators in `src/domain/validation.ts`.
 - Backend (planner repo): `DeleteTaskList` leaves tasks pointing at a tombstoned list and `pushUpsert` then rejects later edits of those tasks; the client detaches tasks locally as a workaround.
 
+M3a was reviewed as two native candidates (`ff3286d`; `968034b` + `8a24421`), both approved. Open advisories, in priority order:
+- **Fix before M4 (real bug):** an in-flight refresh can finish after `logout()` has cleared the store and then `store.save(next)` writes a live token pair back, silently signing the user in again on restore (`src/application/auth/AuthenticatedHttp.ts`, also the identity-only save in the `SessionExpiredError` branch). Guard the save with a session generation or re-read check, and test logout racing a refresh.
+- `KeychainSessionStore.get()`: `Keychain.getGenericPassword` is outside the try/catch, so a Keystore read failure looks like "signed out" and a later login can overwrite the stored tokens. Distinguish "absent" from "unreadable"; log (without secrets) when an entry is corrupt.
+- `createAppServices` throws at import in a release build without `RELEASE_API_BASE_URL`; surface it as a handled startup error instead of a crash before the component registers, and test the fail-fast path.
+- Confirm `SessionService.handleExpired` is wired to `AuthenticatedHttp.onSessionExpired` in the composition root and cover it with a test.
+- Smaller: `runAuthSmoke` should guard `__DEV__` itself; named constant for the 15 s HTTP timeout; test a pre-aborted signal and a malformed 2xx on refresh; a refresh that times out after the server rotated the token leaves a stale refresh token (the server grace window covers a retry); make the smoke `assert` an `asserts` function.
+
 ## Next step
-M3b: auth screens and session gating.
+Fix the refresh-after-logout race and the Keychain read failure, then M3b (auth screens and session gating).
