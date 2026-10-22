@@ -69,5 +69,12 @@ M3a was reviewed as two native candidates (`ff3286d`; `968034b` + `8a24421`), bo
 - A refresh that times out after the server rotated the token leaves a stale refresh token on the device (the server grace window covers a retry).
 - A corrupt Keychain entry is treated as absent and left in place; a later sign-in overwrites it. Decide in M7 whether to surface that.
 
+The M3 fixes (`a91e139`) and the auth screens (`5246b70`) were reviewed as two native candidates, both approved. Open advisories, in priority order:
+- `SessionService.restore()` publishes `restoring` and adopts whatever the store returns without checking the session epoch, so a restore overlapping a login or logout (more plausible now that "Try again" exists) can overwrite newer state; and `login`/`register` advance the epoch only after the network call returns. Guard both and add race tests.
+- The `epoch` dependency defaults to a private `SessionEpoch` in `adoptSession`, `logout`, `AuthenticatedHttp` and `SessionService`; a wiring mistake would silently drop the race protection. Make it required in production wiring.
+- `restore()` maps every error to `unreadable` and `createAppServices` no longer logs the cause; narrow the catch to `SessionStoreUnreadableError` or log the reason code.
+- `SignedInHomeScreen`: if `logout()` throws, `setLeaving(false)` is never called and the Sign out button stays disabled; reset it and show feedback, with a test for a rejecting logout.
+- Tests: the schema-version log test awaits a no-op (use `waitFor`); the path that selects `StartupErrorScreen` from `bootstrapApp` in `index.js` is untested.
+
 ## Next step
 M4: outbox and sync engine (pull with cursor, push with `change_id`, per-item results, retry with backoff, connectivity trigger).
