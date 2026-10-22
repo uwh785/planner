@@ -26,7 +26,8 @@ ask-on-risk. Branch per work unit group; push, PR and merge stay with the user.
 - [x] M1 Scaffold bare RN 0.88 + TypeScript app, tooling (eslint, prettier, jest, tsc), hexagonal folders, runs on the emulator.
 - [x] M2a Local database foundation: `op-sqlite`, a `SqlDatabase` port with an op-sqlite adapter and a `node:sqlite` adapter for Jest, versioned migrations (`PRAGMA user_version`), schema mirroring backend entities (tombstones, `updated_at`, sync state, outbox tables), domain entity types.
 - [x] M2b Repositories behind application ports: local-first mutations that write the row and enqueue the outbox entry in one transaction, reads that hide tombstones, `applyRemoteChanges` for pull that does not overwrite rows with pending outbox entries, ID generation.
-- [ ] M3 API client and auth: register/login/refresh/logout, secure token storage, automatic refresh on 401.
+- [ ] M3a API client and session (uses the backend's own auth endpoints, no separate auth system): HTTP client port with a fetch adapter, auth gateway for register/login/refresh/logout, secure token storage in the Android Keystore, session use cases (register, login, logout, restore) and single-flight automatic refresh on 401, per-user container wiring. Verified against the real backend from the emulator.
+- [ ] M3b Auth screens: minimal accessible login and register forms and session gating (signed out vs signed in); real visual design lands in M5.
 - [ ] M4 Outbox and sync engine: pull with cursor, push with `change_id`, per-item results (402/409/conflict), retry with backoff, connectivity trigger.
 - [ ] M5 Design seed (`DESIGN.md`) and core screens: auth, lists, tasks, task detail with subtasks and tags.
 - [ ] M6 Timer (start/pause/complete with real timestamps) and local reminders (notifications).
