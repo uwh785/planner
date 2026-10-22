@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import {
   StatusBar,
   StyleSheet,
@@ -7,51 +7,49 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { databaseFileName } from '@/infrastructure/db/databaseName';
-import { initDatabase } from '@/infrastructure/db/initDatabase';
+import type { ContainerSource } from '@/application/container';
+import { ContainerProvider, useAcquiredContainer } from './containerContext';
 
 const palettes = {
   light: { background: '#FAFAF7', title: '#1F2933', subtitle: '#52606D' },
   dark: { background: '#14181C', title: '#F1F3F5', subtitle: '#AAB4BE' },
 } as const;
 
-function App() {
+interface AppProps {
+  /** Where the local database comes from; wired in the composition entry. */
+  containers: ContainerSource;
+}
+
+function App({ containers }: AppProps) {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const colors = palettes[scheme];
 
-  // Open and migrate the local database without blocking the first render.
-  // The per-user file name arrives with auth (M3); until then a local one.
-  useEffect(() => {
-    initDatabase(databaseFileName('local'))
-      .then(({ schemaVersion }) => {
-        if (__DEV__) {
-          console.log(`db ready (schema v${schemaVersion})`);
-        }
-      })
-      .catch(error => console.error('db init failed', error));
-  }, []);
+  // The database opens in the background; the screen never waits for it.
+  const container = useAcquiredContainer(containers);
 
   return (
-    <SafeAreaProvider>
-      <StatusBar
-        barStyle={scheme === 'dark' ? 'light-content' : 'dark-content'}
-      />
-      <SafeAreaView
-        style={[styles.container, { backgroundColor: colors.background }]}
-      >
-        <View style={styles.content}>
-          <Text
-            accessibilityRole="header"
-            style={[styles.title, { color: colors.title }]}
-          >
-            Planner
-          </Text>
-          <Text style={[styles.subtitle, { color: colors.subtitle }]}>
-            Your tasks, calm and offline.
-          </Text>
-        </View>
-      </SafeAreaView>
-    </SafeAreaProvider>
+    <ContainerProvider value={container}>
+      <SafeAreaProvider>
+        <StatusBar
+          barStyle={scheme === 'dark' ? 'light-content' : 'dark-content'}
+        />
+        <SafeAreaView
+          style={[styles.container, { backgroundColor: colors.background }]}
+        >
+          <View style={styles.content}>
+            <Text
+              accessibilityRole="header"
+              style={[styles.title, { color: colors.title }]}
+            >
+              Planner
+            </Text>
+            <Text style={[styles.subtitle, { color: colors.subtitle }]}>
+              Your tasks, calm and offline.
+            </Text>
+          </View>
+        </SafeAreaView>
+      </SafeAreaProvider>
+    </ContainerProvider>
   );
 }
 

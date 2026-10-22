@@ -25,7 +25,7 @@ ask-on-risk. Branch per work unit group; push, PR and merge stay with the user.
 ## Tasks
 - [x] M1 Scaffold bare RN 0.88 + TypeScript app, tooling (eslint, prettier, jest, tsc), hexagonal folders, runs on the emulator.
 - [x] M2a Local database foundation: `op-sqlite`, a `SqlDatabase` port with an op-sqlite adapter and a `node:sqlite` adapter for Jest, versioned migrations (`PRAGMA user_version`), schema mirroring backend entities (tombstones, `updated_at`, sync state, outbox tables), domain entity types.
-- [ ] M2b Repositories behind application ports: local-first mutations that write the row and enqueue the outbox entry in one transaction, reads that hide tombstones, `applyRemoteChanges` for pull that does not overwrite rows with pending outbox entries, ID generation.
+- [x] M2b Repositories behind application ports: local-first mutations that write the row and enqueue the outbox entry in one transaction, reads that hide tombstones, `applyRemoteChanges` for pull that does not overwrite rows with pending outbox entries, ID generation.
 - [ ] M3 API client and auth: register/login/refresh/logout, secure token storage, automatic refresh on 401.
 - [ ] M4 Outbox and sync engine: pull with cursor, push with `change_id`, per-item results (402/409/conflict), retry with backoff, connectivity trigger.
 - [ ] M5 Design seed (`DESIGN.md`) and core screens: auth, lists, tasks, task detail with subtasks and tags.
@@ -45,9 +45,12 @@ ask-on-risk. Branch per work unit group; push, PR and merge stay with the user.
 M1 done: bare RN 0.88.0 + TS scaffold at repo root, hexagonal `src/` layout, placeholder screen, runs on emulator-5554.
 M2a done: `@op-engineering/op-sqlite` 18.2.5 (autolinked, no native edits), `SqlDatabase` port, op-sqlite and `node:sqlite` adapters sharing `BaseSqlDatabase` (FIFO queue, BEGIN/COMMIT, savepoints for nesting), `PRAGMA user_version` migration runner, schema v1 mirroring the backend sync schema (no `user_id`, no FKs, no server-only tables), domain types, row mappers, `initDatabase` called from App on mount.
 
+M2b done: application ports (repositories, outbox, sync state, id generator, clock, `ApplyRemoteChanges`), SQLite repositories where each mutation writes the row and its outbox entry in one transaction with coalescing (migration 002 adds `outbox.origin`: `create` = never pushed), `applyRemoteChanges` (one transaction, skips rows with pending entries, tolerant parser), `RandomIdGenerator` over `crypto.getRandomValues` (`react-native-get-random-values` imported once in `index.js`), composition root `createContainer` + `ContainerManager` (ref-counted, serialized open/close) with presentation receiving the container by prop/context and no infrastructure import. Deletes mirror the backend (task: no cascade; tag: links tombstoned locally; list: tasks detached, a deliberate deviation so tasks stay pushable).
+
 ## Verification evidence
 - M1: `npm run typecheck` clean; `npm run lint` clean; `npm test` 1/1 pass (RED observed first: module missing). Gradle debug build + install OK; `mCurrentFocus` = app.planner.mobile/.MainActivity; no FATAL EXCEPTION; screenshot shows 'Planner' + tagline on light background. Needed `adb reverse tcp:8081 tcp:8081` and allowing a nearby-devices permission dialog.
 - M2a: RED first (adapter, migration, schema, mapper, App tests failed on missing modules). `npm run typecheck` clean; `npm run lint` clean; `npm test` 6 suites, 37/37 pass. Gradle `app:installDebug` OK (op-sqlite built via autolinking); on emulator-5554 logcat shows `db ready (schema v1)` on first launch and again after force-stop relaunch, no FATAL EXCEPTION. The op-sqlite adapter itself is verified only through this migration run (BEGIN/COMMIT path); the shared contract suite runs against the Node adapter.
+- M2b: RED first (14 suites failed on missing modules; boundary test failed on App importing infrastructure). `npm run typecheck` clean; `npm run lint` clean; `npm test` 20 suites, 169/169 pass. Gradle `app:installDebug` OK; on emulator-5554 logcat shows `db ready (schema v2)` (v1 database upgraded by migration 002) and `repo smoke ok (outbox=2)` on first launch and again after force-stop relaunch, device ids like `lst_e95256b539c37e51` / `tsk_46adca56c77ec037` match `<prefix>_<16 hex>`, no FATAL EXCEPTION, `mCurrentFocus` = app.planner.mobile/.MainActivity. Hermes has no `crypto.getRandomValues` in RN's JS sources, so `react-native-get-random-values` 2.0.0 (autolinked TurboModule) provides it.
 
 ## Next step
-M2b.
+M3.
