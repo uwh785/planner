@@ -72,6 +72,9 @@ func (a *App) Handler() http.Handler {
 			r.Post("/tasks/{id}/tags", a.addTaskTag)
 			r.Delete("/tasks/{id}/tags/{tagId}", a.removeTaskTag)
 
+			// Sync
+			r.Get("/sync", a.syncPull)
+
 			// Dashboard
 			r.Get("/dashboard", a.dashboard)
 

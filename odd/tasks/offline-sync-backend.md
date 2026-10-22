@@ -27,7 +27,8 @@ ask-on-risk. Forecast ~350 authored changed lines across the feature.
 - [x] T1 Schema migration: `updated_at` + `deleted` on tags and task_tags, backfill, `(user_id, updated_at)` indexes on all synced tables. Route: inline (one mechanical file).
 - [x] T2 Store: soft-delete tags/task_tags, bump `updated_at` on task/subtask delete, filter `deleted` in reads and counts. Route: delegated writer (2+ non-trivial files).
 - [x] T3 Idempotent creates: same-user duplicate ID returns the existing row; cross-user collision returns 409. Route: delegated writer (2+ non-trivial files).
-- [ ] T4 Sync endpoints: `GET /api/sync?since=` (changes + tombstones) and `POST /api/sync/push` (batch, per-item results incl. 402/409).
+- [x] T4a Sync pull: `GET /api/sync?since=` returns every row changed since the cursor, tombstones included, plus a new cursor.
+- [ ] T4b Sync push: `POST /api/sync/push` applies a batch of upserts/deletes with per-item results (incl. 402/409), reusing the T3 idempotent creates.
 - [ ] T5 Client-supplied timestamps for start/pause/complete so offline timer segments replay faithfully.
 - [ ] T6 Auth: longer-lived or refreshable token for long offline periods.
 
@@ -48,7 +49,9 @@ T2: RED observed first (compile failure on `CountTagsUsage`, then with a stub 6 
 
 T3: RED observed first (store test build failure on `ReplayTask`/`ErrConflict`; handler test failed because `createEvent` discarded the client `event_id`). GREEN after implementing: `Replay*` lookups, `ON CONFLICT (pk) DO NOTHING` creates mapped to `ErrConflict`, generic `createIdempotent` handler flow (lookup, then plan/ceiling guard, then create, re-lookup on a lost race). New `backend/pkg/store/idempotent_create_integration_test.go` and `backend/pkg/app/idempotent_create_integration_test.go`. `go build ./...`, `go vet ./...`, `gofmt -l pkg` clean; `TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5434/planner go test -count=1 ./...` (227 passed).
 
+T4a: RED observed first (both new test files failed to compile: `Store.SyncChanges` and `App.syncPull` undefined). GREEN after implementing `backend/pkg/store/sync.go` (`SyncChanges`: cursor read before a single read-only REPEATABLE READ tx, per-table `user_id = $1 AND updated_at >= $2` queries including tombstones, generic `SyncRow[T]` wrapper with its own `MarshalJSON` adding `deleted` so `model.Task`'s custom marshaller is preserved, `SyncTag`/`SyncTaskTag` add `updated_at`), `backend/pkg/app/sync.go` (`GET /api/sync?since=`, 400 on negative/non-integer) and the route in `app.go`. New `backend/pkg/store/sync_integration_test.go` and `backend/pkg/app/sync_integration_test.go`. `go build ./...`, `go vet ./...`, `gofmt -l pkg` clean; `TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5434/planner go test -count=1 ./...` (230 passed).
+
 Follow-up (non-blocking review advisory): soft-deleted tags are never purged and count toward the tag storage ceiling (`CountTagsUsage.Total`); decide a purge policy later.
 
 ## Next step
-T4.
+T4b.
