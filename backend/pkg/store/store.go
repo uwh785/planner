@@ -139,12 +139,12 @@ func (s *Store) CountLists(userID string) (int, error) {
 		`SELECT COUNT(*) FROM task_lists WHERE user_id = $1 AND deleted = 0`, userID)
 }
 
-// CountTags counts every tag a user owns. Tags have no soft-delete flag
-// (DeleteTag is a real DELETE), so this is already the total the storage
-// ceiling needs -- there is no separate "active" count to reconcile it with.
+// CountTags counts the tags a user still has: anything not soft-deleted.
+// That is the number the Free-plan cap compares against; the storage ceiling
+// needs the total including tombstones, see CountTagsUsage.
 func (s *Store) CountTags(userID string) (int, error) {
 	return s.count(context.Background(),
-		`SELECT COUNT(*) FROM tags WHERE user_id = $1`, userID)
+		`SELECT COUNT(*) FROM tags WHERE user_id = $1 AND deleted = 0`, userID)
 }
 
 // CountClasses counts every class session a user owns, including
@@ -208,6 +208,25 @@ func (s *Store) CountListsUsage(userID string) (ListUsage, error) {
 	err := s.pool.QueryRow(context.Background(),
 		`SELECT COUNT(*) FILTER (WHERE deleted = 0), COUNT(*)
 		 FROM task_lists WHERE user_id = $1`, userID,
+	).Scan(&u.Active, &u.Total)
+	return u, err
+}
+
+// TagUsage is the tag-count analogue of ListUsage: Active excludes
+// soft-deleted tags (CountTags' definition), Total is every row the user
+// owns, which is what the flat storage ceiling compares against.
+type TagUsage struct {
+	Active int
+	Total  int
+}
+
+// CountTagsUsage reads Active and Total in one round trip, for the same
+// reason as CountTasksUsage.
+func (s *Store) CountTagsUsage(userID string) (TagUsage, error) {
+	var u TagUsage
+	err := s.pool.QueryRow(context.Background(),
+		`SELECT COUNT(*) FILTER (WHERE deleted = 0), COUNT(*)
+		 FROM tags WHERE user_id = $1`, userID,
 	).Scan(&u.Active, &u.Total)
 	return u, err
 }
@@ -280,8 +299,8 @@ func (s *Store) UpdateTaskList(userID string, l model.TaskList) error {
 
 func (s *Store) DeleteTaskList(userID, listID string) error {
 	_, err := s.pool.Exec(context.Background(),
-		`UPDATE task_lists SET deleted = 1 WHERE user_id = $1 AND list_id = $2`,
-		userID, listID,
+		`UPDATE task_lists SET deleted = 1, updated_at = $3 WHERE user_id = $1 AND list_id = $2`,
+		userID, listID, time.Now().UnixMilli(),
 	)
 	return err
 }
@@ -496,8 +515,8 @@ func (s *Store) UpdateTask(userID string, t model.Task) error {
 
 func (s *Store) DeleteTask(userID, taskID string) error {
 	_, err := s.pool.Exec(context.Background(),
-		`UPDATE tasks SET deleted = 1 WHERE user_id = $1 AND task_id = $2`,
-		userID, taskID,
+		`UPDATE tasks SET deleted = 1, updated_at = $3 WHERE user_id = $1 AND task_id = $2`,
+		userID, taskID, time.Now().UnixMilli(),
 	)
 	return err
 }
@@ -646,8 +665,8 @@ func (s *Store) UpdateSubtask(userID, taskID string, st model.Subtask) error {
 
 func (s *Store) DeleteSubtask(userID, taskID, subtaskID string) error {
 	_, err := s.pool.Exec(context.Background(),
-		`UPDATE subtasks SET deleted = 1 WHERE user_id = $1 AND task_id = $2 AND subtask_id = $3`,
-		userID, taskID, subtaskID,
+		`UPDATE subtasks SET deleted = 1, updated_at = $4 WHERE user_id = $1 AND task_id = $2 AND subtask_id = $3`,
+		userID, taskID, subtaskID, time.Now().UnixMilli(),
 	)
 	return err
 }
@@ -656,7 +675,7 @@ func (s *Store) DeleteSubtask(userID, taskID, subtaskID string) error {
 
 func (s *Store) ListTags(userID string) ([]model.Tag, error) {
 	rows, err := s.pool.Query(context.Background(),
-		`SELECT user_id, tag_id, name, color FROM tags WHERE user_id = $1 ORDER BY name`,
+		`SELECT user_id, tag_id, name, color FROM tags WHERE user_id = $1 AND deleted = 0 ORDER BY name`,
 		userID,
 	)
 	if err != nil {
@@ -683,18 +702,36 @@ func (s *Store) CreateTag(userID string, t model.Tag) (model.Tag, error) {
 		t.Color = "#8E8E93"
 	}
 	_, err := s.pool.Exec(context.Background(),
-		`INSERT INTO tags (user_id, tag_id, name, color) VALUES ($1, $2, $3, $4)`,
-		t.UserID, t.TagID, t.Name, t.Color,
+		`INSERT INTO tags (user_id, tag_id, name, color, updated_at, deleted) VALUES ($1, $2, $3, $4, $5, 0)`,
+		t.UserID, t.TagID, t.Name, t.Color, time.Now().UnixMilli(),
 	)
 	return t, err
 }
 
+// DeleteTag soft-deletes the tag and tombstones every task link to it, so a
+// delta pull sees both the tag and its links disappear.
 func (s *Store) DeleteTag(userID, tagID string) error {
-	_, err := s.pool.Exec(context.Background(),
-		`DELETE FROM tags WHERE user_id = $1 AND tag_id = $2`,
-		userID, tagID,
-	)
-	return err
+	ctx := context.Background()
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	now := time.Now().UnixMilli()
+	if _, err := tx.Exec(ctx,
+		`UPDATE tags SET deleted = 1, updated_at = $3 WHERE user_id = $1 AND tag_id = $2`,
+		userID, tagID, now,
+	); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx,
+		`UPDATE task_tags SET deleted = 1, updated_at = $3 WHERE user_id = $1 AND tag_id = $2 AND deleted = 0`,
+		userID, tagID, now,
+	); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 func (s *Store) ListTaskTags(userID, taskID string) ([]model.Tag, error) {
@@ -702,7 +739,7 @@ func (s *Store) ListTaskTags(userID, taskID string) ([]model.Tag, error) {
 		`SELECT t.user_id, t.tag_id, t.name, t.color
 		 FROM task_tags tt
 		 JOIN tags t ON t.tag_id = tt.tag_id
-		 WHERE tt.user_id = $1 AND tt.task_id = $2`,
+		 WHERE tt.user_id = $1 AND tt.task_id = $2 AND tt.deleted = 0 AND t.deleted = 0`,
 		userID, taskID,
 	)
 	if err != nil {
@@ -720,18 +757,21 @@ func (s *Store) ListTaskTags(userID, taskID string) ([]model.Tag, error) {
 	return items, rows.Err()
 }
 
+// AddTaskTag links a tag to a task. An existing link, including a tombstoned
+// one, is resurrected (deleted = 0) with a fresh updated_at.
 func (s *Store) AddTaskTag(userID, taskID, tagID string) error {
 	_, err := s.pool.Exec(context.Background(),
-		`INSERT INTO task_tags (user_id, task_id, tag_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
-		userID, taskID, tagID,
+		`INSERT INTO task_tags (user_id, task_id, tag_id, updated_at, deleted) VALUES ($1, $2, $3, $4, 0)
+		 ON CONFLICT (user_id, task_id, tag_id) DO UPDATE SET deleted = 0, updated_at = EXCLUDED.updated_at`,
+		userID, taskID, tagID, time.Now().UnixMilli(),
 	)
 	return err
 }
 
 func (s *Store) RemoveTaskTag(userID, taskID, tagID string) error {
 	_, err := s.pool.Exec(context.Background(),
-		`DELETE FROM task_tags WHERE user_id = $1 AND task_id = $2 AND tag_id = $3`,
-		userID, taskID, tagID,
+		`UPDATE task_tags SET deleted = 1, updated_at = $4 WHERE user_id = $1 AND task_id = $2 AND tag_id = $3`,
+		userID, taskID, tagID, time.Now().UnixMilli(),
 	)
 	return err
 }
@@ -843,8 +883,8 @@ func (s *Store) UpdateClass(userID string, c model.ClassSession) error {
 
 func (s *Store) DeleteClass(userID, classID string) error {
 	tag, err := s.pool.Exec(context.Background(),
-		`UPDATE class_sessions SET deleted = 1 WHERE user_id = $1 AND class_id = $2 AND deleted = 0`,
-		userID, classID,
+		`UPDATE class_sessions SET deleted = 1, updated_at = $3 WHERE user_id = $1 AND class_id = $2 AND deleted = 0`,
+		userID, classID, time.Now().UnixMilli(),
 	)
 	if err != nil {
 		return err
@@ -946,8 +986,8 @@ func (s *Store) UpdateEvent(userID string, e model.Event) error {
 
 func (s *Store) DeleteEvent(userID, eventID string) error {
 	tag, err := s.pool.Exec(context.Background(),
-		`UPDATE events SET deleted = 1 WHERE user_id = $1 AND event_id = $2 AND deleted = 0`,
-		userID, eventID,
+		`UPDATE events SET deleted = 1, updated_at = $3 WHERE user_id = $1 AND event_id = $2 AND deleted = 0`,
+		userID, eventID, time.Now().UnixMilli(),
 	)
 	if err != nil {
 		return err

@@ -311,11 +311,10 @@ func (a *App) me(w http.ResponseWriter, r *http.Request) {
 // reached. It returns false after having written the error response, so
 // callers should `return` immediately.
 //
-// For tasks and lists, the Free-plan cap and the ceiling compare against two
-// different counts (active vs. every row the user owns), so both are read in
-// one round trip via CountTasksUsage/CountListsUsage rather than querying
-// the same table twice. Tags have no soft-delete distinction, so CountTags'
-// single total answers both checks.
+// For tasks, lists and tags, the Free-plan cap and the ceiling compare against
+// two different counts (active vs. every row the user owns), so both are read
+// in one round trip via CountTasksUsage/CountListsUsage/CountTagsUsage rather
+// than querying the same table twice.
 func (a *App) enforceLimit(w http.ResponseWriter, r *http.Request, resource plan.Resource) bool {
 	claims := auth.GetUser(r)
 
@@ -343,8 +342,9 @@ func (a *App) enforceLimit(w http.ResponseWriter, r *http.Request, resource plan
 		usage, err = a.store.CountListsUsage(claims.UserID)
 		active, total = usage.Active, usage.Total
 	case plan.ResourceTag:
-		total, err = a.store.CountTags(claims.UserID)
-		active = total
+		var usage store.TagUsage
+		usage, err = a.store.CountTagsUsage(claims.UserID)
+		active, total = usage.Active, usage.Total
 	}
 	if err != nil {
 		log.Printf("count %s for %s: %v", resource, claims.UserID, err)

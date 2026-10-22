@@ -25,7 +25,7 @@ ask-on-risk. Forecast ~350 authored changed lines across the feature.
 
 ## Tasks
 - [x] T1 Schema migration: `updated_at` + `deleted` on tags and task_tags, backfill, `(user_id, updated_at)` indexes on all synced tables. Route: inline (one mechanical file).
-- [ ] T2 Store: soft-delete tags/task_tags, bump `updated_at` on task/subtask delete, filter `deleted` in reads and counts.
+- [x] T2 Store: soft-delete tags/task_tags, bump `updated_at` on task/subtask delete, filter `deleted` in reads and counts. Route: delegated writer (2+ non-trivial files).
 - [ ] T3 Idempotent creates: same-user duplicate ID returns the existing row; cross-user collision returns 409.
 - [ ] T4 Sync endpoints: `GET /api/sync?since=` (changes + tombstones) and `POST /api/sync/push` (batch, per-item results incl. 402/409).
 - [ ] T5 Client-supplied timestamps for start/pause/complete so offline timer segments replay faithfully.
@@ -44,5 +44,7 @@ ask-on-risk. Forecast ~350 authored changed lines across the feature.
 ## Verification evidence
 T1: `go run ./cmd/migrate` run twice on the local dev DB, both OK (34 statements). `\d tags` and `\d task_tags` show `updated_at` bigint and `deleted` int plus the new indexes. `go build ./...`, `go vet ./cmd/migrate`, `go test ./...` (194 passed).
 
+T2: RED observed first (compile failure on `CountTagsUsage`, then with a stub 6 assertion failures: delete `updated_at` not bumped for subtask/list/class/event, `CreateTag` `updated_at` unset, `RemoveTaskTag` hard-deleted the row). GREEN after implementing. New `backend/pkg/store/tombstone_integration_test.go`. `go build ./...` and `go vet ./...` clean; `TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5434/planner go test ./...` (219 passed). `CountTags` now counts active tags only; new `CountTagsUsage` (Active/Total) feeds `enforceLimit` so the plan cap uses active and the ceiling uses total.
+
 ## Next step
-T2.
+T3.
