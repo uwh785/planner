@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"planner/pkg/auth"
+	"planner/pkg/config"
 	"planner/pkg/model"
 	"planner/pkg/plan"
 	"planner/pkg/store"
@@ -23,10 +24,15 @@ import (
 type App struct {
 	store *store.Store
 	auth  *auth.Manager
+
+	// refreshTTL is the lifetime of newly issued refresh tokens.
+	refreshTTL time.Duration
 }
 
 func New(s *store.Store, a *auth.Manager) *App {
-	return &App{store: s, auth: a}
+	// Load(false) never fails; it only reads REFRESH_TTL_DAYS (default 90).
+	cfg, _ := config.Load(false)
+	return &App{store: s, auth: a, refreshTTL: time.Duration(cfg.RefreshTTLDays) * 24 * time.Hour}
 }
 
 func (a *App) Handler() http.Handler {
@@ -39,6 +45,8 @@ func (a *App) Handler() http.Handler {
 		r.Use(maxBodySize)
 		r.Post("/auth/register", a.register)
 		r.Post("/auth/login", a.login)
+		r.Post("/auth/refresh", a.refresh)
+		r.Post("/auth/logout", a.logout)
 		r.Group(func(r chi.Router) {
 			r.Use(a.auth.Middleware)
 			r.Get("/auth/me", a.me)
@@ -266,7 +274,13 @@ func (a *App) register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dataResp(w, http.StatusCreated, model.AuthResponse{Token: token, User: user})
+	refreshToken, err := a.store.IssueRefreshToken(user.UserID, a.refreshTTL)
+	if err != nil {
+		errResp(w, http.StatusInternalServerError, "failed to issue refresh token")
+		return
+	}
+
+	dataResp(w, http.StatusCreated, model.AuthResponse{Token: token, User: user, RefreshToken: refreshToken})
 }
 
 func (a *App) login(w http.ResponseWriter, r *http.Request) {
@@ -295,7 +309,13 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dataResp(w, http.StatusOK, model.AuthResponse{Token: token, User: user})
+	refreshToken, err := a.store.IssueRefreshToken(user.UserID, a.refreshTTL)
+	if err != nil {
+		errResp(w, http.StatusInternalServerError, "failed to issue refresh token")
+		return
+	}
+
+	dataResp(w, http.StatusOK, model.AuthResponse{Token: token, User: user, RefreshToken: refreshToken})
 }
 
 func (a *App) me(w http.ResponseWriter, r *http.Request) {

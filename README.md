@@ -56,6 +56,7 @@ The app will be available at http://localhost:5173.
 | `DATABASE_URL` | PostgreSQL connection string | `postgres://postgres:postgres@localhost:5434/planner` |
 | `JWT_SECRET` | Secret key for JWT signing | - |
 | `JWT_TTL_HOURS` | JWT token lifetime in hours | `72` |
+| `REFRESH_TTL_DAYS` | Refresh token lifetime in days | `90` |
 | `PORT` | Server port | `8080` |
 
 ### Frontend
@@ -70,6 +71,8 @@ The app will be available at http://localhost:5173.
 |--------|------|-------------|
 | POST | `/api/auth/register` | Register |
 | POST | `/api/auth/login` | Login |
+| POST | `/api/auth/refresh` | Rotate a refresh token for a new access token |
+| POST | `/api/auth/logout` | Revoke a refresh token family |
 | GET | `/api/auth/me` | Current user |
 | GET | `/api/lists` | List task lists |
 | POST | `/api/lists` | Create list |

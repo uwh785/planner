@@ -21,8 +21,24 @@ model User {
   subtasks        Subtask[]
   tags            Tag[]
   class_sessions  ClassSession[]
+  refresh_tokens  RefreshToken[]
 
   @@map("app_users")
+}
+
+model RefreshToken {
+  token_hash String  @id
+  user_id    String
+  family_id  String
+  created_at BigInt
+  expires_at BigInt
+  revoked_at BigInt?
+
+  user User @relation(fields: [user_id], references: [user_id])
+
+  @@index([user_id])
+  @@index([family_id])
+  @@map("refresh_tokens")
 }
 
 model TaskList {

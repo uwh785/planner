@@ -15,8 +15,9 @@ type User struct {
 }
 
 type AuthResponse struct {
-	Token string `json:"token"`
-	User  User   `json:"user"`
+	Token        string `json:"token"`
+	User         User   `json:"user"`
+	RefreshToken string `json:"refresh_token"`
 }
 
 type TaskList struct {

@@ -189,6 +189,19 @@ func main() {
 		`CREATE INDEX IF NOT EXISTS idx_task_tags_user_updated ON task_tags(user_id, updated_at)`,
 		`CREATE INDEX IF NOT EXISTS idx_class_sessions_user_updated ON class_sessions(user_id, updated_at)`,
 		`CREATE INDEX IF NOT EXISTS idx_events_user_updated ON events(user_id, updated_at)`,
+		// Opaque rotating refresh tokens. Only the SHA-256 hex of a token is
+		// stored; a family groups every token descended from one login so reuse of
+		// a rotated token can revoke them all.
+		`CREATE TABLE IF NOT EXISTS refresh_tokens (
+			token_hash TEXT PRIMARY KEY,
+			user_id    TEXT NOT NULL REFERENCES app_users(user_id),
+			family_id  TEXT NOT NULL,
+			created_at BIGINT NOT NULL,
+			expires_at BIGINT NOT NULL,
+			revoked_at BIGINT
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_refresh_tokens_family ON refresh_tokens(family_id)`,
 	}
 
 	for i, m := range migrations {
