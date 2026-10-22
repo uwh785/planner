@@ -6,3 +6,15 @@ export type { Tag, TaskTag } from './tag';
 export type { Task, TaskStatus, Priority } from './task';
 export { TASK_STATUSES, PRIORITIES, isTaskStatus, isPriority } from './task';
 export type { TaskList } from './taskList';
+export {
+  NotFoundError,
+  ValidationError,
+  DEFAULT_COLORS,
+  DEFAULT_LIST_ICON,
+  normalizeClassSession,
+  normalizeEvent,
+  normalizeSubtask,
+  normalizeTag,
+  normalizeTask,
+  normalizeTaskList,
+} from './validation';
