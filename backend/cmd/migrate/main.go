@@ -202,6 +202,15 @@ func main() {
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_refresh_tokens_family ON refresh_tokens(family_id)`,
+		// Idempotency keys for sync push timer ops: a replayed change_id must not
+		// apply twice. Purged per user by applied_at.
+		`CREATE TABLE IF NOT EXISTS sync_changes (
+			user_id    TEXT NOT NULL REFERENCES app_users(user_id),
+			change_id  TEXT NOT NULL,
+			applied_at BIGINT NOT NULL,
+			PRIMARY KEY (user_id, change_id)
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_sync_changes_applied ON sync_changes(applied_at)`,
 	}
 
 	for i, m := range migrations {

@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"sort"
+	"time"
 
 	"planner/pkg/auth"
 	"planner/pkg/model"
@@ -22,7 +23,7 @@ const maxPushChanges = 200
 // Per-item outcomes reported by sync push.
 const (
 	pushApplied  = "applied"   // created, updated or deleted (deletes are idempotent)
-	pushExists   = "exists"    // a task_tag link that was already live
+	pushExists   = "exists"    // a task_tag link that was already live, or a replayed change_id
 	pushNotFound = "not_found" // the row, or a parent it needs, is not the caller's
 	pushConflict = "conflict"  // the ID is soft-deleted or another user's
 	pushLimit    = "limit"     // plan cap (402) or storage ceiling (409)
@@ -35,6 +36,25 @@ type pushChange struct {
 	Op     string          `json:"op"`
 	ID     string          `json:"id"`
 	Data   json.RawMessage `json:"data"`
+	// ChangeID is an optional client-chosen idempotency key (see validChangeID).
+	ChangeID *string `json:"change_id"`
+}
+
+// maxChangeIDLen bounds a change_id.
+const maxChangeIDLen = 64
+
+// validChangeID reports whether s is 1 to maxChangeIDLen visible ASCII
+// characters (no spaces or control characters).
+func validChangeID(s string) bool {
+	if len(s) == 0 || len(s) > maxChangeIDLen {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		if s[i] < 0x21 || s[i] > 0x7e {
+			return false
+		}
+	}
+	return true
 }
 
 type pushResult struct {
@@ -44,6 +64,7 @@ type pushResult struct {
 	Status     string `json:"status"`
 	HTTPStatus int    `json:"http_status"`
 	Error      string `json:"error,omitempty"`
+	ChangeID   string `json:"change_id,omitempty"`
 }
 
 // pushOutcome is what one change came to: the status the single-item endpoint
@@ -95,6 +116,12 @@ var pushRank = map[store.Entity]int{
 // complete on entity task, each carrying data {"at": unix ms}, the moment the
 // action really happened. They run after the upserts (so a task created in the
 // same batch exists) and before the deletes, in request order.
+//
+// Any change may carry an optional change_id (1 to 64 visible ASCII characters;
+// anything else refuses the whole batch like an unknown op). It makes a timer
+// op safe to resend after a lost response: the first submit is applied, every
+// replay answers exists (200) and touches nothing. Upserts and deletes are
+// already idempotent, so their change_id is echoed back but never recorded.
 func (a *App) syncPush(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Changes []pushChange `json:"changes"`
@@ -123,6 +150,10 @@ func (a *App) syncPush(w http.ResponseWriter, r *http.Request) {
 			errResp(w, http.StatusBadRequest, fmt.Sprintf("changes[%d]: op %s applies only to task", i, c.Op))
 			return
 		}
+		if c.ChangeID != nil && !validChangeID(*c.ChangeID) {
+			errResp(w, http.StatusBadRequest, fmt.Sprintf("changes[%d]: change_id must be 1 to %d visible ASCII characters", i, maxChangeIDLen))
+			return
+		}
 	}
 
 	// Apply order: upserts by rank, then timer transitions, then deletes by
@@ -144,6 +175,15 @@ func (a *App) syncPush(w http.ResponseWriter, r *http.Request) {
 	sort.SliceStable(order, func(x, y int) bool { return key(req.Changes[order[x]]) < key(req.Changes[order[y]]) })
 
 	userID := auth.GetUser(r).UserID
+	// Housekeeping: drop this user's expired keys once per batch that uses one.
+	for _, c := range req.Changes {
+		if c.ChangeID != nil && pushTimerOps[c.Op] {
+			if err := a.store.PurgeSyncChanges(userID, time.Now()); err != nil {
+				log.Printf("syncPush: purge sync_changes: %v", err)
+			}
+			break
+		}
+	}
 	results := make([]pushResult, len(req.Changes))
 	for _, i := range order {
 		c := req.Changes[i]
@@ -158,6 +198,9 @@ func (a *App) syncPush(w http.ResponseWriter, r *http.Request) {
 			id, out = a.pushUpsert(r, userID, c)
 		}
 		results[i] = pushResult{Index: i, Entity: c.Entity, ID: id, Status: out.status, HTTPStatus: out.http, Error: out.msg}
+		if c.ChangeID != nil {
+			results[i].ChangeID = *c.ChangeID
+		}
 	}
 	dataResp(w, http.StatusOK, map[string]any{"results": results})
 }
@@ -169,6 +212,9 @@ var pushTimerOps = map[string]bool{"start": true, "pause": true, "complete": tru
 // The moment is required: without it the server clock would credit the time of
 // the sync. A wrong current state is a conflict, an unknown or foreign task is
 // not_found, and a missing, non-positive or far-future moment is invalid.
+// With a change_id the transition and the key are recorded together, and a
+// replayed key answers exists without touching the task; a refused transition
+// records nothing, so the same change_id can be retried.
 func (a *App) pushTransition(userID string, c pushChange) (string, pushOutcome) {
 	invalid := func(msg string) (string, pushOutcome) {
 		return c.ID, pushFail(pushInvalid, http.StatusBadRequest, msg)
@@ -186,13 +232,21 @@ func (a *App) pushTransition(userID string, c pushChange) (string, pushOutcome) 
 		return invalid("at must be a positive unix timestamp in milliseconds")
 	}
 	var err error
-	switch c.Op {
-	case "start":
-		err = a.store.StartTask(userID, c.ID, *d.At)
-	case "pause":
-		err = a.store.PauseTask(userID, c.ID, *d.At)
-	case "complete":
-		err = a.store.CompleteTask(userID, c.ID, *d.At)
+	if c.ChangeID != nil {
+		var applied bool
+		applied, err = a.store.TransitionTaskOnce(userID, *c.ChangeID, c.Op, c.ID, *d.At)
+		if err == nil && !applied {
+			return c.ID, pushOutcome{status: pushExists, http: http.StatusOK}
+		}
+	} else {
+		switch c.Op {
+		case "start":
+			err = a.store.StartTask(userID, c.ID, *d.At)
+		case "pause":
+			err = a.store.PauseTask(userID, c.ID, *d.At)
+		case "complete":
+			err = a.store.CompleteTask(userID, c.ID, *d.At)
+		}
 	}
 	switch {
 	case err == nil:

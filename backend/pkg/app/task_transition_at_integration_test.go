@@ -37,7 +37,7 @@ func timerFixture(t *testing.T, prefix string) (*App, *store.Store, string) {
 		t.Fatalf("register: %v", err)
 	}
 	t.Cleanup(func() {
-		for _, table := range []string{"tasks"} {
+		for _, table := range []string{"sync_changes", "subtasks", "tasks"} {
 			if _, err := pool.Exec(context.Background(), `DELETE FROM `+table+` WHERE user_id = $1`, user.UserID); err != nil {
 				t.Errorf("cleanup: delete %s: %v", table, err)
 			}

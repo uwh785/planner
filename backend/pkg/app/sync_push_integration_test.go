@@ -27,6 +27,7 @@ type pushTestResult struct {
 	Status     string `json:"status"`
 	HTTPStatus int    `json:"http_status"`
 	Error      string `json:"error"`
+	ChangeID   string `json:"change_id"`
 }
 
 // syncPushAs runs the push handler as the given user and returns the HTTP

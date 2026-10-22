@@ -22,6 +22,7 @@ model User {
   tags            Tag[]
   class_sessions  ClassSession[]
   refresh_tokens  RefreshToken[]
+  sync_changes    SyncChange[]
 
   @@map("app_users")
 }
@@ -39,6 +40,18 @@ model RefreshToken {
   @@index([user_id])
   @@index([family_id])
   @@map("refresh_tokens")
+}
+
+model SyncChange {
+  user_id    String
+  change_id  String
+  applied_at BigInt
+
+  user User @relation(fields: [user_id], references: [user_id])
+
+  @@id([user_id, change_id])
+  @@index([applied_at])
+  @@map("sync_changes")
 }
 
 model TaskList {

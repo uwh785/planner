@@ -634,11 +634,15 @@ func transitionTimes(at int64) (eff, now int64, err error) {
 // another user), ErrInvalidTransition if it exists but is not pending, or
 // ErrInvalidTime if at is negative or beyond the clock-skew allowance.
 func (s *Store) StartTask(userID, taskID string, at int64) error {
+	return s.startTask(context.Background(), s.pool, userID, taskID, at)
+}
+
+func (s *Store) startTask(ctx context.Context, q refreshExec, userID, taskID string, at int64) error {
 	at, now, err := transitionTimes(at)
 	if err != nil {
 		return err
 	}
-	tag, err := s.pool.Exec(context.Background(),
+	tag, err := q.Exec(ctx,
 		`UPDATE tasks SET status = 'in_progress', started_at = $3, updated_at = $4
 		 WHERE user_id = $1 AND task_id = $2 AND deleted = 0 AND status = 'pending'`,
 		userID, taskID, at, now,
@@ -660,11 +664,15 @@ func (s *Store) StartTask(userID, taskID string, at int64) error {
 // ErrNotFound if the task does not exist, ErrInvalidTransition if it exists
 // but is not in_progress, or ErrInvalidTime for an unacceptable at.
 func (s *Store) PauseTask(userID, taskID string, at int64) error {
+	return s.pauseTask(context.Background(), s.pool, userID, taskID, at)
+}
+
+func (s *Store) pauseTask(ctx context.Context, q refreshExec, userID, taskID string, at int64) error {
 	at, now, err := transitionTimes(at)
 	if err != nil {
 		return err
 	}
-	tag, err := s.pool.Exec(context.Background(),
+	tag, err := q.Exec(ctx,
 		`UPDATE tasks SET status = 'pending', updated_at = $4,
 		        elapsed_ms = elapsed_ms + GREATEST($3 - COALESCE(started_at, $3), 0),
 		        started_at = NULL
@@ -689,11 +697,15 @@ func (s *Store) PauseTask(userID, taskID string, at int64) error {
 // ErrInvalidTransition if it exists but is already completed, or
 // ErrInvalidTime for an unacceptable at.
 func (s *Store) CompleteTask(userID, taskID string, at int64) error {
+	return s.completeTask(context.Background(), s.pool, userID, taskID, at)
+}
+
+func (s *Store) completeTask(ctx context.Context, q refreshExec, userID, taskID string, at int64) error {
 	at, now, err := transitionTimes(at)
 	if err != nil {
 		return err
 	}
-	tag, err := s.pool.Exec(context.Background(),
+	tag, err := q.Exec(ctx,
 		`UPDATE tasks SET status = 'completed', completed_at = $3, updated_at = $4,
 		        elapsed_ms = elapsed_ms + CASE WHEN status = 'in_progress' THEN GREATEST($3 - COALESCE(started_at, $3), 0) ELSE 0 END,
 		        started_at = NULL
