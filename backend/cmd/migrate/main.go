@@ -172,6 +172,23 @@ func main() {
 			CHECK (end_at IS NULL OR end_at >= start_at)
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_events_user_start ON events(user_id, start_at)`,
+		// Offline sync: tags and task_tags gain the change-tracking columns the
+		// other synced tables already have, so deletes can be reported as tombstones.
+		`ALTER TABLE tags ADD COLUMN IF NOT EXISTS updated_at BIGINT DEFAULT 0`,
+		`ALTER TABLE tags ADD COLUMN IF NOT EXISTS deleted INT DEFAULT 0`,
+		`ALTER TABLE task_tags ADD COLUMN IF NOT EXISTS updated_at BIGINT DEFAULT 0`,
+		`ALTER TABLE task_tags ADD COLUMN IF NOT EXISTS deleted INT DEFAULT 0`,
+		// Backfill so existing rows sort after any cursor a client could hold.
+		`UPDATE tags SET updated_at = (extract(epoch FROM now()) * 1000)::bigint WHERE updated_at = 0`,
+		`UPDATE task_tags SET updated_at = (extract(epoch FROM now()) * 1000)::bigint WHERE updated_at = 0`,
+		// Delta pull filters by (user_id, updated_at).
+		`CREATE INDEX IF NOT EXISTS idx_task_lists_user_updated ON task_lists(user_id, updated_at)`,
+		`CREATE INDEX IF NOT EXISTS idx_tasks_user_updated ON tasks(user_id, updated_at)`,
+		`CREATE INDEX IF NOT EXISTS idx_subtasks_user_updated ON subtasks(user_id, updated_at)`,
+		`CREATE INDEX IF NOT EXISTS idx_tags_user_updated ON tags(user_id, updated_at)`,
+		`CREATE INDEX IF NOT EXISTS idx_task_tags_user_updated ON task_tags(user_id, updated_at)`,
+		`CREATE INDEX IF NOT EXISTS idx_class_sessions_user_updated ON class_sessions(user_id, updated_at)`,
+		`CREATE INDEX IF NOT EXISTS idx_events_user_updated ON events(user_id, updated_at)`,
 	}
 
 	for i, m := range migrations {
