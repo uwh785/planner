@@ -29,7 +29,7 @@ ask-on-risk. Branch per work unit group; push, PR and merge stay with the user.
 - [ ] M4 Outbox and sync engine: pull with cursor, push with `change_id`, per-item results (402/409/conflict), retry with backoff, connectivity trigger.
 - [ ] M5 Design seed (`DESIGN.md`) and core screens: auth, lists, tasks, task detail with subtasks and tags.
 - [ ] M6 Timer (start/pause/complete with real timestamps) and local reminders (notifications).
-- [ ] M7 Hardening: offline end-to-end scenarios on the emulator, accessibility pass, error and empty states.
+- [ ] M7 Hardening: offline end-to-end scenarios on the emulator, accessibility pass, error and empty states. Also from the M1 review (non-blocking): the release build type is signed with the debug keystore (template default), so add a real release signing config read from untracked properties and make release fail without it; restrict cleartext HTTP in the manifest to debug builds; test dark mode in the App smoke test.
 - [ ] M8 Plan (no code) the Linux and Windows desktop clients with Tauri after the mobile app: offline is mandatory, so decide local storage and sync engine, how much of `domain`/`application` is shared (shared package or monorepo), and where the project lives (likely the `planner/web` repo). Linux builds natively; Windows NSIS installers can be cross-built with `cargo-xwin` (needs `rustup` and the `x86_64-pc-windows-msvc` target; `.msi` only on Windows).
 
 ## Acceptance criteria
