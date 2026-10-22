@@ -12,6 +12,7 @@ import { AppRegistry } from 'react-native';
 import { bootstrapApp } from '@/infrastructure/composition/bootstrapApp';
 import { runAuthSmoke } from '@/infrastructure/composition/devAuthSmoke';
 import { runRepoSmoke } from '@/infrastructure/composition/devSmoke';
+import { runSyncSmoke } from '@/infrastructure/composition/devSyncSmoke';
 import App from '@/presentation/App';
 import { StartupErrorScreen } from '@/presentation/screens/StartupErrorScreen';
 import { name as appName } from './app.json';
@@ -20,6 +21,8 @@ import { name as appName } from './app.json';
 // A misconfigured build does not throw here: it registers and shows why.
 const boot = bootstrapApp();
 if (boot.kind === 'ready') {
+  // Syncs whoever is signed in, now and after every later sign-in.
+  boot.services.sync.start();
   boot.services.ready.then(() => {
     if (__DEV__) {
       const { status } = boot.services.session.state();
@@ -31,6 +34,7 @@ if (boot.kind === 'ready') {
 if (__DEV__ && boot.kind === 'ready') {
   runRepoSmoke().catch(error => console.error('repo smoke failed', error));
   runAuthSmoke().catch(error => console.error('auth smoke failed', error));
+  runSyncSmoke().catch(error => console.error('sync smoke failed', error));
 }
 
 AppRegistry.registerComponent(
@@ -40,6 +44,7 @@ AppRegistry.registerComponent(
       <App
         session={boot.services.session}
         containers={boot.services.containers}
+        sync={boot.services.sync}
       />
     ) : (
       <StartupErrorScreen message={boot.message} />

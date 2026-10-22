@@ -2,13 +2,21 @@ import { AuthenticatedHttp } from '@/application/auth/AuthenticatedHttp';
 import { SessionEpoch } from '@/application/auth/SessionEpoch';
 import { SessionService } from '@/application/auth/SessionService';
 import type { AppContainer } from '@/application/container';
+import type { AppLifecycle } from '@/application/ports/AppLifecycle';
+import type { Connectivity } from '@/application/ports/Connectivity';
+import type { Timer } from '@/application/ports/Timer';
 import type { SessionStore } from '@/application/ports/SessionStore';
 import type { AppServices } from '@/application/services';
+import { SyncCoordinator } from '@/application/sync/SyncCoordinator';
 import { UserContainers } from '@/application/userContainers';
 import { currentApiBaseUrl } from '../config/apiConfig';
 import { FetchHttpClient } from '../http/FetchHttpClient';
 import { HttpAuthGateway } from '../http/HttpAuthGateway';
 import { KeychainSessionStore } from '../security/KeychainSessionStore';
+import { AppStateLifecycle } from '../sync/AppStateLifecycle';
+import { NetInfoConnectivity } from '../sync/NetInfoConnectivity';
+import { SystemTimer } from '../sync/SystemTimer';
+import { SystemClock } from '../system/SystemClock';
 import { createContainer } from './createContainer';
 
 export interface AppServicesOptions {
@@ -16,6 +24,14 @@ export interface AppServicesOptions {
   sessionStore?: SessionStore;
   /** Opens the database of a user; defaults to `planner_<userId>.db`. */
   openContainer?: (userId: string) => Promise<AppContainer>;
+  /** Replaces the platform adapters behind sync (tests, fakes). */
+  syncAdapters?: {
+    connectivity?: Connectivity;
+    lifecycle?: AppLifecycle;
+    timer?: Timer;
+  };
+  /** Sync log lines (reason codes and counts); default: console in dev. */
+  syncLog?: (message: string) => void;
 }
 
 /**
@@ -56,5 +72,19 @@ export function createAppServices(
 
   // restore() never rejects: a storage failure becomes the `unreadable` state.
   restoring = session.restore().then(() => undefined);
-  return { session, http: authenticated, containers, ready: restoring };
+  const adapters = options.syncAdapters ?? {};
+  const sync = new SyncCoordinator({
+    session,
+    containers,
+    http: authenticated,
+    connectivity: adapters.connectivity ?? new NetInfoConnectivity(),
+    lifecycle: adapters.lifecycle ?? new AppStateLifecycle(),
+    timer: adapters.timer ?? new SystemTimer(),
+    clock: new SystemClock(),
+    random: Math.random,
+    log:
+      options.syncLog ??
+      (__DEV__ ? message => console.log(`sync: ${message}`) : undefined),
+  });
+  return { session, http: authenticated, containers, sync, ready: restoring };
 }

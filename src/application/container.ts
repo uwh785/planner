@@ -1,3 +1,4 @@
+import type { ChangeSource } from './ports/ChangeNotifier';
 import type { ApplyRemoteChanges } from './ports/RemoteChanges';
 import type { OutboxRepository } from './ports/OutboxRepository';
 import type { SyncStateRepository } from './ports/SyncStateRepository';
@@ -21,6 +22,8 @@ export interface AppContainer {
   outbox: OutboxRepository;
   syncState: SyncStateRepository;
   remoteChanges: ApplyRemoteChanges;
+  /** Fires after a local write has committed (the sync scheduler listens). */
+  changes: ChangeSource;
   schemaVersion: number;
   /** Releases the database handle. Call once, via ContainerSource.release. */
   close(): Promise<void>;
