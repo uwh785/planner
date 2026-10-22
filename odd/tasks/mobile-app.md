@@ -82,5 +82,12 @@ The M3 fixes (`a91e139`) and the auth screens (`5246b70`) were reviewed as two n
 - `SignedInHomeScreen`: if `logout()` throws, `setLeaving(false)` is never called and the Sign out button stays disabled; reset it and show feedback, with a test for a rejecting logout.
 - Tests: the schema-version log test awaits a no-op (use `waitFor`); the path that selects `StartupErrorScreen` from `bootstrapApp` in `index.js` is untested.
 
+M4 was reviewed as three native candidates (`788cdd2`, `e504216`, `3aadc2e`), all approved. Open advisories, in priority order:
+- `SyncEngine`: a whole-request HTTP 400 parks EVERY entry of the batch (up to 200) as `rejected`, including valid ones, so one malformed change or a proxy-generated 400 strands many good changes until a manual `retryParked`. Bisect the batch to isolate the offender and add a test that valid siblings survive.
+- `SyncEngine.loop()` clears `inflight` only on normal completion; if `runOnce` rejects (for example a status subscriber throws), later `sync()` calls return the rejected promise forever. Wrap in try/finally.
+- `SyncCoordinator.setup()` returns silently if `containers.acquire()` rejects while the user is still signed in: no sync, no status, no retry. Surface an error status, retry, and test the path.
+- Minor: the relative-time refresh interval also runs in `idle` with pending changes; a future `lastSyncAt` shows "Synced just now" until the clock catches up; `DevTaskButton` does not catch a synchronous throw from `tasks.create`.
+- A local-change burst has a debounce but no maximum wait.
+
 ## Next step
 M5: design seed (`DESIGN.md`) and core screens. The missing `POST /api/sync/push` route was fixed in the planner repo (`b93f832`, with a router-level test); the M4 walkthrough should be repeated once against the unpatched backend as a final check.
