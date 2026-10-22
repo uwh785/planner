@@ -15,6 +15,8 @@ npm run android      # build, install and launch (second terminal)
 
 On an emulator, if the app cannot reach Metro, run `adb reverse tcp:8081 tcp:8081`.
 
+Auth screens (sign in, create account) gate the app: signed out shows them, a stored session restores offline straight into the signed-in home. The look lives in one module, `src/presentation/theme.ts`.
+
 Checks: `npm run typecheck`, `npm run lint`, `npm test`.
 
 ## Architecture
@@ -28,7 +30,7 @@ Source lives in `src/`; the `@/*` alias maps to `src/*`.
   - `infrastructure/db/repositories`: SQLite implementations of the repository ports. Every mutation writes the row and its `outbox` entry in one transaction. `infrastructure/system` holds the id generator (needs `crypto.getRandomValues`, installed by `react-native-get-random-values` in `index.js`) and the clock.
   - `infrastructure/composition`: `createAppServices` wires HTTP, the Keychain session and the per-user database; `createContainer` builds one user's repositories. Only `index.js` calls them.
   - `infrastructure/http`: `FetchHttpClient` (global `fetch`, JSON, timeout) and `HttpAuthGateway` (the backend's own `/api/auth/*`). `infrastructure/security`: `KeychainSessionStore` (`react-native-keychain`, Android Keystore-backed).
-- `presentation`: screens and atomic components, talks to application only; it never imports `infrastructure` (enforced by a Jest test). It receives the container through the `containers` prop of `App`.
+- `presentation`: screens and atomic components, talks to application only; it never imports `infrastructure` (enforced by a Jest test). `index.js` hands `App` the `SessionService` and the container source.
 
 ### Local-first writes and the outbox
 
@@ -48,6 +50,9 @@ Auth is the backend's own: `register`, `login`, `refresh`, `logout` under `/api/
 - `AuthenticatedHttp` adds the bearer token. On a 401 it refreshes once (concurrent 401s share one refresh), saves the rotated refresh token before retrying, then retries the request once. If the server refuses the refresh, the tokens are cleared, the identity is kept and `SessionExpiredError` is raised; the local database and outbox stay. A network failure during refresh keeps the session.
 - `logout` calls the server best-effort (short timeout) and always clears the Keychain; it never deletes the local database or the outbox.
 - Switching user or logging out closes the previous database handle (`UserContainers`).
+- A refresh that finishes after logout (or after another user signed in) is discarded: `SessionEpoch` is bumped by logout and sign-in, a refresh checks it before persisting, and the original request fails with `SignedOutError`.
+- `KeychainSessionStore.get()` returns `null` only when nothing usable is stored. A Keystore failure throws `SessionStoreUnreadableError`; the session state becomes `unreadable` and the UI offers a retry instead of a sign-in form (a corrupt entry is logged by reason code and left in place).
+- `SessionService.state()` / `subscribe()` expose the UI state: `restoring`, `unreadable`, `signedOut`, `expired` (identity kept, tokens refused) and `signedIn`. `bootstrapApp` builds the services without throwing; a misconfigured build (e.g. release without `RELEASE_API_BASE_URL`) shows a plain startup error screen.
 - In development, `runAuthSmoke` (`devAuthSmoke.ts`, started from `index.js`) runs register, authenticated call, forced refresh and logout against the real backend using its own Keychain entry and throwaway database, and logs `auth smoke ok`.
 
 ## Configuration

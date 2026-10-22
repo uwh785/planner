@@ -33,7 +33,7 @@ export function useAcquiredContainer(
         }
       })
       .catch(error => {
-        // Signed out: there is no database to open yet (auth screens: M3b).
+        // Signed out meanwhile: there is no database to open.
         if (active && !(error instanceof NotSignedInError)) {
           console.error('db init failed', error);
         }
