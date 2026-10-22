@@ -328,6 +328,13 @@ func (a *App) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Checked after the password so account state is not revealed to someone
+	// who does not know it; the message matches a wrong password, like refresh.
+	if user.Status != "active" {
+		errResp(w, http.StatusUnauthorized, "invalid credentials")
+		return
+	}
+
 	token, err := a.auth.Generate(user.UserID, user.Email, user.Role)
 	if err != nil {
 		errResp(w, http.StatusInternalServerError, "failed to generate token")
