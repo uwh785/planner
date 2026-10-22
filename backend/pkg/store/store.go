@@ -25,6 +25,10 @@ var ErrNotFound = errors.New("not found")
 // status the requested transition allows.
 var ErrInvalidTransition = errors.New("invalid transition")
 
+// ErrInvalidTime is returned by the task state-transition methods when the
+// supplied moment is negative or further in the future than MaxClockSkewMs.
+var ErrInvalidTime = errors.New("invalid transition time")
+
 // ErrConflict is returned by the Create* methods when the ID is already
 // taken, and by the Replay* methods when the ID belongs to another user or to
 // a soft-deleted row. Either way the caller must not insert or resurrect it.
@@ -604,16 +608,40 @@ func (s *Store) taskTransitionError(userID, taskID string) error {
 	return err
 }
 
-// StartTask transitions a task from pending to in_progress, recording the
-// current time as started_at. It returns ErrNotFound if the task does not
-// exist (unknown ID, deleted, or belongs to another user), or
-// ErrInvalidTransition if it exists but is not pending.
-func (s *Store) StartTask(userID, taskID string) error {
-	now := time.Now().UnixMilli()
+// MaxClockSkewMs is how far past the server clock a client-supplied
+// transition time may lie. Offline actions happened in the past; this only
+// absorbs a device clock running slightly fast.
+const MaxClockSkewMs = 5 * 60 * 1000
+
+// transitionTimes returns the effective time of a task transition and the
+// server time that stamps updated_at (the sync cursor, never the client's
+// moment). at == 0 means "now"; a negative or too-far-future at is
+// ErrInvalidTime.
+func transitionTimes(at int64) (eff, now int64, err error) {
+	now = time.Now().UnixMilli()
+	switch {
+	case at == 0:
+		return now, now, nil
+	case at < 0 || at > now+MaxClockSkewMs:
+		return 0, 0, ErrInvalidTime
+	}
+	return at, now, nil
+}
+
+// StartTask transitions a task from pending to in_progress, recording at
+// (unix ms; 0 means the server's current time) as started_at. It returns
+// ErrNotFound if the task does not exist (unknown ID, deleted, or belongs to
+// another user), ErrInvalidTransition if it exists but is not pending, or
+// ErrInvalidTime if at is negative or beyond the clock-skew allowance.
+func (s *Store) StartTask(userID, taskID string, at int64) error {
+	at, now, err := transitionTimes(at)
+	if err != nil {
+		return err
+	}
 	tag, err := s.pool.Exec(context.Background(),
 		`UPDATE tasks SET status = 'in_progress', started_at = $3, updated_at = $4
 		 WHERE user_id = $1 AND task_id = $2 AND deleted = 0 AND status = 'pending'`,
-		userID, taskID, now, now,
+		userID, taskID, at, now,
 	)
 	if err != nil {
 		return err
@@ -625,19 +653,23 @@ func (s *Store) StartTask(userID, taskID string) error {
 }
 
 // PauseTask transitions a task from in_progress back to pending. The
-// just-run segment (now - started_at) is added to the accumulated
-// elapsed_ms and started_at is cleared, so the paused state is unambiguous
-// and a later StartTask resumes the countdown instead of restarting it. It
-// returns ErrNotFound if the task does not exist, or ErrInvalidTransition if
-// it exists but is not in_progress.
-func (s *Store) PauseTask(userID, taskID string) error {
-	now := time.Now().UnixMilli()
+// just-run segment (at - started_at, floored at zero; at == 0 means the
+// server's current time) is added to the accumulated elapsed_ms and
+// started_at is cleared, so the paused state is unambiguous and a later
+// StartTask resumes the countdown instead of restarting it. It returns
+// ErrNotFound if the task does not exist, ErrInvalidTransition if it exists
+// but is not in_progress, or ErrInvalidTime for an unacceptable at.
+func (s *Store) PauseTask(userID, taskID string, at int64) error {
+	at, now, err := transitionTimes(at)
+	if err != nil {
+		return err
+	}
 	tag, err := s.pool.Exec(context.Background(),
-		`UPDATE tasks SET status = 'pending', updated_at = $3,
-		        elapsed_ms = elapsed_ms + ($3 - COALESCE(started_at, $3)),
+		`UPDATE tasks SET status = 'pending', updated_at = $4,
+		        elapsed_ms = elapsed_ms + GREATEST($3 - COALESCE(started_at, $3), 0),
 		        started_at = NULL
 		 WHERE user_id = $1 AND task_id = $2 AND deleted = 0 AND status = 'in_progress'`,
-		userID, taskID, now,
+		userID, taskID, at, now,
 	)
 	if err != nil {
 		return err
@@ -648,20 +680,25 @@ func (s *Store) PauseTask(userID, taskID string) error {
 	return nil
 }
 
-// CompleteTask transitions a task from pending or in_progress to completed.
-// If it was in_progress, the just-run segment (now - started_at) is added
-// to elapsed_ms and started_at is cleared, exactly as PauseTask does; a
+// CompleteTask transitions a task from pending or in_progress to completed,
+// stamping completed_at with at (0 means the server's current time). If it
+// was in_progress, the just-run segment (at - started_at, floored at zero) is
+// added to elapsed_ms and started_at is cleared, exactly as PauseTask does; a
 // completion from pending leaves the already-accumulated elapsed_ms
-// untouched. It returns ErrNotFound if the task does not exist, or
-// ErrInvalidTransition if it exists but is already completed.
-func (s *Store) CompleteTask(userID, taskID string) error {
-	now := time.Now().UnixMilli()
+// untouched. It returns ErrNotFound if the task does not exist,
+// ErrInvalidTransition if it exists but is already completed, or
+// ErrInvalidTime for an unacceptable at.
+func (s *Store) CompleteTask(userID, taskID string, at int64) error {
+	at, now, err := transitionTimes(at)
+	if err != nil {
+		return err
+	}
 	tag, err := s.pool.Exec(context.Background(),
 		`UPDATE tasks SET status = 'completed', completed_at = $3, updated_at = $4,
-		        elapsed_ms = elapsed_ms + CASE WHEN status = 'in_progress' THEN $3 - COALESCE(started_at, $3) ELSE 0 END,
+		        elapsed_ms = elapsed_ms + CASE WHEN status = 'in_progress' THEN GREATEST($3 - COALESCE(started_at, $3), 0) ELSE 0 END,
 		        started_at = NULL
 		 WHERE user_id = $1 AND task_id = $2 AND deleted = 0 AND status IN ('pending', 'in_progress')`,
-		userID, taskID, now, now,
+		userID, taskID, at, now,
 	)
 	if err != nil {
 		return err

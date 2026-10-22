@@ -69,11 +69,11 @@ func TestTaskElapsedAccumulationIntegration(t *testing.T) {
 	const tolerance = int64(2000) // ms, generous for test execution jitter
 
 	// pending -> in_progress -> (3 min later) -> pause: elapsed_ms ~= 3 min.
-	if err := s.StartTask(user.UserID, created.TaskID); err != nil {
+	if err := s.StartTask(user.UserID, created.TaskID, 0); err != nil {
 		t.Fatalf("StartTask: %v", err)
 	}
 	backdateStartedAt(created.TaskID, 3*time.Minute)
-	if err := s.PauseTask(user.UserID, created.TaskID); err != nil {
+	if err := s.PauseTask(user.UserID, created.TaskID, 0); err != nil {
 		t.Fatalf("PauseTask: %v", err)
 	}
 
@@ -95,7 +95,7 @@ func TestTaskElapsedAccumulationIntegration(t *testing.T) {
 	}
 
 	// resume: start again must keep the accumulated elapsed_ms as the base.
-	if err := s.StartTask(user.UserID, created.TaskID); err != nil {
+	if err := s.StartTask(user.UserID, created.TaskID, 0); err != nil {
 		t.Fatalf("StartTask (resume): %v", err)
 	}
 	afterResume, err := s.GetTask(user.UserID, created.TaskID)
@@ -111,7 +111,7 @@ func TestTaskElapsedAccumulationIntegration(t *testing.T) {
 
 	// (2 more min later) -> complete from in_progress: elapsed_ms ~= 5 min total.
 	backdateStartedAt(created.TaskID, 2*time.Minute)
-	if err := s.CompleteTask(user.UserID, created.TaskID); err != nil {
+	if err := s.CompleteTask(user.UserID, created.TaskID, 0); err != nil {
 		t.Fatalf("CompleteTask: %v", err)
 	}
 	afterComplete, err := s.GetTask(user.UserID, created.TaskID)
@@ -131,7 +131,7 @@ func TestTaskElapsedAccumulationIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateTask(untouched): %v", err)
 	}
-	if err := s.CompleteTask(user.UserID, untouched.TaskID); err != nil {
+	if err := s.CompleteTask(user.UserID, untouched.TaskID, 0); err != nil {
 		t.Fatalf("CompleteTask(pending): %v", err)
 	}
 	untouchedAfter, err := s.GetTask(user.UserID, untouched.TaskID)

@@ -21,6 +21,7 @@ func TestTaskTransitionErrResp(t *testing.T) {
 	}{
 		{"not found", store.ErrNotFound, http.StatusNotFound},
 		{"invalid transition", store.ErrInvalidTransition, http.StatusConflict},
+		{"invalid time", store.ErrInvalidTime, http.StatusBadRequest},
 		{"other error", errors.New("connection reset"), http.StatusInternalServerError},
 	}
 

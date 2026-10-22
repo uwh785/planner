@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -715,13 +716,48 @@ func taskTransitionErrResp(w http.ResponseWriter, err error, failMsg string) boo
 		errResp(w, http.StatusConflict, "task cannot transition from its current status")
 		return true
 	}
+	if errors.Is(err, store.ErrInvalidTime) {
+		errResp(w, http.StatusBadRequest, "at is too far in the future")
+		return true
+	}
 	errResp(w, http.StatusInternalServerError, failMsg)
 	return true
 }
 
+// transitionAt reads the optional {"at": unix ms} body of a task transition,
+// the moment the action really happened (an offline replay). No body, or no
+// "at", yields 0, which the store reads as the server's current time. On a bad
+// body it writes the response itself and returns false.
+func transitionAt(w http.ResponseWriter, r *http.Request) (int64, bool) {
+	var body struct {
+		At *int64 `json:"at"`
+	}
+	if err := decodeJSON(r, &body); err != nil && !errors.Is(err, io.EOF) {
+		var mbErr *http.MaxBytesError
+		if errors.As(err, &mbErr) {
+			errResp(w, http.StatusRequestEntityTooLarge, "request body too large")
+		} else {
+			errResp(w, http.StatusBadRequest, "invalid request body")
+		}
+		return 0, false
+	}
+	if body.At == nil {
+		return 0, true
+	}
+	if *body.At <= 0 {
+		errResp(w, http.StatusBadRequest, "at must be a positive unix timestamp in milliseconds")
+		return 0, false
+	}
+	return *body.At, true
+}
+
 func (a *App) startTask(w http.ResponseWriter, r *http.Request) {
 	claims := auth.GetUser(r)
-	if err := a.store.StartTask(claims.UserID, chi.URLParam(r, "id")); taskTransitionErrResp(w, err, "failed to start task") {
+	at, ok := transitionAt(w, r)
+	if !ok {
+		return
+	}
+	if err := a.store.StartTask(claims.UserID, chi.URLParam(r, "id"), at); taskTransitionErrResp(w, err, "failed to start task") {
 		return
 	}
 	dataResp(w, http.StatusOK, map[string]string{"status": "in_progress"})
@@ -729,7 +765,11 @@ func (a *App) startTask(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) pauseTask(w http.ResponseWriter, r *http.Request) {
 	claims := auth.GetUser(r)
-	if err := a.store.PauseTask(claims.UserID, chi.URLParam(r, "id")); taskTransitionErrResp(w, err, "failed to pause task") {
+	at, ok := transitionAt(w, r)
+	if !ok {
+		return
+	}
+	if err := a.store.PauseTask(claims.UserID, chi.URLParam(r, "id"), at); taskTransitionErrResp(w, err, "failed to pause task") {
 		return
 	}
 	dataResp(w, http.StatusOK, map[string]string{"status": "pending"})
@@ -737,7 +777,11 @@ func (a *App) pauseTask(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) completeTask(w http.ResponseWriter, r *http.Request) {
 	claims := auth.GetUser(r)
-	if err := a.store.CompleteTask(claims.UserID, chi.URLParam(r, "id")); taskTransitionErrResp(w, err, "failed to complete task") {
+	at, ok := transitionAt(w, r)
+	if !ok {
+		return
+	}
+	if err := a.store.CompleteTask(claims.UserID, chi.URLParam(r, "id"), at); taskTransitionErrResp(w, err, "failed to complete task") {
 		return
 	}
 	dataResp(w, http.StatusOK, map[string]string{"status": "completed"})

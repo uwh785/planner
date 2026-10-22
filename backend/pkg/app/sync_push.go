@@ -91,7 +91,10 @@ var pushRank = map[store.Entity]int{
 //
 // Task timer transitions (start/pause/complete) are not part of upsert: the
 // update path leaves status and timer fields alone and only a create takes the
-// client's status. Replaying offline timer segments is task T5.
+// client's status. An offline timer is replayed with the ops start, pause and
+// complete on entity task, each carrying data {"at": unix ms}, the moment the
+// action really happened. They run after the upserts (so a task created in the
+// same batch exists) and before the deletes, in request order.
 func (a *App) syncPush(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Changes []pushChange `json:"changes"`
@@ -112,22 +115,29 @@ func (a *App) syncPush(w http.ResponseWriter, r *http.Request) {
 			errResp(w, http.StatusBadRequest, fmt.Sprintf("changes[%d]: unknown entity %q", i, c.Entity))
 			return
 		}
-		if c.Op != "upsert" && c.Op != "delete" {
-			errResp(w, http.StatusBadRequest, fmt.Sprintf("changes[%d]: op must be upsert or delete", i))
+		if !pushTimerOps[c.Op] && c.Op != "upsert" && c.Op != "delete" {
+			errResp(w, http.StatusBadRequest, fmt.Sprintf("changes[%d]: op must be upsert, delete, start, pause or complete", i))
+			return
+		}
+		if pushTimerOps[c.Op] && c.Entity != string(store.EntityTask) {
+			errResp(w, http.StatusBadRequest, fmt.Sprintf("changes[%d]: op %s applies only to task", i, c.Op))
 			return
 		}
 	}
 
-	// Apply order: upserts by rank, then deletes by reverse rank; ties keep
-	// request order.
+	// Apply order: upserts by rank, then timer transitions, then deletes by
+	// reverse rank; ties keep request order.
 	order := make([]int, len(req.Changes))
 	for i := range order {
 		order[i] = i
 	}
 	key := func(c pushChange) int {
 		rank := pushRank[store.Entity(c.Entity)]
-		if c.Op == "delete" {
+		switch {
+		case c.Op == "delete":
 			return 100 + len(pushRank) - rank
+		case pushTimerOps[c.Op]:
+			return len(pushRank)
 		}
 		return rank
 	}
@@ -139,14 +149,62 @@ func (a *App) syncPush(w http.ResponseWriter, r *http.Request) {
 		c := req.Changes[i]
 		var id string
 		var out pushOutcome
-		if c.Op == "delete" {
+		switch {
+		case c.Op == "delete":
 			id, out = a.pushDelete(userID, c)
-		} else {
+		case pushTimerOps[c.Op]:
+			id, out = a.pushTransition(userID, c)
+		default:
 			id, out = a.pushUpsert(r, userID, c)
 		}
 		results[i] = pushResult{Index: i, Entity: c.Entity, ID: id, Status: out.status, HTTPStatus: out.http, Error: out.msg}
 	}
 	dataResp(w, http.StatusOK, map[string]any{"results": results})
+}
+
+// pushTimerOps are the task timer transitions a push may replay.
+var pushTimerOps = map[string]bool{"start": true, "pause": true, "complete": true}
+
+// pushTransition replays one offline timer action at the moment it happened.
+// The moment is required: without it the server clock would credit the time of
+// the sync. A wrong current state is a conflict, an unknown or foreign task is
+// not_found, and a missing, non-positive or far-future moment is invalid.
+func (a *App) pushTransition(userID string, c pushChange) (string, pushOutcome) {
+	invalid := func(msg string) (string, pushOutcome) {
+		return c.ID, pushFail(pushInvalid, http.StatusBadRequest, msg)
+	}
+	if c.ID == "" {
+		return invalid("id is required")
+	}
+	var d struct {
+		At *int64 `json:"at"`
+	}
+	if err := decodeData(c.Data, &d); err != nil {
+		return invalid("invalid data")
+	}
+	if d.At == nil || *d.At <= 0 {
+		return invalid("at must be a positive unix timestamp in milliseconds")
+	}
+	var err error
+	switch c.Op {
+	case "start":
+		err = a.store.StartTask(userID, c.ID, *d.At)
+	case "pause":
+		err = a.store.PauseTask(userID, c.ID, *d.At)
+	case "complete":
+		err = a.store.CompleteTask(userID, c.ID, *d.At)
+	}
+	switch {
+	case err == nil:
+		return c.ID, pushOK(http.StatusOK)
+	case errors.Is(err, store.ErrNotFound):
+		return c.ID, pushFail(pushNotFound, http.StatusNotFound, "task not found")
+	case errors.Is(err, store.ErrInvalidTransition):
+		return c.ID, pushFail(pushConflict, http.StatusConflict, "task cannot transition from its current status")
+	case errors.Is(err, store.ErrInvalidTime):
+		return invalid("at is too far in the future")
+	}
+	return c.ID, pushServerError("apply "+c.Op, err)
 }
 
 // pushRecorder captures what a create guard (enforceLimit, guardEvent, ...)

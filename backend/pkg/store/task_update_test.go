@@ -52,7 +52,7 @@ func TestUpdateTaskEditableFieldsOnlyIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
-	if err := s.StartTask(user.UserID, task.TaskID); err != nil {
+	if err := s.StartTask(user.UserID, task.TaskID, 0); err != nil {
 		t.Fatalf("StartTask: %v", err)
 	}
 	// Give the row a non-zero sort_order directly, since nothing in the

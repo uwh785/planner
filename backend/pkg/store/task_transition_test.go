@@ -56,24 +56,24 @@ func TestTaskStateTransitionsIntegration(t *testing.T) {
 	}
 
 	// Unknown task ID -> ErrNotFound for all three transitions.
-	if err := s.StartTask(user.UserID, "tsk_does_not_exist"); !errors.Is(err, ErrNotFound) {
+	if err := s.StartTask(user.UserID, "tsk_does_not_exist", 0); !errors.Is(err, ErrNotFound) {
 		t.Errorf("StartTask(unknown): err = %v, want ErrNotFound", err)
 	}
-	if err := s.PauseTask(user.UserID, "tsk_does_not_exist"); !errors.Is(err, ErrNotFound) {
+	if err := s.PauseTask(user.UserID, "tsk_does_not_exist", 0); !errors.Is(err, ErrNotFound) {
 		t.Errorf("PauseTask(unknown): err = %v, want ErrNotFound", err)
 	}
-	if err := s.CompleteTask(user.UserID, "tsk_does_not_exist"); !errors.Is(err, ErrNotFound) {
+	if err := s.CompleteTask(user.UserID, "tsk_does_not_exist", 0); !errors.Is(err, ErrNotFound) {
 		t.Errorf("CompleteTask(unknown): err = %v, want ErrNotFound", err)
 	}
 
 	// A different user cannot transition this user's task -> ErrNotFound.
 	pendingTask := mustCreate("pending task")
-	if err := s.StartTask("usr_someone_else", pendingTask.TaskID); !errors.Is(err, ErrNotFound) {
+	if err := s.StartTask("usr_someone_else", pendingTask.TaskID, 0); !errors.Is(err, ErrNotFound) {
 		t.Errorf("StartTask(other user): err = %v, want ErrNotFound", err)
 	}
 
 	// pending -> in_progress (valid).
-	if err := s.StartTask(user.UserID, pendingTask.TaskID); err != nil {
+	if err := s.StartTask(user.UserID, pendingTask.TaskID, 0); err != nil {
 		t.Fatalf("StartTask(pending): unexpected error: %v", err)
 	}
 	got, err := s.GetTask(user.UserID, pendingTask.TaskID)
@@ -88,12 +88,12 @@ func TestTaskStateTransitionsIntegration(t *testing.T) {
 	}
 
 	// starting an already in_progress task -> ErrInvalidTransition, no change.
-	if err := s.StartTask(user.UserID, pendingTask.TaskID); !errors.Is(err, ErrInvalidTransition) {
+	if err := s.StartTask(user.UserID, pendingTask.TaskID, 0); !errors.Is(err, ErrInvalidTransition) {
 		t.Errorf("StartTask(already in_progress): err = %v, want ErrInvalidTransition", err)
 	}
 
 	// in_progress -> pending (valid, pause).
-	if err := s.PauseTask(user.UserID, pendingTask.TaskID); err != nil {
+	if err := s.PauseTask(user.UserID, pendingTask.TaskID, 0); err != nil {
 		t.Fatalf("PauseTask(in_progress): unexpected error: %v", err)
 	}
 	got, err = s.GetTask(user.UserID, pendingTask.TaskID)
@@ -105,12 +105,12 @@ func TestTaskStateTransitionsIntegration(t *testing.T) {
 	}
 
 	// pausing a pending task -> ErrInvalidTransition.
-	if err := s.PauseTask(user.UserID, pendingTask.TaskID); !errors.Is(err, ErrInvalidTransition) {
+	if err := s.PauseTask(user.UserID, pendingTask.TaskID, 0); !errors.Is(err, ErrInvalidTransition) {
 		t.Errorf("PauseTask(already pending): err = %v, want ErrInvalidTransition", err)
 	}
 
 	// pending -> completed (valid).
-	if err := s.CompleteTask(user.UserID, pendingTask.TaskID); err != nil {
+	if err := s.CompleteTask(user.UserID, pendingTask.TaskID, 0); err != nil {
 		t.Fatalf("CompleteTask(pending): unexpected error: %v", err)
 	}
 	got, err = s.GetTask(user.UserID, pendingTask.TaskID)
@@ -125,13 +125,13 @@ func TestTaskStateTransitionsIntegration(t *testing.T) {
 	}
 
 	// starting/pausing/completing an already-completed task -> ErrInvalidTransition, no change.
-	if err := s.StartTask(user.UserID, pendingTask.TaskID); !errors.Is(err, ErrInvalidTransition) {
+	if err := s.StartTask(user.UserID, pendingTask.TaskID, 0); !errors.Is(err, ErrInvalidTransition) {
 		t.Errorf("StartTask(completed): err = %v, want ErrInvalidTransition", err)
 	}
-	if err := s.PauseTask(user.UserID, pendingTask.TaskID); !errors.Is(err, ErrInvalidTransition) {
+	if err := s.PauseTask(user.UserID, pendingTask.TaskID, 0); !errors.Is(err, ErrInvalidTransition) {
 		t.Errorf("PauseTask(completed): err = %v, want ErrInvalidTransition", err)
 	}
-	if err := s.CompleteTask(user.UserID, pendingTask.TaskID); !errors.Is(err, ErrInvalidTransition) {
+	if err := s.CompleteTask(user.UserID, pendingTask.TaskID, 0); !errors.Is(err, ErrInvalidTransition) {
 		t.Errorf("CompleteTask(completed): err = %v, want ErrInvalidTransition", err)
 	}
 	final, err := s.GetTask(user.UserID, pendingTask.TaskID)
@@ -144,10 +144,10 @@ func TestTaskStateTransitionsIntegration(t *testing.T) {
 
 	// in_progress -> completed (valid, second task).
 	inProgressTask := mustCreate("in progress task")
-	if err := s.StartTask(user.UserID, inProgressTask.TaskID); err != nil {
+	if err := s.StartTask(user.UserID, inProgressTask.TaskID, 0); err != nil {
 		t.Fatalf("StartTask(second task): unexpected error: %v", err)
 	}
-	if err := s.CompleteTask(user.UserID, inProgressTask.TaskID); err != nil {
+	if err := s.CompleteTask(user.UserID, inProgressTask.TaskID, 0); err != nil {
 		t.Fatalf("CompleteTask(in_progress): unexpected error: %v", err)
 	}
 	got, err = s.GetTask(user.UserID, inProgressTask.TaskID)
@@ -163,7 +163,7 @@ func TestTaskStateTransitionsIntegration(t *testing.T) {
 	if err := s.DeleteTask(user.UserID, deletedTask.TaskID); err != nil {
 		t.Fatalf("DeleteTask: %v", err)
 	}
-	if err := s.StartTask(user.UserID, deletedTask.TaskID); !errors.Is(err, ErrNotFound) {
+	if err := s.StartTask(user.UserID, deletedTask.TaskID, 0); !errors.Is(err, ErrNotFound) {
 		t.Errorf("StartTask(deleted): err = %v, want ErrNotFound", err)
 	}
 }
