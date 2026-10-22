@@ -26,7 +26,7 @@ ask-on-risk. Forecast ~350 authored changed lines across the feature.
 ## Tasks
 - [x] T1 Schema migration: `updated_at` + `deleted` on tags and task_tags, backfill, `(user_id, updated_at)` indexes on all synced tables. Route: inline (one mechanical file).
 - [x] T2 Store: soft-delete tags/task_tags, bump `updated_at` on task/subtask delete, filter `deleted` in reads and counts. Route: delegated writer (2+ non-trivial files).
-- [ ] T3 Idempotent creates: same-user duplicate ID returns the existing row; cross-user collision returns 409.
+- [x] T3 Idempotent creates: same-user duplicate ID returns the existing row; cross-user collision returns 409. Route: delegated writer (2+ non-trivial files).
 - [ ] T4 Sync endpoints: `GET /api/sync?since=` (changes + tombstones) and `POST /api/sync/push` (batch, per-item results incl. 402/409).
 - [ ] T5 Client-supplied timestamps for start/pause/complete so offline timer segments replay faithfully.
 - [ ] T6 Auth: longer-lived or refreshable token for long offline periods.
@@ -46,5 +46,9 @@ T1: `go run ./cmd/migrate` run twice on the local dev DB, both OK (34 statements
 
 T2: RED observed first (compile failure on `CountTagsUsage`, then with a stub 6 assertion failures: delete `updated_at` not bumped for subtask/list/class/event, `CreateTag` `updated_at` unset, `RemoveTaskTag` hard-deleted the row). GREEN after implementing. New `backend/pkg/store/tombstone_integration_test.go`. `go build ./...` and `go vet ./...` clean; `TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5434/planner go test ./...` (219 passed). `CountTags` now counts active tags only; new `CountTagsUsage` (Active/Total) feeds `enforceLimit` so the plan cap uses active and the ceiling uses total.
 
+T3: RED observed first (store test build failure on `ReplayTask`/`ErrConflict`; handler test failed because `createEvent` discarded the client `event_id`). GREEN after implementing: `Replay*` lookups, `ON CONFLICT (pk) DO NOTHING` creates mapped to `ErrConflict`, generic `createIdempotent` handler flow (lookup, then plan/ceiling guard, then create, re-lookup on a lost race). New `backend/pkg/store/idempotent_create_integration_test.go` and `backend/pkg/app/idempotent_create_integration_test.go`. `go build ./...`, `go vet ./...`, `gofmt -l pkg` clean; `TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5434/planner go test -count=1 ./...` (227 passed).
+
+Follow-up (non-blocking review advisory): soft-deleted tags are never purged and count toward the tag storage ceiling (`CountTagsUsage.Total`); decide a purge policy later.
+
 ## Next step
-T3.
+T4.

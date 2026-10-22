@@ -390,6 +390,56 @@ func (a *App) enforceCeiling(w http.ResponseWriter, resource plan.Resource, tota
 	return true
 }
 
+// createIdempotent runs a create so an offline client can replay it safely.
+// With a client-supplied id it first looks the row up: the caller's own live
+// row is returned as 200 without touching the stored data, and an id owned by
+// another user or already soft-deleted is a 409 that reveals nothing about the
+// row. Only a genuinely new create reaches guard (the plan-limit and
+// storage-ceiling checks, which write their own response and return false),
+// so replaying an already-applied create is never refused by a cap. If the
+// insert itself loses a race for the id, the winner is looked up again.
+func createIdempotent[T any](w http.ResponseWriter, id string, find func() (T, error), guard func() bool, create func() (T, error), failMsg string) {
+	if id != "" {
+		if replayed(w, find) {
+			return
+		}
+	}
+	if !guard() {
+		return
+	}
+	created, err := create()
+	if errors.Is(err, store.ErrConflict) && id != "" {
+		if replayed(w, find) {
+			return
+		}
+	}
+	if err != nil {
+		log.Printf("%s: %v", failMsg, err)
+		errResp(w, http.StatusInternalServerError, failMsg)
+		return
+	}
+	dataResp(w, http.StatusCreated, created)
+}
+
+// replayed answers a create whose id may already exist. It returns true after
+// writing the response (200 existing row, 409 conflict, or 500), and false
+// when the id is free and the create should proceed.
+func replayed[T any](w http.ResponseWriter, find func() (T, error)) bool {
+	existing, err := find()
+	switch {
+	case err == nil:
+		dataResp(w, http.StatusOK, existing)
+	case errors.Is(err, store.ErrConflict):
+		errResp(w, http.StatusConflict, "id already in use")
+	case errors.Is(err, store.ErrNotFound):
+		return false
+	default:
+		log.Printf("look up existing row: %v", err)
+		errResp(w, http.StatusInternalServerError, "failed to create")
+	}
+	return true
+}
+
 // planView builds the entitlement payload the client uses to render the plan
 // badge, the caps and the remaining headroom for each resource.
 func (a *App) planView(userID string) (model.PlanView, error) {
@@ -485,15 +535,11 @@ func (a *App) createList(w http.ResponseWriter, r *http.Request) {
 		errResp(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if !a.enforceLimit(w, r, plan.ResourceList) {
-		return
-	}
-	created, err := a.store.CreateTaskList(claims.UserID, l)
-	if err != nil {
-		errResp(w, http.StatusInternalServerError, "failed to create list")
-		return
-	}
-	dataResp(w, http.StatusCreated, created)
+	createIdempotent(w, l.ListID,
+		func() (model.TaskList, error) { return a.store.ReplayTaskList(claims.UserID, l.ListID) },
+		func() bool { return a.enforceLimit(w, r, plan.ResourceList) },
+		func() (model.TaskList, error) { return a.store.CreateTaskList(claims.UserID, l) },
+		"failed to create list")
 }
 
 func (a *App) updateList(w http.ResponseWriter, r *http.Request) {
@@ -563,16 +609,11 @@ func (a *App) createTask(w http.ResponseWriter, r *http.Request) {
 		errResp(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if !a.enforceLimit(w, r, plan.ResourceTask) {
-		return
-	}
-	created, err := a.store.CreateTask(claims.UserID, t)
-	if err != nil {
-		log.Printf("createTask error: %v", err)
-		errResp(w, http.StatusInternalServerError, "failed to create task")
-		return
-	}
-	dataResp(w, http.StatusCreated, created)
+	createIdempotent(w, t.TaskID,
+		func() (model.Task, error) { return a.store.ReplayTask(claims.UserID, t.TaskID) },
+		func() bool { return a.enforceLimit(w, r, plan.ResourceTask) },
+		func() (model.Task, error) { return a.store.CreateTask(claims.UserID, t) },
+		"failed to create task")
 }
 
 func (a *App) getTask(w http.ResponseWriter, r *http.Request) {
@@ -691,21 +732,19 @@ func (a *App) createSubtask(w http.ResponseWriter, r *http.Request) {
 		errResp(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	total, err := a.store.CountSubtasks(claims.UserID, taskID)
-	if err != nil {
-		log.Printf("count subtasks for %s/%s: %v", claims.UserID, taskID, err)
-		errResp(w, http.StatusInternalServerError, "failed to resolve usage")
-		return
-	}
-	if !a.enforceCeiling(w, plan.ResourceSubtask, total) {
-		return
-	}
-	created, err := a.store.CreateSubtask(claims.UserID, taskID, st)
-	if err != nil {
-		errResp(w, http.StatusInternalServerError, "failed to create subtask")
-		return
-	}
-	dataResp(w, http.StatusCreated, created)
+	createIdempotent(w, st.SubtaskID,
+		func() (model.Subtask, error) { return a.store.ReplaySubtask(claims.UserID, taskID, st.SubtaskID) },
+		func() bool {
+			total, err := a.store.CountSubtasks(claims.UserID, taskID)
+			if err != nil {
+				log.Printf("count subtasks for %s/%s: %v", claims.UserID, taskID, err)
+				errResp(w, http.StatusInternalServerError, "failed to resolve usage")
+				return false
+			}
+			return a.enforceCeiling(w, plan.ResourceSubtask, total)
+		},
+		func() (model.Subtask, error) { return a.store.CreateSubtask(claims.UserID, taskID, st) },
+		"failed to create subtask")
 }
 
 func (a *App) updateSubtask(w http.ResponseWriter, r *http.Request) {
@@ -760,15 +799,11 @@ func (a *App) createTag(w http.ResponseWriter, r *http.Request) {
 		errResp(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if !a.enforceLimit(w, r, plan.ResourceTag) {
-		return
-	}
-	created, err := a.store.CreateTag(claims.UserID, t)
-	if err != nil {
-		errResp(w, http.StatusInternalServerError, "failed to create tag")
-		return
-	}
-	dataResp(w, http.StatusCreated, created)
+	createIdempotent(w, t.TagID,
+		func() (model.Tag, error) { return a.store.ReplayTag(claims.UserID, t.TagID) },
+		func() bool { return a.enforceLimit(w, r, plan.ResourceTag) },
+		func() (model.Tag, error) { return a.store.CreateTag(claims.UserID, t) },
+		"failed to create tag")
 }
 
 func (a *App) deleteTag(w http.ResponseWriter, r *http.Request) {
@@ -897,21 +932,19 @@ func (a *App) createClass(w http.ResponseWriter, r *http.Request) {
 		errResp(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	total, err := a.store.CountClasses(claims.UserID)
-	if err != nil {
-		log.Printf("count classes for %s: %v", claims.UserID, err)
-		errResp(w, http.StatusInternalServerError, "failed to resolve usage")
-		return
-	}
-	if !a.enforceCeiling(w, plan.ResourceClass, total) {
-		return
-	}
-	created, err := a.store.CreateClass(claims.UserID, c)
-	if err != nil {
-		errResp(w, http.StatusInternalServerError, "failed to create class")
-		return
-	}
-	dataResp(w, http.StatusCreated, created)
+	createIdempotent(w, c.ClassID,
+		func() (model.ClassSession, error) { return a.store.ReplayClass(claims.UserID, c.ClassID) },
+		func() bool {
+			total, err := a.store.CountClasses(claims.UserID)
+			if err != nil {
+				log.Printf("count classes for %s: %v", claims.UserID, err)
+				errResp(w, http.StatusInternalServerError, "failed to resolve usage")
+				return false
+			}
+			return a.enforceCeiling(w, plan.ResourceClass, total)
+		},
+		func() (model.ClassSession, error) { return a.store.CreateClass(claims.UserID, c) },
+		"failed to create class")
 }
 
 func (a *App) updateClass(w http.ResponseWriter, r *http.Request) {
@@ -990,23 +1023,19 @@ func (a *App) createEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	claims := auth.GetUser(r)
-	total, err := a.store.CountEvents(claims.UserID)
-	if err != nil {
-		log.Printf("count events for %s: %v", claims.UserID, err)
-		errResp(w, http.StatusInternalServerError, "failed to resolve usage")
-		return
-	}
-	if !a.enforceCeiling(w, plan.ResourceEvent, total) {
-		return
-	}
-	// The ID is always server-generated; a client-supplied one is ignored.
-	e.EventID = ""
-	created, err := a.store.CreateEvent(claims.UserID, e)
-	if err != nil {
-		errResp(w, http.StatusInternalServerError, "failed to create event")
-		return
-	}
-	dataResp(w, http.StatusCreated, created)
+	createIdempotent(w, e.EventID,
+		func() (model.Event, error) { return a.store.ReplayEvent(claims.UserID, e.EventID) },
+		func() bool {
+			total, err := a.store.CountEvents(claims.UserID)
+			if err != nil {
+				log.Printf("count events for %s: %v", claims.UserID, err)
+				errResp(w, http.StatusInternalServerError, "failed to resolve usage")
+				return false
+			}
+			return a.enforceCeiling(w, plan.ResourceEvent, total)
+		},
+		func() (model.Event, error) { return a.store.CreateEvent(claims.UserID, e) },
+		"failed to create event")
 }
 
 func (a *App) updateEvent(w http.ResponseWriter, r *http.Request) {

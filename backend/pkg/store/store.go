@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"planner/pkg/model"
@@ -23,6 +24,11 @@ var ErrNotFound = errors.New("not found")
 // (StartTask, PauseTask, CompleteTask) when the task exists but is not in a
 // status the requested transition allows.
 var ErrInvalidTransition = errors.New("invalid transition")
+
+// ErrConflict is returned by the Create* methods when the ID is already
+// taken, and by the Replay* methods when the ID belongs to another user or to
+// a soft-deleted row. Either way the caller must not insert or resurrect it.
+var ErrConflict = errors.New("conflict")
 
 type Store struct {
 	pool *pgxpool.Pool
@@ -267,6 +273,41 @@ func (s *Store) ListTaskLists(userID string) ([]model.TaskList, error) {
 	return items, rows.Err()
 }
 
+// createResult turns an INSERT ... ON CONFLICT DO NOTHING outcome into the
+// Create* error: zero affected rows means the ID was already taken.
+func createResult(tag pgconn.CommandTag, err error) error {
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrConflict
+	}
+	return nil
+}
+
+// checkReplay classifies a client-supplied ID before a create: nil if it is
+// the caller's live row, ErrNotFound if no row has it, and ErrConflict if it
+// belongs to another user or is soft-deleted. It deliberately reads the row
+// without a user filter and returns nothing but the verdict, so a collision
+// never exposes the other user's data. table and idCol are constants.
+func (s *Store) checkReplay(table, idCol, id, userID string) error {
+	var owner string
+	var deleted int
+	err := s.pool.QueryRow(context.Background(),
+		`SELECT user_id, deleted FROM `+table+` WHERE `+idCol+` = $1`, id,
+	).Scan(&owner, &deleted)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if owner != userID || deleted != 0 {
+		return ErrConflict
+	}
+	return nil
+}
+
 func (s *Store) CreateTaskList(userID string, l model.TaskList) (model.TaskList, error) {
 	l.UserID = userID
 	if l.ListID == "" {
@@ -279,11 +320,27 @@ func (s *Store) CreateTaskList(userID string, l model.TaskList) (model.TaskList,
 		l.Icon = "list"
 	}
 	l.UpdatedAt = time.Now().UnixMilli()
-	_, err := s.pool.Exec(context.Background(),
+	tag, err := s.pool.Exec(context.Background(),
 		`INSERT INTO task_lists (user_id, list_id, name, color, icon, sort_order, updated_at, deleted)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, 0)`,
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, 0)
+		 ON CONFLICT (list_id) DO NOTHING`,
 		l.UserID, l.ListID, l.Name, l.Color, l.Icon, l.SortOrder, l.UpdatedAt,
 	)
+	return l, createResult(tag, err)
+}
+
+// ReplayTaskList returns the caller's live list with this ID, ErrNotFound if
+// no such list exists, or ErrConflict if the ID is another user's or deleted.
+func (s *Store) ReplayTaskList(userID, listID string) (model.TaskList, error) {
+	if err := s.checkReplay("task_lists", "list_id", listID, userID); err != nil {
+		return model.TaskList{}, err
+	}
+	var l model.TaskList
+	err := s.pool.QueryRow(context.Background(),
+		`SELECT user_id, list_id, name, color, icon, sort_order, updated_at
+		 FROM task_lists WHERE user_id = $1 AND list_id = $2 AND deleted = 0`,
+		userID, listID,
+	).Scan(&l.UserID, &l.ListID, &l.Name, &l.Color, &l.Icon, &l.SortOrder, &l.UpdatedAt)
 	return l, err
 }
 
@@ -478,14 +535,24 @@ func (s *Store) CreateTask(userID string, t model.Task) (model.Task, error) {
 		t.Status = "pending"
 	}
 	t.UpdatedAt = time.Now().UnixMilli()
-	_, err := s.pool.Exec(context.Background(),
+	tag, err := s.pool.Exec(context.Background(),
 		`INSERT INTO tasks (user_id, list_id, task_id, title, description, priority, status,
 		        due_date, due_all_day, duration_ms, started_at, sort_order, updated_at, deleted)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 0)`,
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 0)
+		 ON CONFLICT (task_id) DO NOTHING`,
 		t.UserID, t.ListID, t.TaskID, t.Title, t.Description, t.Priority, t.Status,
 		t.DueDate, t.DueAllDay, t.DurationMs, t.StartedAt, t.SortOrder, t.UpdatedAt,
 	)
-	return t, err
+	return t, createResult(tag, err)
+}
+
+// ReplayTask returns the caller's live task with this ID, ErrNotFound if no
+// such task exists, or ErrConflict if the ID is another user's or deleted.
+func (s *Store) ReplayTask(userID, taskID string) (model.Task, error) {
+	if err := s.checkReplay("tasks", "task_id", taskID, userID); err != nil {
+		return model.Task{}, err
+	}
+	return s.GetTask(userID, taskID)
 }
 
 // UpdateTask overwrites only the user-editable fields of a task: list_id,
@@ -645,11 +712,31 @@ func (s *Store) CreateSubtask(userID, taskID string, st model.Subtask) (model.Su
 		st.SubtaskID = genID("sub")
 	}
 	st.UpdatedAt = time.Now().UnixMilli()
-	_, err := s.pool.Exec(context.Background(),
+	tag, err := s.pool.Exec(context.Background(),
 		`INSERT INTO subtasks (user_id, task_id, subtask_id, title, completed, sort_order, updated_at, deleted)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, 0)`,
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, 0)
+		 ON CONFLICT (subtask_id) DO NOTHING`,
 		st.UserID, st.TaskID, st.SubtaskID, st.Title, st.Completed, st.SortOrder, st.UpdatedAt,
 	)
+	return st, createResult(tag, err)
+}
+
+// ReplaySubtask returns the caller's live subtask with this ID, ErrNotFound
+// if no such subtask exists, or ErrConflict if the ID is another user's,
+// deleted, or already attached to a different task.
+func (s *Store) ReplaySubtask(userID, taskID, subtaskID string) (model.Subtask, error) {
+	if err := s.checkReplay("subtasks", "subtask_id", subtaskID, userID); err != nil {
+		return model.Subtask{}, err
+	}
+	var st model.Subtask
+	err := s.pool.QueryRow(context.Background(),
+		`SELECT user_id, task_id, subtask_id, title, completed, sort_order, updated_at
+		 FROM subtasks WHERE user_id = $1 AND subtask_id = $2 AND deleted = 0`,
+		userID, subtaskID,
+	).Scan(&st.UserID, &st.TaskID, &st.SubtaskID, &st.Title, &st.Completed, &st.SortOrder, &st.UpdatedAt)
+	if err == nil && st.TaskID != taskID {
+		return model.Subtask{}, ErrConflict
+	}
 	return st, err
 }
 
@@ -701,10 +788,25 @@ func (s *Store) CreateTag(userID string, t model.Tag) (model.Tag, error) {
 	if t.Color == "" {
 		t.Color = "#8E8E93"
 	}
-	_, err := s.pool.Exec(context.Background(),
-		`INSERT INTO tags (user_id, tag_id, name, color, updated_at, deleted) VALUES ($1, $2, $3, $4, $5, 0)`,
+	tag, err := s.pool.Exec(context.Background(),
+		`INSERT INTO tags (user_id, tag_id, name, color, updated_at, deleted) VALUES ($1, $2, $3, $4, $5, 0)
+		 ON CONFLICT (tag_id) DO NOTHING`,
 		t.UserID, t.TagID, t.Name, t.Color, time.Now().UnixMilli(),
 	)
+	return t, createResult(tag, err)
+}
+
+// ReplayTag returns the caller's live tag with this ID, ErrNotFound if no
+// such tag exists, or ErrConflict if the ID is another user's or deleted.
+func (s *Store) ReplayTag(userID, tagID string) (model.Tag, error) {
+	if err := s.checkReplay("tags", "tag_id", tagID, userID); err != nil {
+		return model.Tag{}, err
+	}
+	var t model.Tag
+	err := s.pool.QueryRow(context.Background(),
+		`SELECT user_id, tag_id, name, color FROM tags WHERE user_id = $1 AND tag_id = $2 AND deleted = 0`,
+		userID, tagID,
+	).Scan(&t.UserID, &t.TagID, &t.Name, &t.Color)
 	return t, err
 }
 
@@ -853,14 +955,24 @@ func (s *Store) CreateClass(userID string, c model.ClassSession) (model.ClassSes
 		c.Color = "#0A84FF"
 	}
 	c.UpdatedAt = time.Now().UnixMilli()
-	_, err := s.pool.Exec(context.Background(),
+	tag, err := s.pool.Exec(context.Background(),
 		`INSERT INTO class_sessions (user_id, class_id, subject, day_of_week, start_minute,
 		        end_minute, room, teacher, color, updated_at, deleted)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 0)`,
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 0)
+		 ON CONFLICT (class_id) DO NOTHING`,
 		c.UserID, c.ClassID, c.Subject, c.DayOfWeek, c.StartMinute, c.EndMinute,
 		c.Room, c.Teacher, c.Color, c.UpdatedAt,
 	)
-	return c, err
+	return c, createResult(tag, err)
+}
+
+// ReplayClass returns the caller's live class with this ID, ErrNotFound if no
+// such class exists, or ErrConflict if the ID is another user's or deleted.
+func (s *Store) ReplayClass(userID, classID string) (model.ClassSession, error) {
+	if err := s.checkReplay("class_sessions", "class_id", classID, userID); err != nil {
+		return model.ClassSession{}, err
+	}
+	return s.GetClass(userID, classID)
 }
 
 func (s *Store) UpdateClass(userID string, c model.ClassSession) error {
@@ -956,14 +1068,24 @@ func (s *Store) CreateEvent(userID string, e model.Event) (model.Event, error) {
 		e.Color = "#0A84FF"
 	}
 	e.UpdatedAt = time.Now().UnixMilli()
-	_, err := s.pool.Exec(context.Background(),
+	tag, err := s.pool.Exec(context.Background(),
 		`INSERT INTO events (user_id, event_id, title, description, location, start_at, end_at,
 		        all_day, color, updated_at, deleted)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 0)`,
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 0)
+		 ON CONFLICT (event_id) DO NOTHING`,
 		e.UserID, e.EventID, e.Title, e.Description, e.Location, e.StartAt, e.EndAt,
 		e.AllDay, e.Color, e.UpdatedAt,
 	)
-	return e, err
+	return e, createResult(tag, err)
+}
+
+// ReplayEvent returns the caller's live event with this ID, ErrNotFound if no
+// such event exists, or ErrConflict if the ID is another user's or deleted.
+func (s *Store) ReplayEvent(userID, eventID string) (model.Event, error) {
+	if err := s.checkReplay("events", "event_id", eventID, userID); err != nil {
+		return model.Event{}, err
+	}
+	return s.GetEvent(userID, eventID)
 }
 
 func (s *Store) UpdateEvent(userID string, e model.Event) error {
