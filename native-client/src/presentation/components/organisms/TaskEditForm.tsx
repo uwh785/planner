@@ -1,14 +1,16 @@
 import React from 'react';
 import { ScrollView, View } from 'react-native';
+import type { MessageKey } from '@/application/i18n';
 import type { Priority } from '@/domain';
 import { Button } from '../atoms/Button';
 import { ColorDot } from '../atoms/ColorDot';
-import { FlagIcon } from '../atoms/Icons';
+import { Flag } from '../atoms/icons';
 import { InlineMessage } from '../atoms/InlineMessage';
 import { TextField } from '../atoms/TextField';
 import { DueDateField } from '../molecules/DueDateField';
 import { FormSection } from '../molecules/FormSection';
 import { RadioGroup } from '../molecules/RadioGroup';
+import { useT } from '../../i18n/I18nProvider';
 import { useStyles, useTheme } from '../../theme';
 import type { Theme } from '../../theme';
 
@@ -43,11 +45,11 @@ const makeStyles = (t: Theme) => ({
   actions: { gap: t.spacing.sm, marginTop: t.spacing.xs },
 });
 
-const PRIORITIES: readonly { value: Priority; label: string }[] = [
-  { value: 0, label: 'None' },
-  { value: 1, label: 'Low' },
-  { value: 2, label: 'Medium' },
-  { value: 3, label: 'High' },
+const PRIORITIES: readonly { value: Priority; label: MessageKey }[] = [
+  { value: 0, label: 'taskPriorityNone' },
+  { value: 1, label: 'taskPriorityLow' },
+  { value: 2, label: 'taskPriorityMedium' },
+  { value: 3, label: 'taskPriorityHigh' },
 ];
 
 /** The basic task form: explicit Save, a confirmed Delete. Props in, callbacks out. */
@@ -66,6 +68,7 @@ export function TaskEditForm({
   onDelete,
 }: TaskEditFormProps) {
   const styles = useStyles(makeStyles);
+  const t = useT();
   const { colors } = useTheme();
   const priorityColor = [
     colors.priority.none,
@@ -80,34 +83,38 @@ export function TaskEditForm({
     >
       <InlineMessage kind="error" message={error} />
       <TextField
-        label="Title"
+        label={t('taskTitle')}
         value={values.title}
         onChangeText={title => onChange({ title })}
         returnKeyType="next"
       />
       <TextField
-        label="Notes"
+        label={t('taskDescription')}
         value={values.description}
         onChangeText={description => onChange({ description })}
         multiline
         numberOfLines={4}
         autoCapitalize="sentences"
       />
-      <FormSection title="Priority">
+      <FormSection title={t('taskPriority')}>
         <RadioGroup
           value={values.priority}
           onChange={priority => onChange({ priority })}
           options={PRIORITIES.map(({ value, label }) => ({
             value,
-            label,
+            label: t(label),
             leading:
               value === 0 ? undefined : (
-                <FlagIcon color={priorityColor[value]!} />
+                <Flag
+                  size={16}
+                  color={priorityColor[value]!}
+                  strokeWidth={2.5}
+                />
               ),
           }))}
         />
       </FormSection>
-      <FormSection title="Due date">
+      <FormSection title={t('taskDueDate')}>
         <DueDateField
           text={dueText}
           allDay={values.dueAllDay}
@@ -117,12 +124,12 @@ export function TaskEditForm({
           onAllDayChange={onAllDayChange}
         />
       </FormSection>
-      <FormSection title="List">
+      <FormSection title={t('fieldList')}>
         <RadioGroup<string | null>
           value={values.listId}
           onChange={listId => onChange({ listId })}
           options={[
-            { value: null, label: 'No list' },
+            { value: null, label: t('listNone') },
             ...lists.map(list => ({
               value: list.id,
               label: list.name,
@@ -132,10 +139,15 @@ export function TaskEditForm({
         />
       </FormSection>
       <View style={styles.actions}>
-        <Button label="Save" busyLabel="Saving…" busy={busy} onPress={onSave} />
+        <Button
+          label={t('save')}
+          busyLabel={t('saving')}
+          busy={busy}
+          onPress={onSave}
+        />
         <Button
           variant="destructive"
-          label="Delete task"
+          label={t('taskDeleteAction')}
           disabled={busy}
           onPress={onDelete}
         />

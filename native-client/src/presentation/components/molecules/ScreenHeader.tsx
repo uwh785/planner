@@ -1,6 +1,7 @@
 import React from 'react';
 import { Text, View } from 'react-native';
 import { Button } from '../atoms/Button';
+import { useT } from '../../i18n/I18nProvider';
 import { useStyles } from '../../theme';
 import type { Theme } from '../../theme';
 
@@ -42,12 +43,13 @@ export function ScreenHeader({
   actions = [],
 }: ScreenHeaderProps) {
   const styles = useStyles(makeStyles);
+  const t = useT();
   return (
     <View style={styles.wrap}>
       {onBack || actions.length > 0 ? (
         <View style={styles.bar}>
           {onBack ? (
-            <Button variant="link" label="Back" onPress={onBack} />
+            <Button variant="link" label={t('back')} onPress={onBack} />
           ) : (
             <View />
           )}

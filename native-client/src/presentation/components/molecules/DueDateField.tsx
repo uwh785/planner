@@ -2,6 +2,7 @@ import React from 'react';
 import { Switch, Text, View } from 'react-native';
 import { Button } from '../atoms/Button';
 import { GroupedRow } from '../atoms/GroupedRow';
+import { useT } from '../../i18n/I18nProvider';
 import { useStyles, useTheme } from '../../theme';
 import type { Theme } from '../../theme';
 
@@ -54,31 +55,32 @@ export function DueDateField({
   onPickTime,
 }: DueDateFieldProps) {
   const styles = useStyles(makeStyles);
+  const t = useT();
   const { colors } = useTheme();
   return (
     <GroupedRow position="only">
       <Text style={[styles.value, text === null ? styles.empty : null]}>
-        {text ?? 'No due date'}
+        {text ?? t('dueNone')}
       </Text>
       <View style={styles.actions}>
         <Button
           variant="link"
-          label={text === null ? 'Set date' : 'Change date'}
+          label={text === null ? t('dateSet') : t('dateChange')}
           onPress={onPickDate}
         />
         {text !== null ? (
-          <Button variant="link" label="Clear date" onPress={onClear} />
+          <Button variant="link" label={t('dateClear')} onPress={onClear} />
         ) : null}
         {text !== null && !allDay ? (
-          <Button variant="link" label="Set time" onPress={onPickTime} />
+          <Button variant="link" label={t('timeSet')} onPress={onPickTime} />
         ) : null}
       </View>
       {text !== null ? (
         <View style={styles.switchRow}>
-          <Text style={styles.switchLabel}>All day</Text>
+          <Text style={styles.switchLabel}>{t('allDay')}</Text>
           <Switch
             accessibilityRole="switch"
-            accessibilityLabel="All day"
+            accessibilityLabel={t('allDay')}
             value={allDay}
             onValueChange={onAllDayChange}
             trackColor={{ false: colors.borderStrong, true: colors.primary }}

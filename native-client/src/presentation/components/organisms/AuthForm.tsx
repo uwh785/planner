@@ -4,7 +4,10 @@ import { Button } from '../atoms/Button';
 import { InlineMessage } from '../atoms/InlineMessage';
 import { TextField } from '../atoms/TextField';
 import type { TextInputHandle } from '../atoms/TextField';
+import { LanguageLink } from '../molecules/LanguageLink';
 import { PasswordField } from '../molecules/PasswordField';
+import type { MessageKey } from '@/application/i18n';
+import { useT } from '../../i18n/I18nProvider';
 import { useStyles } from '../../theme';
 import type { Theme } from '../../theme';
 
@@ -30,20 +33,29 @@ interface AuthFormProps {
   onSwitchMode: () => void;
 }
 
-const COPY = {
+/** The catalog keys for each mode's copy. */
+const COPY: Record<
+  AuthFormMode,
+  {
+    title: MessageKey;
+    submit: MessageKey;
+    busy: MessageKey;
+    switchTo: MessageKey;
+  }
+> = {
   signIn: {
-    title: 'Welcome back',
-    submit: 'Sign in',
-    busy: 'Signing in…',
-    switchTo: 'Create account',
+    title: 'loginTitle',
+    submit: 'loginButton',
+    busy: 'authSigningIn',
+    switchTo: 'registerButton',
   },
   register: {
-    title: 'Create your account',
-    submit: 'Create account',
-    busy: 'Creating account…',
-    switchTo: 'Sign in',
+    title: 'registerTitle',
+    submit: 'registerButton',
+    busy: 'authCreatingAccount',
+    switchTo: 'registerLogin',
   },
-} as const;
+};
 
 const makeStyles = (t: Theme) => ({
   title: {
@@ -68,6 +80,7 @@ export function AuthForm({
   onSwitchMode,
 }: AuthFormProps) {
   const styles = useStyles(makeStyles);
+  const t = useT();
   const copy = COPY[mode];
   const [email, setEmail] = useState(initialEmail);
   const [name, setName] = useState('');
@@ -90,13 +103,13 @@ export function AuthForm({
   return (
     <View>
       <Text accessibilityRole="header" style={styles.title}>
-        {copy.title}
+        {t(copy.title)}
       </Text>
       <InlineMessage kind="notice" message={notice} />
       <InlineMessage kind="error" message={formError} />
       <TextField
         ref={emailRef}
-        label="Email"
+        label={t('loginEmail')}
         value={email}
         onChangeText={setEmail}
         error={fieldErrors?.email}
@@ -113,7 +126,7 @@ export function AuthForm({
       {register ? (
         <TextField
           ref={nameRef}
-          label="Name (optional)"
+          label={t('registerNameOptional')}
           value={name}
           onChangeText={setName}
           autoCapitalize="words"
@@ -125,7 +138,7 @@ export function AuthForm({
       ) : null}
       <PasswordField
         ref={passwordRef}
-        label="Password"
+        label={t('loginPassword')}
         value={password}
         onChangeText={setPassword}
         error={fieldErrors?.password}
@@ -136,8 +149,8 @@ export function AuthForm({
       />
       <View style={styles.actions}>
         <Button
-          label={copy.submit}
-          busyLabel={copy.busy}
+          label={t(copy.submit)}
+          busyLabel={t(copy.busy)}
           busy={busy}
           onPress={submit}
         />
@@ -145,10 +158,13 @@ export function AuthForm({
       <View style={styles.switchRow}>
         <Button
           variant="link"
-          label={copy.switchTo}
+          label={t(copy.switchTo)}
           disabled={busy}
           onPress={onSwitchMode}
         />
+      </View>
+      <View style={styles.switchRow}>
+        <LanguageLink />
       </View>
     </View>
   );

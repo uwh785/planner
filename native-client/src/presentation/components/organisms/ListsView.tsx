@@ -1,5 +1,6 @@
 import React from 'react';
 import { FlatList } from 'react-native';
+import { useT } from '../../i18n/I18nProvider';
 import { groupPosition } from '../atoms/GroupedRow';
 import { EmptyState } from '../molecules/EmptyState';
 import { ListRow } from '../molecules/ListRow';
@@ -14,52 +15,22 @@ export interface ListRowModel {
 }
 
 interface ListsViewProps {
-  allOpenCount: number;
   lists: readonly ListRowModel[];
-  onOpenAll: () => void;
   onOpenList: (id: string) => void;
-}
-
-interface Item {
-  key: string;
-  name: string;
-  color: string | null;
-  openCount: number;
-  onPress: () => void;
 }
 
 const makeStyles = (t: Theme) => ({
   content: { paddingHorizontal: t.spacing.lg, paddingBottom: t.spacing.lg },
 });
 
-/** "All tasks" and one row per list, in one grouped surface. */
-export function ListsView({
-  allOpenCount,
-  lists,
-  onOpenAll,
-  onOpenList,
-}: ListsViewProps) {
+/** One row per list, in one grouped surface; a row opens its edit screen. */
+export function ListsView({ lists, onOpenList }: ListsViewProps) {
+  const t = useT();
   const styles = useStyles(makeStyles);
-  const items: Item[] = [
-    {
-      key: 'all',
-      name: 'All tasks',
-      color: null,
-      openCount: allOpenCount,
-      onPress: onOpenAll,
-    },
-    ...lists.map(list => ({
-      key: list.id,
-      name: list.name,
-      color: list.color,
-      openCount: list.openCount,
-      onPress: () => onOpenList(list.id),
-    })),
-  ];
   return (
     <FlatList
-      data={items}
-      keyExtractor={item => item.key}
+      data={lists}
+      keyExtractor={list => list.id}
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={styles.content}
       renderItem={({ item, index }) => (
@@ -67,16 +38,13 @@ export function ListsView({
           name={item.name}
           color={item.color}
           openCount={item.openCount}
-          position={groupPosition(index, items.length)}
-          onPress={item.onPress}
+          position={groupPosition(index, lists.length)}
+          onPress={() => onOpenList(item.id)}
         />
       )}
       ListFooterComponent={
         lists.length === 0 ? (
-          <EmptyState
-            title="No lists yet"
-            body="Lists group your tasks. Add one above."
-          />
+          <EmptyState title={t('listsEmptyTitle')} body={t('listsEmptyBody')} />
         ) : undefined
       }
     />

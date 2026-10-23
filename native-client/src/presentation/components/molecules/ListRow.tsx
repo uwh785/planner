@@ -2,6 +2,7 @@ import React from 'react';
 import { Pressable, Text } from 'react-native';
 import { ColorDot } from '../atoms/ColorDot';
 import { GroupedRow, type GroupPosition } from '../atoms/GroupedRow';
+import { useT } from '../../i18n/I18nProvider';
 import { useStyles } from '../../theme';
 import type { Theme } from '../../theme';
 
@@ -28,9 +29,6 @@ const makeStyles = (t: Theme) => ({
   count: { ...t.typography.callout, color: t.colors.textMuted },
 });
 
-export const openTasksText = (n: number): string =>
-  n === 0 ? 'no open tasks' : n === 1 ? '1 open task' : `${n} open tasks`;
-
 /** A list in the lists group: color marker, name, and how many are open. */
 export function ListRow({
   name,
@@ -40,18 +38,25 @@ export function ListRow({
   onPress,
 }: ListRowProps) {
   const styles = useStyles(makeStyles);
+  const t = useT();
+  const spokenCount =
+    openCount === 0
+      ? t('listOpenCountNone')
+      : t('listOpenCount', { count: openCount });
   return (
     <GroupedRow position={position}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${name}, ${openTasksText(openCount)}`}
+        accessibilityLabel={`${name}, ${spokenCount}`}
         onPress={onPress}
         style={({ pressed }) => [styles.row, pressed && styles.pressed]}
       >
         <ColorDot color={color} />
         <Text style={styles.name}>{name}</Text>
         {openCount > 0 ? (
-          <Text style={styles.count}>{`${openCount} open`}</Text>
+          <Text style={styles.count}>
+            {t('listOpenBadge', { count: openCount })}
+          </Text>
         ) : null}
       </Pressable>
     </GroupedRow>

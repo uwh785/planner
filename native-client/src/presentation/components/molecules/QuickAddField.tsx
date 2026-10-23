@@ -2,11 +2,12 @@ import React, { useRef, useState } from 'react';
 import { View } from 'react-native';
 import { Button } from '../atoms/Button';
 import { TextField } from '../atoms/TextField';
+import { useT } from '../../i18n/I18nProvider';
 import { useStyles } from '../../theme';
 import type { Theme } from '../../theme';
 
 interface QuickAddFieldProps {
-  /** Visible label and spoken name, e.g. "Add a task". */
+  /** Visible label and spoken name, e.g. "Add a task" (already translated). */
   label: string;
   /** Resolves to an error sentence to show, or null when it worked. */
   onSubmit: (text: string) => Promise<string | null>;
@@ -23,6 +24,7 @@ const makeStyles = (t: Theme) => ({
  */
 export function QuickAddField({ label, onSubmit }: QuickAddFieldProps) {
   const styles = useStyles(makeStyles);
+  const t = useT();
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
   const busy = useRef(false);
@@ -57,7 +59,7 @@ export function QuickAddField({ label, onSubmit }: QuickAddFieldProps) {
         blurOnSubmit={false}
         onSubmitEditing={submit}
         autoCapitalize="sentences"
-        trailing={<Button variant="link" label="Add" onPress={submit} />}
+        trailing={<Button variant="link" label={t('add')} onPress={submit} />}
       />
     </View>
   );

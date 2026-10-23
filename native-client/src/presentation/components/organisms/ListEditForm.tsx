@@ -7,6 +7,7 @@ import { InlineMessage } from '../atoms/InlineMessage';
 import { TextField } from '../atoms/TextField';
 import { FormSection } from '../molecules/FormSection';
 import { RadioGroup } from '../molecules/RadioGroup';
+import { useT } from '../../i18n/I18nProvider';
 import { useStyles } from '../../theme';
 import type { Theme } from '../../theme';
 
@@ -39,12 +40,13 @@ export function ListEditForm({
   onDelete,
 }: ListEditFormProps) {
   const styles = useStyles(makeStyles);
+  const t = useT();
   const known = LIST_COLORS.some(
     c => c.value.toLowerCase() === values.color.toLowerCase(),
   );
   const options = LIST_COLORS.map(c => ({
     value: c.value.toLowerCase(),
-    label: c.name,
+    label: t(`color${c.key}`),
     leading: <ColorDot color={c.value} />,
   }));
   return (
@@ -54,12 +56,12 @@ export function ListEditForm({
     >
       <InlineMessage kind="error" message={error} />
       <TextField
-        label="Name"
+        label={t('listName')}
         value={values.name}
         onChangeText={name => onChange({ name })}
         returnKeyType="done"
       />
-      <FormSection title="Color">
+      <FormSection title={t('listColor')}>
         <RadioGroup<string>
           value={values.color.toLowerCase()}
           onChange={color => {
@@ -74,7 +76,7 @@ export function ListEditForm({
               : [
                   {
                     value: values.color.toLowerCase(),
-                    label: 'Custom',
+                    label: t('colorCustom'),
                     leading: <ColorDot color={values.color} />,
                   },
                   ...options,
@@ -83,10 +85,15 @@ export function ListEditForm({
         />
       </FormSection>
       <View style={styles.actions}>
-        <Button label="Save" busyLabel="Saving…" busy={busy} onPress={onSave} />
+        <Button
+          label={t('save')}
+          busyLabel={t('saving')}
+          busy={busy}
+          onPress={onSave}
+        />
         <Button
           variant="destructive"
-          label="Delete list"
+          label={t('listDeleteAction')}
           disabled={busy}
           onPress={onDelete}
         />

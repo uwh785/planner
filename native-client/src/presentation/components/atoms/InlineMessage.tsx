@@ -1,5 +1,6 @@
 import React from 'react';
 import { Text, View } from 'react-native';
+import { useT } from '../../i18n/I18nProvider';
 import { useStyles } from '../../theme';
 import type { Theme } from '../../theme';
 
@@ -33,12 +34,13 @@ const makeStyles = (t: Theme) => ({
  */
 export function InlineMessage({ message, kind }: InlineMessageProps) {
   const styles = useStyles(makeStyles);
+  const t = useT();
   return (
     <View accessibilityLiveRegion="polite">
       {message ? (
         <View style={[styles.box, styles[kind]]}>
           <Text style={[styles.text, kind === 'error' && styles.errorText]}>
-            {kind === 'error' ? `Error: ${message}` : message}
+            {kind === 'error' ? `${t('errorPrefix')} ${message}` : message}
           </Text>
         </View>
       ) : null}

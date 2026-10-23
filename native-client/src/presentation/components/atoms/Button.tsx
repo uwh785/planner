@@ -13,6 +13,8 @@ interface ButtonProps {
   busy?: boolean;
   busyLabel?: string;
   disabled?: boolean;
+  /** Spoken name when it must say more than the label (it still starts with it). */
+  accessibilityLabel?: string;
   testID?: string;
 }
 
@@ -57,6 +59,7 @@ export function Button({
   busy = false,
   busyLabel,
   disabled = false,
+  accessibilityLabel,
   testID,
 }: ButtonProps) {
   const styles = useStyles(makeStyles);
@@ -73,7 +76,7 @@ export function Button({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={shown}
+      accessibilityLabel={accessibilityLabel ?? shown}
       accessibilityState={{ disabled: inactive, busy }}
       disabled={inactive}
       onPress={onPress}
