@@ -6,13 +6,21 @@ import { useStyles, useTheme } from '../../theme';
 import type { Theme } from '../../theme';
 import { Check } from './icons';
 
-const BASE_SIZE = 40;
-const STROKE = 3;
+/**
+ * `compact` is the task card's ring (40dp, 3dp stroke); `large` is the detail
+ * screen's (80dp, 6dp stroke), both as on the web. Each grows with the system
+ * font, up to the cap, so the percent never spills out.
+ */
+const SIZES = {
+  compact: { base: 40, stroke: 3, maxScale: 1.6 },
+  large: { base: 80, stroke: 6, maxScale: 1.5 },
+} as const;
 
 interface CountdownRingProps {
   /** 0 to 1, how much of the time is used. */
   progress: number;
   status: TaskStatus;
+  size?: keyof typeof SIZES;
 }
 
 const makeStyles = (t: Theme) => ({
@@ -26,6 +34,7 @@ const makeStyles = (t: Theme) => ({
     color: t.colors.text,
     fontWeight: '600' as const,
   },
+  percentLarge: { ...t.typography.callout, fontWeight: '600' as const },
 });
 
 /**
@@ -35,11 +44,16 @@ const makeStyles = (t: Theme) => ({
  * hidden from screen readers. It grows with the system font so the percent
  * never spills out.
  */
-export function CountdownRing({ progress, status }: CountdownRingProps) {
+export function CountdownRing({
+  progress,
+  status,
+  size: variant = 'compact',
+}: CountdownRingProps) {
   const styles = useStyles(makeStyles);
   const { colors } = useTheme();
   const { fontScale } = useWindowDimensions();
-  const size = Math.round(BASE_SIZE * Math.min(Math.max(fontScale, 1), 1.6));
+  const { base, stroke: STROKE, maxScale } = SIZES[variant];
+  const size = Math.round(base * Math.min(Math.max(fontScale, 1), maxScale));
   const radius = (size - STROKE) / 2;
   const circumference = 2 * Math.PI * radius;
   const done = status === 'completed';
@@ -86,7 +100,9 @@ export function CountdownRing({ progress, status }: CountdownRingProps) {
         {done ? (
           <Check size={size * 0.4} strokeWidth={3} color={colors.ring.ok} />
         ) : (
-          <Text style={styles.percent}>{`${Math.round(progress * 100)}%`}</Text>
+          <Text
+            style={[styles.percent, variant === 'large' && styles.percentLarge]}
+          >{`${Math.round(progress * 100)}%`}</Text>
         )}
       </View>
     </View>

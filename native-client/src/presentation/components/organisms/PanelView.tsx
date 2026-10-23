@@ -3,6 +3,8 @@ import { ScrollView, Text, View } from 'react-native';
 import { useT } from '../../i18n/I18nProvider';
 import { useStyles } from '../../theme';
 import type { Theme } from '../../theme';
+import type { MessageRef } from '@/application/i18n';
+import { Announcement } from '../molecules/Announcement';
 import { StatTile } from '../molecules/StatTile';
 import { TaskCard, type TaskCardModel } from '../molecules/TaskCard';
 
@@ -18,10 +20,20 @@ interface PanelViewProps {
   header: React.ReactNode;
   counts: PanelCounts;
   active: readonly TaskCardModel[];
+  /** The latest short message to say out loud (see Announcement). */
+  notice?: { id: number; message: MessageRef } | null;
+  /** Ids of the tasks in their undo window. */
+  completing?: ReadonlySet<string>;
   onOpenTask: (id: string) => void;
+  onStartTask: (id: string) => void;
+  onPauseTask: (id: string) => void;
+  onCompleteTask: (id: string) => void;
+  onUndo: (id: string) => void;
   /** Rendered last (the discreet sync line). */
   footer?: React.ReactNode;
 }
+
+const NONE: ReadonlySet<string> = new Set();
 
 const makeStyles = (t: Theme) => ({
   content: { paddingBottom: t.spacing.xl },
@@ -54,13 +66,20 @@ const makeStyles = (t: Theme) => ({
 
 /**
  * The web's Panel on a phone: the four counters, then the active tasks as
- * cards (ring and time left). Counters carry their label, not only color.
+ * cards (ring, time left, Pause and Complete). Counters carry their label,
+ * not only color.
  */
 export function PanelView({
   header,
   counts,
   active,
+  notice = null,
+  completing = NONE,
   onOpenTask,
+  onStartTask,
+  onPauseTask,
+  onCompleteTask,
+  onUndo,
   footer,
 }: PanelViewProps) {
   const t = useT();
@@ -71,6 +90,7 @@ export function PanelView({
       keyboardShouldPersistTaps="handled"
     >
       {header}
+      <Announcement notice={notice} />
       <View style={styles.body}>
         <View style={styles.stats}>
           <StatTile label={t('dashboardPending')} count={counts.pending} />
@@ -104,7 +124,12 @@ export function PanelView({
               <TaskCard
                 key={task.id}
                 task={task}
+                completing={completing.has(task.id)}
                 onOpen={() => onOpenTask(task.id)}
+                onStart={() => onStartTask(task.id)}
+                onPause={() => onPauseTask(task.id)}
+                onComplete={() => onCompleteTask(task.id)}
+                onUndo={() => onUndo(task.id)}
               />
             ))}
           </View>

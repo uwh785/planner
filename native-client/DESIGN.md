@@ -172,6 +172,56 @@ components:
     typography: "{typography.caption}"
     rounded: "6px"
     padding: "2px 8px"
+  timer-action-start:
+    backgroundColor: "{colors.light-accent-text}"
+    textColor: "{colors.light-on-accent}"
+    typography: "{typography.body}"
+    rounded: "{rounded.control}"
+    height: "48px"
+    padding: "8px 16px"
+  timer-action-pause:
+    backgroundColor: "{colors.light-orange}"
+    textColor: "{colors.light-on-accent}"
+    typography: "{typography.body}"
+    rounded: "{rounded.control}"
+    height: "48px"
+    padding: "8px 16px"
+  timer-action-complete:
+    backgroundColor: "{colors.light-success}"
+    textColor: "{colors.light-on-accent}"
+    typography: "{typography.body}"
+    rounded: "{rounded.control}"
+    height: "48px"
+    padding: "8px 16px"
+  timer-action-outlined:
+    backgroundColor: "{colors.light-surface}"
+    textColor: "{colors.light-orange}"
+    typography: "{typography.body}"
+    rounded: "{rounded.control}"
+    height: "48px"
+    padding: "8px 16px"
+  timer-card:
+    backgroundColor: "{colors.light-surface}"
+    textColor: "{colors.light-text}"
+    typography: "{typography.headline}"
+    rounded: "{rounded.card}"
+    padding: "16px"
+  icon-button:
+    backgroundColor: "{colors.light-surface}"
+    textColor: "{colors.light-text}"
+    rounded: "{rounded.control}"
+    height: "48px"
+    width: "48px"
+  subtask-row:
+    backgroundColor: "{colors.light-surface}"
+    textColor: "{colors.light-text}"
+    typography: "{typography.body}"
+    rounded: "{rounded.control}"
+    height: "48px"
+    padding: "0 4px 0 4px"
+  info-pair:
+    textColor: "{colors.light-text}"
+    typography: "{typography.callout}"
   language-selector:
     backgroundColor: "{colors.light-surface}"
     textColor: "{colors.light-text}"
@@ -254,8 +304,13 @@ Text pairings need 4.5:1; borders, focus ring and icons need 3:1. Asserted in `_
 | Success text on ground / surface | 10.39 / 8.42 | 4.84 / 5.40 |
 | Ring on Surface 2 (track / green / yellow / orange / red) | 3.27 / 6.89 / 9.87 / 6.78 / 4.09 | 3.31 / 4.30 / 4.98 / 4.25 / 4.58 |
 | Selected chip border (accent) on ground | 5.76 | 3.60 |
+| Pause label on its fill (black on `#ff9f0a` / white on `#a85400`) | 10.22 | 5.34 |
+| Complete label on its fill (black on `#30d158` / white on `#1d7a36`) | 10.39 | 5.40 |
+| Outlined Pause / Complete text on Surface | 8.28 / 8.42 | 5.34 / 5.40 |
+| Pause / Complete fill on ground (not text, at least 3:1) | 10.22 / 10.39 | 4.78 / 4.84 |
+| Ring on Surface, the detail card (track / green / yellow / orange / red) | 3.99 / 8.42 / 12.05 / 8.28 / 4.99 | 4.16 / 5.40 / 6.25 / 5.34 / 5.75 |
 
-Adjusted from the web values: light `text2` `#8e8e93` to `#636366`; light accent as text and button fill `#007aff` to `#0062cc`; light red as text `#ff3b30` to `#c4271c`; light orange as icon `#ff9500` to `#a85400`; dark button label white to black (white on `#0a84ff` is 3.65:1); light green as text `#34c759` to `#1d7a36`; the light ring green, yellow and orange (see Success Green and Ring colors). The web priority label (red 11px text on Surface 2, 4.09:1 in dark) is replaced by a flag icon plus the word in the text color. Everything else is the web value unchanged.
+Adjusted from the web values: light `text2` `#8e8e93` to `#636366`; light accent as text and button fill `#007aff` to `#0062cc`; light red as text `#ff3b30` to `#c4271c`; light orange as icon `#ff9500` to `#a85400`; dark button label white to black (white on `#0a84ff` is 3.65:1); light green as text `#34c759` to `#1d7a36`; the light ring green, yellow and orange (see Success Green and Ring colors); the white label of the web's orange Pause and green Complete buttons (2.20 and 2.22 on the light fills, 2.06 and 2.02 on the dark ones) becomes a fill of `#a85400` / `#1d7a36` in light and a black label on the web fills in dark. The web priority label (red 11px text on Surface 2, 4.09:1 in dark) is replaced by a flag icon plus the word in the text color. Everything else is the web value unchanged.
 
 ### Named Rules
 **The One Voice Rule.** The accent is used on the primary action, links and the focus ring. If two filled accent buttons share a screen, one is wrong.
@@ -330,12 +385,26 @@ The web's card on a phone: Surface fill, 1dp hairline border, 12dp radius, 16dp 
 - **Due line:** callout muted ("Today, 14:30", "Dec 3"). Overdue reads "Overdue, Oct 20" in the danger color and weight 600; the words carry the meaning.
 - **Description:** callout muted, two lines at most.
 - **Edge:** a full 1dp accent border for in progress and danger for overdue (The Active Card Rule), otherwise the hairline. A completed card is not dimmed (the web's 0.6 opacity would drop its text below AA): the title is struck through and muted, and the due line says "Completed Oct 21".
-- **Actions (Tasks tab):** a secondary "Complete" button, spoken "Complete <title>". After a tap the card shows "Completed" and a link-style "Undo" for about five seconds (completion cannot be reopened once saved). The Panel's cards have no actions; Start and Pause arrive with the task detail.
+- **Actions (Panel and Tasks):** the web's outlined timer actions (see Timer actions): Start for a pending task, Pause for one in progress, Complete for both, spoken "Start <title>", "Pause <title>", "Complete <title>". After Complete the card shows "Completed" and a link-style "Undo" for about five seconds (completion cannot be reopened once saved). A completed card has no actions.
 
 ### Remaining-time box and countdown ring
-Inside the card when the task has a duration: a Surface 2 box (8dp radius, 12dp padding) with the ring on the left and, on the right, "Time left" (caption) over the time in headline weight 700 ("1 h 58 min"). Both texts use the text color (The Surface 2 Rule). A finished task says "Completed", a task past its duration says "Time over".
+(The detail screen's larger version of this box is the timer card below.) Inside the card when the task has a duration: a Surface 2 box (8dp radius, 12dp padding) with the ring on the left and, on the right, "Time left" (caption) over the time in headline weight 700 ("1 h 58 min"). Both texts use the text color (The Surface 2 Rule). A finished task says "Completed", a task past its duration says "Time over".
 
 The ring is a 40dp SVG: a 3dp track, an arc for the time used (round caps), the percent in the middle (a check when completed). The arc color follows the web thresholds (green up to 25%, yellow to 50%, orange to 75%, red above) with the ring colors of section 2. It is drawn once per tick (every 30 seconds), never animated, so reduced motion needs no special case. It is hidden from screen readers; the box is one spoken unit ("1 h 58 min left"). At large system font sizes the ring grows with the font (up to 1.6 times) so the percent never spills out.
+
+### Timer actions
+The web's three buttons in their AA-safe values: Start (primary blue), Pause (orange) and Complete (green). Two variants share one set of tokens (`colors.action` in `theme.ts`).
+- **Filled** (task detail): equal-width 48dp buttons that wrap to a second line at large font sizes. Start uses the primary pair; Pause is `#a85400` with a white label in light and the web `#ff9f0a` with a black label in dark; Complete is `#1d7a36` with white in light and the web `#30d158` with black in dark. The web's white label fails on its own fills (2.0 to 2.2), which is why the pairs differ.
+- **Outlined** (task cards, as on the web dashboard): 1dp border and label in the same color on Surface, 48dp tall.
+- The word is always shown ("Start", "Pause", "Complete"), the spoken name adds the title, and a busy write disables the buttons. A pending task offers Start and Complete, one in progress Pause and Complete, a completed one nothing. While the undo window is open the actions give way to the **Undo bar**: "Completed" (polite live region) and a link-style "Undo".
+
+### Task detail
+The web's detail screen on a phone, one column: the **detail header** (Back as a link, then the Edit pencil and the Delete trash as 48dp **icon buttons** on the right, the title below it, wrapping), the description in muted body text, a row of **info pairs** (a caption label over its value: Priority with its flag, Due date, Status with its status dot; always a translated word, never `in_progress`), the **timer card**, the timer actions and the Subtasks section.
+- **Icon button:** 48dp square, Surface, 1px strong border, 10dp radius, a 20dp Lucide icon in the text color; Delete keeps the icon and a 1px outline in the danger color. Always named for screen readers ("Edit task", "Delete task"), never icon alone.
+- **Timer card:** Surface, 1px hairline, 12dp radius, 16dp padding, the large countdown ring (80dp, 6dp stroke, up to 1.5 times at large font sizes; same arc rules and colors as the card ring, on Surface where the track is 3.99 / 4.16:1) beside "Time left" in muted caption and the time in headline weight 700. The last minute counts in seconds. It is one spoken unit: "Time left: 1 h 12 min. 40% of the time used", the text equivalent of the ring. Done says "Completed" with a check, past the duration "Time over". The text refreshes every second while the task runs, every 30 seconds with reduced motion and not at all otherwise; the ring never animates.
+- **Subtask row:** Surface, 1px hairline, 10dp radius. A checkbox (22dp Lucide square or checked square, announced as a checkbox with its state) and the title (wraps; done is struck through and muted, so it is not color alone) form one 48dp target; a 48dp X icon button deletes it, spoken "Delete subtask <title>". Rows are 8dp apart.
+- **Subtask add field:** the quick add text field with the label "New subtask", the keyboard's done key and a link-style Add; a refusal shows as the field error.
+- **Estimated duration:** the task edit form gets two number fields, Hours and Minutes (minutes held at 59), as the web's form has.
 
 ### Stat tile
 One Panel counter: Surface fill, hairline, 12dp radius, 16dp padding, centered. The number is 28dp, weight 700; below it the label in caption muted. Four tiles in a 2 by 2 grid with 12dp gaps. The number's color follows the web (text for pending, accent text for in progress, success for completed, danger for overdue) in AA-safe values, and the tile is read as one "Pending: 3", so color is never the only signal. The Panel stays a glance: the four counters and the active tasks, nothing more.

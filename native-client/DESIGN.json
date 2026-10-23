@@ -345,6 +345,70 @@
       "description": "Two radio rows, each language written in itself.",
       "html": "<div class=\"ds-lang\"><div class=\"ds-radio\">Español</div><div class=\"ds-radio\">English</div></div>",
       "css": ".ds-lang{background:#fff;border:1px solid #d1d1d6;border-radius:12px}.ds-radio{min-height:48px;padding:8px 16px;display:flex;align-items:center;font:400 17px/24px system-ui}"
+    },
+    {
+      "name": "Pause Action",
+      "kind": "button",
+      "refersTo": "timer-action-pause",
+      "description": "Filled orange timer action of the task detail; white label on the AA-safe amber in light, black on the web orange in dark.",
+      "html": "<button class=\"ds-pause\">Pause</button>",
+      "css": ".ds-pause{background:#a85400;color:#fff;min-height:48px;padding:8px 16px;border:0;border-radius:10px;font:600 17px/24px system-ui}"
+    },
+    {
+      "name": "Complete Action",
+      "kind": "button",
+      "refersTo": "timer-action-complete",
+      "description": "Filled green timer action; white label on #1d7a36 in light, black on #30d158 in dark.",
+      "html": "<button class=\"ds-complete\">Complete</button>",
+      "css": ".ds-complete{background:#1d7a36;color:#fff;min-height:48px;padding:8px 16px;border:0;border-radius:10px;font:600 17px/24px system-ui}"
+    },
+    {
+      "name": "Start Action",
+      "kind": "button",
+      "refersTo": "timer-action-start",
+      "description": "The primary button as the Start action.",
+      "html": "<button class=\"ds-start\">Start</button>",
+      "css": ".ds-start{background:#0062cc;color:#fff;min-height:48px;padding:8px 16px;border:0;border-radius:10px;font:600 17px/24px system-ui}"
+    },
+    {
+      "name": "Outlined Timer Action",
+      "kind": "button",
+      "refersTo": "timer-action-outlined",
+      "description": "The task card variant: 1dp border and label in the action color on Surface.",
+      "html": "<button class=\"ds-pause-o\">Pause</button>",
+      "css": ".ds-pause-o{background:#fff;color:#a85400;border:1px solid #a85400;min-height:48px;padding:8px 16px;border-radius:10px;font:600 17px/24px system-ui}"
+    },
+    {
+      "name": "Timer Card",
+      "kind": "card",
+      "refersTo": "timer-card",
+      "description": "The detail screen ring card: large ring, Time left and the time; one spoken unit with the ring text equivalent.",
+      "html": "<div class=\"ds-timer\"><span class=\"ds-ring\">40%</span><div><small>Time left</small><b>1 h 12 min</b></div></div>",
+      "css": ".ds-timer{display:flex;gap:16px;align-items:center;padding:16px;background:#fff;border:1px solid #d1d1d6;border-radius:12px}.ds-ring{width:80px;height:80px;border:6px solid #7c7c80;border-radius:50%;display:grid;place-items:center;font:600 15px system-ui}.ds-timer small{display:block;font:400 13px/18px system-ui;color:#636366}.ds-timer b{font:700 22px/28px system-ui}"
+    },
+    {
+      "name": "Icon Button",
+      "kind": "button",
+      "refersTo": "icon-button",
+      "description": "48dp square icon button named by its label (Edit task, Delete task).",
+      "html": "<button class=\"ds-icon\" aria-label=\"Edit task\">&#9998;</button>",
+      "css": ".ds-icon{width:48px;height:48px;background:#fff;border:1px solid #85858a;border-radius:10px}"
+    },
+    {
+      "name": "Subtask Row",
+      "kind": "card",
+      "refersTo": "subtask-row",
+      "description": "Checkbox with the title (struck through and muted when done) and a delete icon button; 48dp targets.",
+      "html": "<div class=\"ds-sub\"><span>&#9744; Outline</span><button aria-label=\"Delete subtask Outline\">&times;</button></div>",
+      "css": ".ds-sub{display:flex;align-items:center;min-height:48px;background:#fff;border:1px solid #d1d1d6;border-radius:10px;padding:0 4px;font:400 17px/24px system-ui}.ds-sub span{flex:1}"
+    },
+    {
+      "name": "Info Pair",
+      "kind": "custom",
+      "refersTo": "info-pair",
+      "description": "Small muted label over its translated value (Priority High, Status In progress).",
+      "html": "<div class=\"ds-pair\"><small>Status</small><b>In progress</b></div>",
+      "css": ".ds-pair small{display:block;font:400 13px/18px system-ui;color:#636366}.ds-pair b{font:600 15px/21px system-ui}"
     }
   ],
   "narrative": {

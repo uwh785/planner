@@ -11,6 +11,8 @@ interface QuickAddFieldProps {
   label: string;
   /** Resolves to an error sentence to show, or null when it worked. */
   onSubmit: (text: string) => Promise<string | null>;
+  /** Side padding of a full-width screen field; off inside a padded section. */
+  inset?: boolean;
 }
 
 const makeStyles = (t: Theme) => ({
@@ -22,7 +24,11 @@ const makeStyles = (t: Theme) => ({
  * button), clears itself when it worked and keeps the keyboard open for the
  * next one.
  */
-export function QuickAddField({ label, onSubmit }: QuickAddFieldProps) {
+export function QuickAddField({
+  label,
+  onSubmit,
+  inset = true,
+}: QuickAddFieldProps) {
   const styles = useStyles(makeStyles);
   const t = useT();
   const [text, setText] = useState('');
@@ -40,13 +46,16 @@ export function QuickAddField({ label, onSubmit }: QuickAddFieldProps) {
       if (problem === null) {
         setText('');
       }
+    } catch {
+      // A rejecting add must not vanish: say so and keep the text to retry.
+      setError(t('errorSave'));
     } finally {
       busy.current = false;
     }
   }
 
   return (
-    <View style={styles.wrap}>
+    <View style={inset ? styles.wrap : undefined}>
       <TextField
         label={label}
         value={text}

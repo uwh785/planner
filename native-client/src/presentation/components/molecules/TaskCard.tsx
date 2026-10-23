@@ -2,13 +2,14 @@ import React from 'react';
 import { Pressable, Text, View } from 'react-native';
 import type { Priority, TaskStatus } from '@/domain';
 import type { MessageKey } from '@/application/i18n';
-import { Button } from '../atoms/Button';
 import { StatusDot } from '../atoms/StatusDot';
 import { useT } from '../../i18n/I18nProvider';
 import { useStyles } from '../../theme';
 import type { Theme } from '../../theme';
 import { PriorityBadge, usePriorityWord } from './PriorityBadge';
+import { TimerActions } from './TimerActions';
 import { TimerBox, type TimerModel } from './TimerBox';
+import { UndoBar } from './UndoBar';
 import { formatDuration } from '../../format/duration';
 
 /** What a card needs to know about a task; no repository types leak in. */
@@ -28,7 +29,13 @@ interface TaskCardProps {
   /** In the undo window: shown as done, with an Undo action. */
   completing?: boolean;
   onOpen: () => void;
-  /** Shows the Complete action when given (and the task is still open). */
+  /**
+   * The timer actions: Start for a pending task, Pause for one in progress
+   * (the web's card buttons), Complete for both. Each shows only when its
+   * handler is given and the task is still open.
+   */
+  onStart?: () => void;
+  onPause?: () => void;
   onComplete?: () => void;
   onUndo?: () => void;
 }
@@ -74,29 +81,21 @@ const makeStyles = (t: Theme) => ({
     fontWeight: '400' as const,
     color: t.colors.textMuted,
   },
-  actions: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    gap: t.spacing.xs,
-  },
-  completedWord: {
-    ...t.typography.callout,
-    color: t.colors.text,
-    flexShrink: 1,
-  },
   pressed: { opacity: 0.8 },
 });
 
 /**
  * The web's task card: status dot, title, priority badge, due line,
  * description, remaining-time box, then the actions. The body opens the task;
- * the Complete action (Tasks tab) and its Undo are separate controls so a
- * screen reader reaches each. Overdue and priority always carry words.
+ * the Start, Pause and Complete actions and the Undo are separate controls so
+ * a screen reader reaches each. Overdue and priority always carry words.
  */
 export function TaskCard({
   task,
   completing = false,
   onOpen,
+  onStart,
+  onPause,
   onComplete,
   onUndo,
 }: TaskCardProps) {
@@ -160,23 +159,16 @@ export function TaskCard({
         ) : null}
       </Pressable>
       {completing ? (
-        <View style={styles.actions}>
-          <Text accessibilityLiveRegion="polite" style={styles.completedWord}>
-            {t('taskDone')}
-          </Text>
-          {onUndo ? (
-            <Button variant="link" label={t('undo')} onPress={onUndo} />
-          ) : null}
-        </View>
-      ) : task.status !== 'completed' && onComplete ? (
-        <View style={styles.actions}>
-          <Button
-            variant="secondary"
-            label={t('taskComplete')}
-            accessibilityLabel={t('taskMarkDone', { title: task.title })}
-            onPress={onComplete}
-          />
-        </View>
+        <UndoBar onUndo={onUndo} />
+      ) : task.status !== 'completed' && (onStart || onPause || onComplete) ? (
+        <TimerActions
+          variant="outlined"
+          status={task.status}
+          title={task.title}
+          onStart={onStart}
+          onPause={onPause}
+          onComplete={onComplete}
+        />
       ) : null}
     </View>
   );

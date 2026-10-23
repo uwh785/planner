@@ -243,6 +243,51 @@ describe('actions', () => {
     expect(screen.queryByRole('button', { name: /^Complete / })).toBeNull();
   });
 
+  it('offers Start on a pending card and Pause on one in progress, each with Complete', async () => {
+    const h = { onStart: jest.fn(), onPause: jest.fn(), onComplete: jest.fn() };
+    await show(model(), h);
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Start Prepare slides' }),
+    );
+    expect(h.onStart).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: /^Pause/ })).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Complete Prepare slides' }),
+    ).toBeTruthy();
+    screen.unmount();
+    await show(model({ status: 'in_progress' }), h);
+    fireEvent.press(
+      screen.getByRole('button', { name: 'Pause Prepare slides' }),
+    );
+    expect(h.onPause).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: /^Start/ })).toBeNull();
+  });
+
+  it('draws the card actions outlined in their AA-safe colors, like the web dashboard', async () => {
+    await show(model({ status: 'in_progress' }), {
+      onPause: jest.fn(),
+      onComplete: jest.fn(),
+    });
+    const style = (name: string) =>
+      StyleSheet.flatten(screen.getByRole('button', { name }).props.style);
+    expect(style('Pause Prepare slides')).toMatchObject({
+      borderColor: lightTheme.colors.action.pause,
+      borderWidth: 1,
+    });
+    expect(style('Complete Prepare slides')).toMatchObject({
+      borderColor: lightTheme.colors.action.complete,
+    });
+  });
+
+  it('shows no actions on a completed card', async () => {
+    await show(model({ status: 'completed' }), {
+      onStart: jest.fn(),
+      onPause: jest.fn(),
+      onComplete: jest.fn(),
+    });
+    expect(screen.queryByTestId('timer-actions')).toBeNull();
+  });
+
   it('while completing: shows Completed and Undo instead of Complete', async () => {
     const onUndo = jest.fn();
     await show(model(), { completing: true, onComplete: jest.fn(), onUndo });

@@ -119,6 +119,18 @@ describe.each([
     ['button label on primary', colors.onPrimary, colors.primary],
     ['success text on background', colors.success, colors.background],
     ['success text on surface', colors.success, colors.surface],
+    // The detail screen's filled actions: Start uses the primary pair above.
+    ['pause label on pause fill', colors.action.onPause, colors.action.pause],
+    [
+      'complete label on complete fill',
+      colors.action.onComplete,
+      colors.action.complete,
+    ],
+    // The card's outlined actions write their label in the fill color.
+    ['pause text on surface', colors.action.pause, colors.surface],
+    ['complete text on surface', colors.action.complete, colors.surface],
+    ['pause text on background', colors.action.pause, colors.background],
+    ['complete text on background', colors.action.complete, colors.background],
   ])('%s is at least 4.5:1', (_label, fg, bg) => {
     expect(contrast(fg, bg)).toBeGreaterThanOrEqual(4.5);
   });
@@ -152,6 +164,16 @@ describe.each([
     ['ring warn on surface2', colors.ring.warn, colors.surface2],
     ['ring danger on surface2', colors.ring.danger, colors.surface2],
     ['active chip border on background', colors.accent, colors.background],
+    // The large countdown ring sits on the detail card (Surface).
+    ['ring track on surface', colors.ring.track, colors.surface],
+    ['ring ok on surface', colors.ring.ok, colors.surface],
+    ['ring caution on surface', colors.ring.caution, colors.surface],
+    ['ring warn on surface', colors.ring.warn, colors.surface],
+    ['ring danger on surface', colors.ring.danger, colors.surface],
+    ['pause fill on background', colors.action.pause, colors.background],
+    ['complete fill on background', colors.action.complete, colors.background],
+    ['pause outline on surface', colors.action.pause, colors.surface],
+    ['complete outline on surface', colors.action.complete, colors.surface],
   ])('%s is at least 3:1', (_label, fg, bg) => {
     expect(contrast(fg, bg)).toBeGreaterThanOrEqual(3);
   });
@@ -180,6 +202,33 @@ describe('web values replaced for the Panel and task card', () => {
     expect(
       contrast(darkTheme.colors.text, darkTheme.colors.surface2),
     ).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
+describe('web values replaced for the task detail actions', () => {
+  it('the web white label fails on the web orange and green fills in light', () => {
+    expect(contrast('#ffffff', WEB.light.orange)).toBeLessThan(4.5);
+    expect(contrast('#ffffff', WEB.light.green)).toBeLessThan(4.5);
+    expect(lightTheme.colors.action.pause).not.toBe(WEB.light.orange);
+    expect(lightTheme.colors.action.complete).not.toBe(WEB.light.green);
+  });
+
+  it('light reuses the AA-safe amber and success green, keeping the white label', () => {
+    expect(lightTheme.colors.action.pause).toBe(
+      lightTheme.colors.priority.medium,
+    );
+    expect(lightTheme.colors.action.complete).toBe(lightTheme.colors.success);
+    expect(lightTheme.colors.action.onPause).toBe('#ffffff');
+    expect(lightTheme.colors.action.onComplete).toBe('#ffffff');
+  });
+
+  it('dark keeps the web orange and green fills and swaps the label to black', () => {
+    expect(darkTheme.colors.action.pause).toBe(WEB.dark.orange);
+    expect(darkTheme.colors.action.complete).toBe(WEB.dark.green);
+    expect(contrast('#ffffff', WEB.dark.orange)).toBeLessThan(4.5);
+    expect(contrast('#ffffff', WEB.dark.green)).toBeLessThan(4.5);
+    expect(darkTheme.colors.action.onPause).toBe('#000000');
+    expect(darkTheme.colors.action.onComplete).toBe('#000000');
   });
 });
 

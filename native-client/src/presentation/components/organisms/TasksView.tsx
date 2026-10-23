@@ -25,6 +25,8 @@ interface TasksViewProps {
   completing: ReadonlySet<string>;
   completedExpanded: boolean;
   onToggleCompleted: () => void;
+  onStartTask: (id: string) => void;
+  onPauseTask: (id: string) => void;
   onCompleteTask: (id: string) => void;
   onUndo: (id: string) => void;
   onOpenTask: (id: string) => void;
@@ -92,6 +94,8 @@ export function TasksView({
   completing,
   completedExpanded,
   onToggleCompleted,
+  onStartTask,
+  onPauseTask,
   onCompleteTask,
   onUndo,
   onOpenTask,
@@ -160,6 +164,8 @@ export function TasksView({
             task={item}
             completing={completing.has(item.id)}
             onOpen={() => onOpenTask(item.id)}
+            onStart={() => onStartTask(item.id)}
+            onPause={() => onPauseTask(item.id)}
             onComplete={() => onCompleteTask(item.id)}
             onUndo={() => onUndo(item.id)}
           />

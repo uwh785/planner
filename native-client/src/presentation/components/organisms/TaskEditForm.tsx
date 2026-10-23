@@ -20,6 +20,8 @@ export interface TaskEditValues {
   priority: Priority;
   dueDate: number | null;
   dueAllDay: boolean;
+  /** Estimated duration in ms, or null for none. */
+  durationMs: number | null;
   listId: string | null;
 }
 
@@ -43,7 +45,16 @@ const makeStyles = (t: Theme) => ({
   content: { padding: t.spacing.lg, paddingBottom: t.spacing.xxl },
   notes: { minHeight: 96, textAlignVertical: 'top' as const },
   actions: { gap: t.spacing.sm, marginTop: t.spacing.xs },
+  durationRow: { flexDirection: 'row' as const, gap: t.spacing.sm },
+  durationField: { flex: 1 },
 });
+
+const HOUR_MS = 3_600_000;
+const MINUTE_MS = 60_000;
+
+/** The digits of a text, as a whole number (empty is 0). */
+const digits = (text: string): number =>
+  Number.parseInt(text.replace(/\D/g, ''), 10) || 0;
 
 const PRIORITIES: readonly { value: Priority; label: MessageKey }[] = [
   { value: 0, label: 'taskPriorityNone' },
@@ -70,6 +81,10 @@ export function TaskEditForm({
   const styles = useStyles(makeStyles);
   const t = useT();
   const { colors } = useTheme();
+  const hours = Math.floor((values.durationMs ?? 0) / HOUR_MS);
+  const minutes = Math.floor(((values.durationMs ?? 0) % HOUR_MS) / MINUTE_MS);
+  const setDuration = (ms: number) =>
+    onChange({ durationMs: ms === 0 ? null : ms });
   const priorityColor = [
     colors.priority.none,
     colors.priority.low,
@@ -123,6 +138,34 @@ export function TaskEditForm({
           onClear={onClearDate}
           onAllDayChange={onAllDayChange}
         />
+      </FormSection>
+      <FormSection title={t('taskDuration')}>
+        <View style={styles.durationRow}>
+          <View style={styles.durationField}>
+            <TextField
+              label={t('durationHoursField')}
+              value={hours === 0 ? '' : String(hours)}
+              placeholder="0"
+              keyboardType="number-pad"
+              onChangeText={text =>
+                setDuration(digits(text) * HOUR_MS + minutes * MINUTE_MS)
+              }
+            />
+          </View>
+          <View style={styles.durationField}>
+            <TextField
+              label={t('durationMinutesField')}
+              value={minutes === 0 ? '' : String(minutes)}
+              placeholder="0"
+              keyboardType="number-pad"
+              onChangeText={text =>
+                setDuration(
+                  hours * HOUR_MS + Math.min(digits(text), 59) * MINUTE_MS,
+                )
+              }
+            />
+          </View>
+        </View>
       </FormSection>
       <FormSection title={t('fieldList')}>
         <RadioGroup<string | null>
