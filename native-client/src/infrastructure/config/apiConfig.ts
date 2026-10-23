@@ -2,11 +2,13 @@
 export const DEV_API_BASE_URL = 'http://10.0.2.2:8080';
 
 /**
- * Backend URL of release builds. Deliberately empty: a release build fails
- * at startup until this is set to the deployed HTTPS origin, so it can never
- * silently talk to the development URL. Set it before building a release.
+ * Backend URL of release builds: the deployed HTTPS origin. It must stay
+ * https (resolveApiBaseUrl rejects anything else) and a release build fails
+ * at startup if it is ever emptied, so it can never silently talk to the
+ * development URL.
  */
-export const RELEASE_API_BASE_URL: string | null = null;
+export const RELEASE_API_BASE_URL: string | null =
+  'https://planner-opal-delta.vercel.app';
 
 /** Picks the API origin: the emulator alias in development, else the release URL. */
 export function resolveApiBaseUrl(options: {

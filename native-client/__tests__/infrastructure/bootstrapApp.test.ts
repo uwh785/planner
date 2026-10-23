@@ -23,17 +23,31 @@ it('turns a missing release API URL into a handled fatal state, not a throw', ()
   const errorSpy = jest
     .spyOn(console, 'error')
     .mockImplementation(() => undefined);
-  const dev = (globalThis as { __DEV__?: boolean }).__DEV__;
-  (globalThis as { __DEV__?: boolean }).__DEV__ = false;
-  try {
-    const boot = bootstrapApp({ sessionStore: new InMemorySessionStore() });
+  // Simulate a release build whose URL was emptied, independent of the real
+  // committed constant (which is set for release builds).
+  jest.isolateModules(() => {
+    jest.doMock('@/infrastructure/config/apiConfig', () => {
+      const actual = jest.requireActual(
+        '@/infrastructure/config/apiConfig',
+      ) as typeof import('@/infrastructure/config/apiConfig');
+      return {
+        ...actual,
+        currentApiBaseUrl: () =>
+          actual.resolveApiBaseUrl({ dev: false, releaseUrl: null }),
+      };
+    });
+    const isolated = jest.requireActual(
+      '@/infrastructure/composition/bootstrapApp',
+    ) as typeof import('@/infrastructure/composition/bootstrapApp');
+    const boot = isolated.bootstrapApp({
+      sessionStore: new InMemorySessionStore(),
+    });
     expect(boot.kind).toBe('fatal');
     if (boot.kind === 'fatal') {
       expect(boot.message).toMatch(/not set up correctly/i);
       expect(boot.message).not.toMatch(/RELEASE_API_BASE_URL|https?:\/\//);
     }
     expect(errorSpy).toHaveBeenCalled();
-  } finally {
-    (globalThis as { __DEV__?: boolean }).__DEV__ = dev;
-  }
+  });
+  jest.dontMock('@/infrastructure/config/apiConfig');
 });

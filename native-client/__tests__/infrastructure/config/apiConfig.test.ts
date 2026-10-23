@@ -1,4 +1,14 @@
-import { resolveApiBaseUrl } from '@/infrastructure/config/apiConfig';
+import {
+  RELEASE_API_BASE_URL,
+  resolveApiBaseUrl,
+} from '@/infrastructure/config/apiConfig';
+
+it('ships a valid https release URL so a release build can start', () => {
+  expect(() =>
+    resolveApiBaseUrl({ dev: false, releaseUrl: RELEASE_API_BASE_URL }),
+  ).not.toThrow();
+  expect(RELEASE_API_BASE_URL).toMatch(/^https:\/\//);
+});
 
 it('uses the emulator host alias in development', () => {
   expect(resolveApiBaseUrl({ dev: true, releaseUrl: null })).toBe(
