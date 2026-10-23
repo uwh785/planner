@@ -125,5 +125,11 @@ M5c was reviewed as native candidates: the i18n/queries commit (`7c4443d`), the 
 - Tests: `listsScreen.test.tsx` ends the Spanish confirm test with `expect(list.id).toBeTruthy()` and never exercises Cancelar/Eliminar; the priority flag assertion in `taskCard.test.tsx` is vacuous. Strengthen both. (The Config screen's sign-out and release-build tests were restored in M5d.)
 - Visual note: web parity differs on purpose in a few places (full 1dp accent border instead of the web's 3dp stripe, no day grouping or search in Tasks, no plan-usage block in Config); revisit if strict parity is wanted.
 
+M5d was reviewed as three native candidates (`41cffb3`; `e70b679` + `bd5fcf1`; `d96029f`), all approved (the first with no findings). Open advisories:
+- `TaskDetailScreen.runTimer` uses try/finally without catch: if `taskTimer.start` or `pause` rejects (failed local write or invalid transition) the rejection is unhandled and the user sees nothing; the Panel and Tasks cards call start/pause without awaiting or catching either. Catch, show a notice like the subtask failures do, and test a failing timer write.
+- Untested new logic: hours and minutes parsing in `TaskEditForm` (minutes clamp to 59, zero duration becomes null, non-digit input, very large hours, clearing a field), `formatRemaining`, `useNow(null)`, `useFlushCompletionOnLeave` (catch and announce path), `useReduceMotion`, and the NOT_FOUND mapping for subtasks. Add tests.
+- Tags were skipped on purpose (the web has no tag UI); revisit only if the web adds one.
+- Known behavior: opening another task's detail within 5 s of ticking Complete commits the first completion early because the list screen flushes on blur.
+
 ## Next step
 M5e: the sync "needs attention" view for parked outbox entries (blocked and rejected), with retry. Notes: `OutboxRepository.listParked()` and `retryParked(ids)` exist; parked timer transitions (see the M5d notes in the follow-ups) now appear there too and keep their task's row from being overwritten by pulls until retried, so the view should name the task and the action (start, pause, complete).
