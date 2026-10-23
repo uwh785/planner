@@ -102,5 +102,14 @@ The M5a design system (`7baa199`, `8411234`) was reviewed as one native candidat
 - `theme.test.ts` does not assert that the web's light orange `#ff9500` fails the 3:1 icon contrast that justified replacing it; add that assertion so the documented claim is proved.
 - Known design gap: the text-field focus border is invisible while an error is shown (the error border wins); decide whether focus needs a second cue.
 
+M5b was reviewed as three native candidates (`92e3e58`; `f971db0` + `f438383`; `08c32bd`), all approved (the first with no findings). Open advisories:
+- `TasksScreen` unmount cleanup calls `completion.flush()` without awaiting or catching; a failed write loses the completion tick silently and the rejection is unhandled. Catch it and surface a notice; test the failure path.
+- `ListEditScreen.save` does rename and recolor as two writes; if the second fails the first is already persisted and `initial` is stale, so a retry repeats the rename. Make it one update (or refresh `initial` after each success) and test a failed save.
+- `useDiscardGuard`: the `allowed` ref is never reset, so if navigation after `allowLeaving()` fails, later back presses discard edits without a prompt. Reset it on failure and test the guard flow (prompt on dirty back, keep editing, discard, allow after save).
+- `QuickAddField.submit` has try/finally without catch: a rejecting `onSubmit` becomes an unhandled rejection with no message. Catch and show an error.
+- `TaskEditScreen`: a live-query emission with null data between a successful delete and unmount can render an inconsistent frame; guard it.
+- Tests: add error-path coverage for failed save and failed delete in the edit screens, the date picker dismissal/error fallback, the completed-section truncation caption and the custom-color path of the list form.
+- Product gap recorded: the backend has no reopen transition, so completion is final; the UI offers a 5 second undo window instead. Revisit if reopening becomes a requirement (needs a backend transition and a push op).
+
 ## Next step
 M5c: task detail (subtasks, tags) and the sync "needs attention" view for parked outbox entries (the status line already counts them). Notes for it: the edit screen already has title, notes, priority, due date and list; `TaskRepository` has no reopen, so completed tasks stay read-mostly; the M4 walkthrough ran against the unpatched backend (route fix `b93f832`) in this task, so that final check is done.
