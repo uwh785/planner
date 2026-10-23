@@ -13,9 +13,11 @@ import {
   SessionStoreUnreadableError,
 } from '@/application/auth/errors';
 import { SessionService } from '@/application/auth/SessionService';
-import type { AppContainer, ContainerSource } from '@/application/container';
+import type { ContainerSource } from '@/application/container';
 import type { AuthSession } from '@/domain/auth';
 import App from '@/presentation/App';
+import { asContainer } from '../helpers/plannerWorld';
+import { openTestWorld } from '../helpers/testRepositories';
 import {
   active,
   FakeAuthGateway,
@@ -35,8 +37,9 @@ function setup(initial: AuthSession | null = null) {
   const gateway = new FakeAuthGateway();
   const users = { setUser: jest.fn(async (_id: string | null) => undefined) };
   const session = new SessionService({ gateway, store, users });
+  const world = openTestWorld();
   const containers = {
-    acquire: jest.fn(async () => ({ schemaVersion: 2 } as AppContainer)),
+    acquire: jest.fn(async () => asContainer(await world)),
     release: jest.fn(),
   } satisfies ContainerSource;
   return { store, gateway, users, session, containers };
@@ -51,6 +54,7 @@ async function open(initial: AuthSession | null = null) {
 
 const type = (label: string, text: string) =>
   fireEvent.changeText(screen.getByLabelText(label), text);
+const lists = () => screen.findByRole('header', { name: 'Lists' });
 const press = (name: string) =>
   act(async () => {
     fireEvent.press(screen.getByRole('button', { name }));
@@ -78,7 +82,7 @@ describe('loading', () => {
     expect(screen.queryByRole('button')).toBeNull();
     finish(active());
     await act(() => restoring);
-    expect(await screen.findByText('Ann')).toBeTruthy();
+    expect(await lists()).toBeTruthy();
   });
 });
 
@@ -113,8 +117,7 @@ describe('sign in', () => {
     type('Email', ' a@b.co ');
     type('Password', 'pw');
     await press('Sign in');
-    expect(await screen.findByText('Ann')).toBeTruthy();
-    expect(screen.getByText('a@b.co')).toBeTruthy();
+    expect(await lists()).toBeTruthy();
     expect(env.gateway.login).toHaveBeenCalledWith({
       email: 'a@b.co',
       password: 'pw',
@@ -140,7 +143,7 @@ describe('sign in', () => {
     fireEvent(screen.getByLabelText('Password'), 'submitEditing');
     expect(env.gateway.login).toHaveBeenCalledTimes(1);
     await act(async () => finish());
-    expect(await screen.findByText('Ann')).toBeTruthy();
+    expect(await lists()).toBeTruthy();
   });
 
   it.each([
@@ -165,7 +168,7 @@ describe('sign in', () => {
           .accessibilityState,
       ).toMatchObject({ disabled: false });
       await press('Sign in');
-      expect(await screen.findByText('Ann')).toBeTruthy();
+      expect(await lists()).toBeTruthy();
     },
   );
 
@@ -224,9 +227,7 @@ describe('create account', () => {
       name: 'Nia',
       password: 'pw',
     });
-    expect(
-      await screen.findByRole('button', { name: 'Sign out' }),
-    ).toBeTruthy();
+    expect(await lists()).toBeTruthy();
   });
 
   it('shows the server refusal for a taken email', async () => {
@@ -269,24 +270,28 @@ describe('session states', () => {
     expect(screen.queryByLabelText('Email')).toBeNull();
     env.store.get = read;
     await press('Try again');
-    expect(await screen.findByText('Ann')).toBeTruthy();
+    expect(await lists()).toBeTruthy();
   });
 });
 
 describe('signed in', () => {
-  it('shows who is signed in and holds the user database', async () => {
+  it('shows the lists, holds the user database and keeps the account one tap away', async () => {
     const env = await open(active());
-    expect(await screen.findByText('Ann')).toBeTruthy();
-    expect(screen.getByText('a@b.co')).toBeTruthy();
+    expect(await lists()).toBeTruthy();
     expect(env.containers.acquire).toHaveBeenCalledTimes(1);
     await waitFor(() =>
       expect(logSpy).toHaveBeenCalledWith('db ready (schema v2)'),
     );
+    expect(screen.queryByText('Your tasks will live here.')).toBeNull();
+    await press('Account');
+    expect(await screen.findByText('Ann')).toBeTruthy();
+    expect(screen.getByText('a@b.co')).toBeTruthy();
   });
 
   it('signs out: clears secure storage, closes the database, keeps local data', async () => {
     const env = await open(active());
-    await screen.findByText('Ann');
+    await lists();
+    await press('Account');
     await press('Sign out');
     expect(await screen.findByText('Welcome back')).toBeTruthy();
     expect(env.store.value).toBeNull();
@@ -297,7 +302,7 @@ describe('signed in', () => {
 
   it('returns to the sign-in form when the session expires mid-use', async () => {
     const env = await open(active());
-    await screen.findByText('Ann');
+    await lists();
     act(() => env.session.handleExpired());
     expect(await screen.findByText(/Your session expired/)).toBeTruthy();
   });

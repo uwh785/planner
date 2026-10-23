@@ -118,6 +118,20 @@ components:
     rounded: "{rounded.pill}"
     height: "48px"
     padding: "0 12px"
+  task-row:
+    backgroundColor: "{colors.light-surface}"
+    textColor: "{colors.light-text}"
+    typography: "{typography.body}"
+    rounded: "{rounded.card}"
+    height: "48px"
+    padding: "0 16px 0 0"
+  radio-row:
+    backgroundColor: "{colors.light-surface}"
+    textColor: "{colors.light-text}"
+    typography: "{typography.body}"
+    rounded: "{rounded.card}"
+    height: "48px"
+    padding: "8px 16px"
 ---
 
 # Design System: Planner
@@ -246,7 +260,26 @@ One caption line in muted text under the main content, for example "Synced 5 min
 Rows sit inside one Surface group with 12dp radius, a hairline outline and 16dp padding; rows are separated by a hairline inset 16dp. Row height at least 48dp. Title in body, detail in callout muted. No chevron decoration unless the row navigates.
 
 ### Task row
-A list row with a leading complete toggle (48dp touch area around a 24dp circle, filled with the accent and a check mark when done). Title in body; due date in callout. Completed titles use a strikethrough in muted text, so state is never color alone.
+A list row with a leading complete toggle (48dp touch area around a 24dp circle, filled with the accent and a check mark when done). Title in body; due date in callout. Completed titles use a strikethrough in muted text, so state is never color alone. The body of the row is a second target that opens the task; the toggle and the body are separate controls so a screen reader reaches both.
+
+- **Overdue:** the due line reads "Overdue, Oct 20" in the danger color. The word carries the meaning, the color only reinforces it. Due text otherwise says "Today", "Tomorrow" or a short date, with 24-hour time when the task has one.
+- **Completing (undo window):** completing a task cannot be reversed once saved, because the backend has no way to reopen a task. Ticking a task only starts a window of about five seconds in which the row shows as done with a plain "Undo" link under the title; nothing is saved until the window ends, and leaving the screen or the app saves it at once. The announcement line says "Completed Call Ann. Undo is available."
+- **Completed:** a checked, disabled toggle (its label ends in "completed"), a struck-through muted title and "Completed Oct 21" instead of the due line. Completed rows live in their own collapsed section.
+
+### Completed header
+A 48dp row above the completed tasks: "Completed (3)" in callout muted and the word "Show" or "Hide" in link style, so the state of the section is a word, not a chevron. The section is collapsed by default and, past 200 tasks, says "Showing the latest 200 of 340."
+
+### Radio row
+A single-choice row in a grouped list: a 22dp ring (filled dot when chosen, weight 600 label), an optional decorative marker (color dot, flag) and the label in body. 48dp tall, announced as a radio with its selected state. Used for priority, list and list color. A list color is always chosen by name ("Green"), never by swatch alone.
+
+### Quick add field
+The text field component with the label always visible ("Add a task", "Add a list"), the keyboard's done key as the primary way to add, and a link-style "Add" inside the field for people who do not use the key. It clears itself on success and keeps the keyboard open for the next entry; a refusal ("Name is required") appears as the field error line.
+
+### Screen header
+Back (link) on the left and the screen's actions (link) on the right in one wrapping row, then the Title below it. The title wraps; nothing is truncated at large text sizes. Screens change without animation.
+
+### Announcement line
+One caption in muted text under the quick add field, a polite live region: "Added Buy milk", "Deleted Buy milk", "Saved Buy milk". It clears itself after five seconds.
 
 ### Tag chip
 Surface 2 fill, pill radius, callout label in Text color, 12dp horizontal padding, 48dp touch height when interactive (visual height 32dp inside it). No border.

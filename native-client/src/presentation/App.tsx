@@ -2,6 +2,7 @@ import React from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import type { SessionService } from '@/application/auth/SessionService';
 import type { ContainerSource } from '@/application/container';
+import type { PlannerRuntime } from '@/application/planner/createPlanner';
 import type { SyncStatusSource } from '@/application/sync/SyncStatus';
 import { SessionGate } from './screens/SessionGate';
 import { SessionProvider } from './sessionContext';
@@ -14,14 +15,31 @@ interface AppProps {
   containers: ContainerSource;
   /** What the sync status line reads; omit to show no line. */
   sync?: SyncStatusSource;
+  /** Clock, timer and app lifecycle for the screens; plain globals if omitted. */
+  runtime?: PlannerRuntime;
 }
 
-function App({ session, containers, sync }: AppProps) {
+const DEFAULT_RUNTIME: PlannerRuntime = {
+  clock: { now: () => Date.now() },
+  timer: {
+    schedule: (fn, delayMs) => {
+      const handle = setTimeout(fn, delayMs);
+      return () => clearTimeout(handle);
+    },
+  },
+};
+
+function App({
+  session,
+  containers,
+  sync,
+  runtime = DEFAULT_RUNTIME,
+}: AppProps) {
   return (
     <SessionProvider session={session}>
       <SyncProvider source={sync}>
         <SafeAreaProvider>
-          <SessionGate containers={containers} />
+          <SessionGate containers={containers} runtime={runtime} />
         </SafeAreaProvider>
       </SyncProvider>
     </SessionProvider>

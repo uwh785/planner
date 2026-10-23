@@ -1,7 +1,7 @@
 import React from 'react';
 import { act, render, renderHook, screen } from '@testing-library/react-native';
 import { SessionService } from '@/application/auth/SessionService';
-import type { AppContainer, ContainerSource } from '@/application/container';
+import type { ContainerSource } from '@/application/container';
 import {
   INITIAL_SYNC_SNAPSHOT,
   SyncStatus,
@@ -10,6 +10,8 @@ import {
 import App from '@/presentation/App';
 import { SyncProvider, useSyncStatus } from '@/presentation/syncContext';
 import { syncStatusText } from '@/presentation/syncStatusText';
+import { asContainer } from '../helpers/plannerWorld';
+import { openTestWorld } from '../helpers/testRepositories';
 import {
   active,
   FakeAuthGateway,
@@ -74,7 +76,8 @@ describe('useSyncStatus', () => {
   });
 });
 
-function renderHome(source?: SyncStatus) {
+async function renderHome(source?: SyncStatus) {
+  const world = await openTestWorld();
   const store = new InMemorySessionStore(active());
   const session = new SessionService({
     gateway: new FakeAuthGateway(),
@@ -82,14 +85,14 @@ function renderHome(source?: SyncStatus) {
     users: { setUser: jest.fn(async () => undefined) },
   });
   const containers: ContainerSource = {
-    acquire: jest.fn(async () => ({ schemaVersion: 2 } as AppContainer)),
+    acquire: jest.fn(async () => asContainer(world)),
     release: jest.fn(),
   };
   render(<App session={session} containers={containers} sync={source} />);
   return act(() => session.restore());
 }
 
-describe('status line on the signed-in home', () => {
+describe('status line on the lists home', () => {
   beforeEach(() =>
     jest.spyOn(console, 'log').mockImplementation(() => undefined),
   );
@@ -118,7 +121,7 @@ describe('status line on the signed-in home', () => {
 
   it('is absent when no sync status is provided', async () => {
     await renderHome(undefined);
-    await screen.findByText('Ann');
+    await screen.findByRole('header', { name: 'Lists' });
     expect(screen.queryByText(/sync/i)).toBeNull();
   });
 

@@ -251,6 +251,22 @@
       "description": "Rows on one rounded surface, hairline separators.",
       "html": "<div class=\"ds-group\"><div class=\"ds-row\">Signed in as<br><strong>Ada</strong></div><div class=\"ds-row\">ada@example.com</div></div>",
       "css": ".ds-group{background:#fff;border:1px solid #d1d1d6;border-radius:12px;font:400 17px/24px system-ui,sans-serif;color:#000}.ds-row{padding:12px 16px;min-height:48px;box-sizing:border-box}.ds-row+.ds-row{border-top:1px solid #d1d1d6;margin-left:16px;padding-left:0}"
+    },
+    {
+      "name": "Task Row",
+      "kind": "card",
+      "refersTo": "task-row",
+      "description": "Complete toggle, title, due text and priority; Undo while completing.",
+      "html": "<div class=\"ds-task\"><span class=\"ds-toggle\"></span><div><div>Call Ann</div><div class=\"ds-meta\">Overdue, Oct 20 &nbsp; Medium</div></div></div>",
+      "css": ".ds-task{display:flex;align-items:flex-start;background:#fff;border:1px solid #d1d1d6;border-radius:12px;color:#000;font:400 17px/24px system-ui,sans-serif;min-height:48px}.ds-toggle{box-sizing:border-box;flex:none;width:24px;height:24px;margin:12px;border:2px solid #85858a;border-radius:50%}.ds-meta{font:500 15px/21px system-ui,sans-serif;color:#c4271c;padding-bottom:8px}"
+    },
+    {
+      "name": "Radio Row",
+      "kind": "card",
+      "refersTo": "radio-row",
+      "description": "A single choice in a grouped list: ring, optional marker, label.",
+      "html": "<div class=\"ds-radio\"><span class=\"ds-ring\"></span>Green</div>",
+      "css": ".ds-radio{display:flex;align-items:center;gap:12px;min-height:48px;padding:8px 16px;background:#fff;border:1px solid #d1d1d6;border-radius:12px;color:#000;font:600 17px/24px system-ui,sans-serif}.ds-ring{box-sizing:border-box;width:22px;height:22px;border:2px solid #0062cc;border-radius:50%}"
     }
   ],
   "narrative": {

@@ -1,15 +1,25 @@
 import React from 'react';
 import type { ContainerSource } from '@/application/container';
+import type { PlannerRuntime } from '@/application/planner/createPlanner';
 import { MessageView } from '../components/molecules/MessageView';
 import { useSession } from '../sessionContext';
 import { AuthScreen } from './AuthScreen';
-import { SignedInHomeScreen } from './SignedInHomeScreen';
+import { SignedInNavigator } from '../navigation/SignedInNavigator';
 
 const EXPIRED_NOTICE =
   'Your session expired. Sign in again; your offline changes are kept.';
 
-/** Chooses what to show from the session state; no navigation library yet. */
-export function SessionGate({ containers }: { containers: ContainerSource }) {
+/**
+ * Chooses what to show from the session state: the auth screens, or the
+ * navigator (lists, tasks, account) once signed in.
+ */
+export function SessionGate({
+  containers,
+  runtime,
+}: {
+  containers: ContainerSource;
+  runtime: PlannerRuntime;
+}) {
   const { state, retryRestore } = useSession();
   switch (state.status) {
     case 'restoring':
@@ -28,7 +38,7 @@ export function SessionGate({ containers }: { containers: ContainerSource }) {
         />
       );
     case 'signedIn':
-      return <SignedInHomeScreen user={state.user} containers={containers} />;
+      return <SignedInNavigator containers={containers} runtime={runtime} />;
     case 'expired':
       return (
         <AuthScreen notice={EXPIRED_NOTICE} initialEmail={state.user.email} />

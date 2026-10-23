@@ -15,7 +15,7 @@ npm run android      # build, install and launch (second terminal)
 
 On an emulator, if the app cannot reach Metro, run `adb reverse tcp:8081 tcp:8081`.
 
-Auth screens (sign in, create account) gate the app: signed out shows them, a stored session restores offline straight into the signed-in home. The look lives in one module, `src/presentation/theme.ts`.
+Auth screens (sign in, create account) gate the app: signed out shows them, a stored session restores offline straight into the lists screen. Signed in, React Navigation (native stack) shows Lists, Tasks, Task edit, List edit and Account; every screen reads the local database and never waits for the network. Completing a task has an undo window of about five seconds because the backend cannot reopen a task (see `src/application/README.md`). The look lives in one module, `src/presentation/theme.ts`.
 
 Checks: `npm run typecheck`, `npm run lint`, `npm test`.
 
@@ -50,9 +50,9 @@ The UI only talks to the repositories. A create, update or delete changes the lo
 - Parked entries are never pushed automatically. Editing the entity revives its parked upsert as pending; deleting it drops a parked create or replaces a parked update with one delete; `retryParked()` is for a future attention screen. A pull never overwrites a row that has any outbox entry.
 - Backoff is a pure function (2 s, 5 s, 15 s, 60 s, 5 min, then 15 min, +/-20% jitter). The engine exposes `nextRetryAt`; it owns no timers.
 - `SyncStatus` (`getSnapshot`/`subscribe`): `idle | syncing | offline | error | paused` plus pending/blocked/rejected counts, `lastSyncAt`, `lastError`, `nextRetryAt`.
-- `SyncScheduler` runs the engine on start, when connectivity returns, on foreground, 2 s after the last local change, every 5 min while on screen and when `nextRetryAt` arrives; never while offline or paused. `SyncCoordinator` builds one engine and scheduler per signed-in user from the session state, tears them down on sign-out, expiry or user switch, and is the status source for the UI (`useSyncStatus`, one polite status line on the home). `index.js` calls `services.sync.start()`.
+- `SyncScheduler` runs the engine on start, when connectivity returns, on foreground, 2 s after the last local change, every 5 min while on screen and when `nextRetryAt` arrives; never while offline or paused. `SyncCoordinator` builds one engine and scheduler per signed-in user from the session state, tears them down on sign-out, expiry or user switch, and is the status source for the UI (`useSyncStatus`, one polite status line on the lists screen). `index.js` calls `services.sync.start()`.
 - Local writes notify the scheduler after commit: the repositories write through `NotifyingDatabase`, which fires `ChangeNotifier` after each top-level transaction.
-- Dev only: `runSyncSmoke` registers a throwaway user, works offline, syncs, checks the server through the real API and pulls server-side changes, logging `sync smoke ok`; the home shows an "Add sample task (dev)" button.
+- Dev only: `runSyncSmoke` registers a throwaway user, works offline, syncs, checks the server through the real API and pulls server-side changes, logging `sync smoke ok`; the Account screen shows an "Add sample task (dev)" button.
 - Backend note: sync push needs the planner backend at commit `b93f832` or later on `feat/offline-sync-schema`; earlier commits had the handler but never mounted `POST /api/sync/push` (it answered 404).
 
 ## Auth and session
