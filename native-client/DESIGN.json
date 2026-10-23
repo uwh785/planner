@@ -1,0 +1,362 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-22T23:25:20.301Z",
+  "title": "Design System: Planner",
+  "extensions": {
+    "colorMeta": {
+      "dark-accent": {
+        "role": "primary",
+        "displayName": "System Blue (dark)",
+        "canonical": "#0a84ff",
+        "tonalRamp": [
+          "#00264d",
+          "#004387",
+          "#0060c1",
+          "#007dfb",
+          "#379aff",
+          "#71b8ff",
+          "#abd5ff",
+          "#e6f2ff"
+        ]
+      },
+      "light-accent": {
+        "role": "primary",
+        "displayName": "System Blue (light, non-text)",
+        "canonical": "#007aff",
+        "tonalRamp": [
+          "#00254d",
+          "#004087",
+          "#005cc1",
+          "#0078fb",
+          "#3797ff",
+          "#71b5ff",
+          "#abd3ff",
+          "#e6f2ff"
+        ]
+      },
+      "light-accent-text": {
+        "role": "primary",
+        "displayName": "Deep System Blue (light, AA text and button fill)",
+        "canonical": "#0062cc",
+        "tonalRamp": [
+          "#00254d",
+          "#004187",
+          "#005dc1",
+          "#0079fb",
+          "#3797ff",
+          "#71b5ff",
+          "#abd3ff",
+          "#e6f2ff"
+        ]
+      },
+      "dark-danger": {
+        "role": "secondary",
+        "displayName": "Alert Red (dark)",
+        "canonical": "#ff453a",
+        "tonalRamp": [
+          "#4d0400",
+          "#870800",
+          "#c10b00",
+          "#fb0e00",
+          "#ff4237",
+          "#ff7971",
+          "#ffb0ab",
+          "#ffe7e6"
+        ]
+      },
+      "light-danger": {
+        "role": "secondary",
+        "displayName": "Alert Red (light, AA text)",
+        "canonical": "#c4271c",
+        "tonalRamp": [
+          "#430d0a",
+          "#761711",
+          "#a92218",
+          "#dc2c1f",
+          "#e65a50",
+          "#ed8a83",
+          "#f5bab6",
+          "#fceae9"
+        ]
+      },
+      "dark-orange": {
+        "role": "tertiary",
+        "displayName": "Amber (dark)",
+        "canonical": "#ff9f0a",
+        "tonalRamp": [
+          "#4d2f00",
+          "#875200",
+          "#c17500",
+          "#fb9900",
+          "#ffb037",
+          "#ffc771",
+          "#ffdeab",
+          "#fff5e6"
+        ]
+      },
+      "light-orange": {
+        "role": "tertiary",
+        "displayName": "Amber (light, AA icon)",
+        "canonical": "#a85400",
+        "tonalRamp": [
+          "#4d2600",
+          "#874300",
+          "#c16100",
+          "#fb7e00",
+          "#ff9b37",
+          "#ffb871",
+          "#ffd5ab",
+          "#fff2e6"
+        ]
+      },
+      "dark-surface": {
+        "role": "neutral",
+        "displayName": "Surface (dark)",
+        "canonical": "#1c1c1e",
+        "tonalRamp": [
+          "#252528",
+          "#414146",
+          "#5d5d64",
+          "#797982",
+          "#97979e",
+          "#b6b6ba",
+          "#d4d4d7",
+          "#f2f2f3"
+        ]
+      },
+      "light-surface-2": {
+        "role": "neutral",
+        "displayName": "Surface 2 (light)",
+        "canonical": "#e5e5ea",
+        "tonalRamp": [
+          "#22222a",
+          "#3c3c4b",
+          "#56566b",
+          "#70708b",
+          "#9090a5",
+          "#b0b0c0",
+          "#d1d1da",
+          "#f1f1f4"
+        ]
+      },
+      "light-text-muted": {
+        "role": "neutral",
+        "displayName": "Muted Text (light)",
+        "canonical": "#636366",
+        "tonalRamp": [
+          "#262627",
+          "#424244",
+          "#5f5f62",
+          "#7c7c80",
+          "#99999c",
+          "#b7b7b9",
+          "#d4d4d6",
+          "#f2f2f2"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "title": {
+        "displayName": "Title",
+        "purpose": "One per screen."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Section and message titles."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Reading text, values, button labels at 600."
+      },
+      "callout": {
+        "displayName": "Callout",
+        "purpose": "Field labels and secondary lines."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "Status line and error text."
+      }
+    },
+    "shadows": [],
+    "motion": [
+      {
+        "name": "pressed-opacity",
+        "value": "opacity 0.8, no animation",
+        "purpose": "Pressed feedback without decorative motion."
+      }
+    ],
+    "breakpoints": []
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one filled action on a screen.",
+      "html": "<button class=\"ds-btn-primary\">Sign in</button>",
+      "css": ".ds-btn-primary{background:#0062cc;color:#fff;min-height:48px;padding:8px 16px;border:0;border-radius:10px;font:600 17px/24px system-ui,sans-serif}.ds-btn-primary:active{opacity:.8}.ds-btn-primary:focus-visible{outline:2px solid #007aff;outline-offset:2px}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "A quiet action on a surface with a strong outline.",
+      "html": "<button class=\"ds-btn-secondary\">Sign out</button>",
+      "css": ".ds-btn-secondary{background:#fff;color:#000;min-height:48px;padding:8px 16px;border:1px solid #85858a;border-radius:10px;font:600 17px/24px system-ui,sans-serif}.ds-btn-secondary:active{opacity:.8}.ds-btn-secondary:focus-visible{outline:2px solid #007aff;outline-offset:2px}"
+    },
+    {
+      "name": "Destructive Button",
+      "kind": "button",
+      "refersTo": "button-destructive",
+      "description": "Irreversible action: danger outline and label, never a red fill.",
+      "html": "<button class=\"ds-btn-destructive\">Delete task</button>",
+      "css": ".ds-btn-destructive{background:#fff;color:#c4271c;min-height:48px;padding:8px 16px;border:1px solid #c4271c;border-radius:10px;font:600 17px/24px system-ui,sans-serif}.ds-btn-destructive:active{opacity:.8}.ds-btn-destructive:focus-visible{outline:2px solid #007aff;outline-offset:2px}"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "text-field",
+      "description": "Labeled single-line input with an accent focus border.",
+      "html": "<div class=\"ds-field\"><label class=\"ds-label\">Email</label><input class=\"ds-input\" value=\"you@example.com\"/></div>",
+      "css": ".ds-field{font-family:system-ui,sans-serif}.ds-label{display:block;font:500 15px/21px system-ui,sans-serif;color:#636366;margin-bottom:4px}.ds-input{box-sizing:border-box;width:100%;min-height:48px;padding:0 16px;background:#fff;color:#000;border:1px solid #85858a;border-radius:10px;font:400 17px/24px system-ui,sans-serif}.ds-input:focus{outline:0;border:2px solid #007aff}"
+    },
+    {
+      "name": "Notice",
+      "kind": "custom",
+      "refersTo": "inline-message-notice",
+      "description": "Calm information on Surface 2, no side stripe.",
+      "html": "<div class=\"ds-notice\">Your session expired. Sign in again; your offline changes are kept.</div>",
+      "css": ".ds-notice{background:#e5e5ea;color:#000;padding:12px 16px;border-radius:10px;font:400 17px/24px system-ui,sans-serif}"
+    },
+    {
+      "name": "Error Message",
+      "kind": "custom",
+      "refersTo": "inline-message-notice",
+      "description": "Error text with a danger outline and an Error: prefix.",
+      "html": "<div class=\"ds-error\">Error: Check your email and password.</div>",
+      "css": ".ds-error{background:#fff;color:#c4271c;padding:12px 16px;border:1px solid #c4271c;border-radius:10px;font:400 17px/24px system-ui,sans-serif}"
+    },
+    {
+      "name": "Tag Chip",
+      "kind": "chip",
+      "refersTo": "tag-chip",
+      "description": "Pill on Surface 2 with a Text-colored label.",
+      "html": "<span class=\"ds-chip\">Errands</span>",
+      "css": ".ds-chip{display:inline-block;background:#e5e5ea;color:#000;padding:6px 12px;border-radius:999px;font:500 15px/21px system-ui,sans-serif}"
+    },
+    {
+      "name": "Grouped List",
+      "kind": "card",
+      "refersTo": "list-group",
+      "description": "Rows on one rounded surface, hairline separators.",
+      "html": "<div class=\"ds-group\"><div class=\"ds-row\">Signed in as<br><strong>Ada</strong></div><div class=\"ds-row\">ada@example.com</div></div>",
+      "css": ".ds-group{background:#fff;border:1px solid #d1d1d6;border-radius:12px;font:400 17px/24px system-ui,sans-serif;color:#000}.ds-row{padding:12px 16px;min-height:48px;box-sizing:border-box}.ds-row+.ds-row{border-top:1px solid #d1d1d6;margin-left:16px;padding-left:0}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Quiet Notebook",
+    "overview": "Planner is a notebook you can open in a basement classroom or on a plane: flat paper-like surfaces, one blue accent, plain words. It reuses the web app's palette on purpose, the iOS system colors, so a person who uses both sees one product. PRODUCT.md asks for \"calm, minimal, light\" and for a screen that \"lowers the user's stress, not adds to it\". Every rule below serves that line: show one main thing per screen, let empty space do work, and keep color for the few things that need to be found.\n\nThe system is restrained. Surfaces are separated by tone and a hairline, never by shadow. There is one accent, and it appears on the primary action, links and the focus ring only. Type is the platform font at a short, named scale; hierarchy comes from size and weight, not from color or decoration. Lists are grouped rows on a rounded surface, like iOS settings, with generous 16dp padding and 48dp touch height.\n\nIt explicitly rejects the anti-reference in PRODUCT.md: \"Dense, data-heavy apps in the style of Binance: crowded screens, many numbers and charts, heavy chrome, constant visual noise. Nothing should feel like a dashboard to monitor.\"\n\nThe web palette is the brand, but two of its light-mode values fail WCAG AA for text (the app promises AA). Those few values are darkened in the app only; the web values stay canonical for surfaces, borders and non-text accents. The measured table in section 2 is the evidence.",
+    "keyCharacteristics": [
+      "Flat: tone and hairline, zero shadows.",
+      "One accent (iOS blue), used on at most one control per screen plus links and focus.",
+      "Platform system font only, five named roles, scales with the system font setting.",
+      "Grouped rows, 16dp padding, 48dp minimum touch target.",
+      "Dark by system preference or light, both fully specified and both AA.",
+      "Color is never the only signal: priority, error and sync always carry text or an icon.",
+      "**System Blue** (dark `#0a84ff`, light `#007aff`): the accent. Focus ring, primary button fill in dark, non-text emphasis. In dark it is also the link color (5.76:1 on black, 4.66:1 on surface).",
+      "**Deep System Blue** (light `#0062cc`): the AA-safe light variant. Primary button fill, links and accent text on light grounds. `#007aff` is 3.60:1 on the light background and 4.02:1 on white, too weak for small text and for a white button label.",
+      "**Alert Red** (dark `#ff453a`, light `#c4271c`): error text, the error outline of a field, the destructive button label. The web red `#ff3b30` is 3.18:1 on the light background, so light mode uses the darker `#c4271c` (5.15:1).",
+      "**Amber** (dark `#ff9f0a`, light `#a85400`): the medium priority icon. The web orange `#ff9500` is 1.97:1 on light grounds; as a priority icon it needs 3:1, so light uses `#a85400`.",
+      "**Green and Yellow** (dark `#30d158` / `#ffd60a`, light `#34c759` / `#ffcc00`): decorative status dots only, canonical web values. They are never text and never the only signal; they always sit next to a word.",
+      "**Ground** (dark `#000000`, light `#f2f2f7`): screen background.",
+      "**Surface** (dark `#1c1c1e`, light `#ffffff`): grouped lists, fields, secondary buttons.",
+      "**Surface 2** (dark `#2c2c2e`, light `#e5e5ea`): notices, chips, pressed rows. Text on it is always the primary text color.",
+      "**Hairline** (dark `#38383a`, light `#d1d1d6`): separators and group outlines. Decorative, never the sole edge of a control.",
+      "**Strong Border** (dark `#6e6e73`, light `#85858a`): outline of inputs and secondary buttons, at least 3:1.",
+      "**Text** (dark `#ffffff`, light `#000000`): all primary text.",
+      "**Muted Text** (dark `#8e8e93`, light `#636366`): secondary text, captions, placeholders. Use on ground and surface, never on Surface 2 (dark `#8e8e93` is 4.27:1 there). The web light value `#8e8e93` is 2.92:1 on the ground.",
+      "**Title** (700, 30/36): one per screen, the screen name or form heading.",
+      "**Headline** (600, 22/28): section or message titles, a person's name.",
+      "**Body** (400, 17/24): reading text, field values, button labels (button labels use weight 600). Keep paragraphs to 65 to 75 characters per line, which one narrow phone column already does.",
+      "**Callout** (500, 15/21): field labels, secondary lines such as an email under a name, chip labels.",
+      "**Caption** (400, 13/18): the sync status line, field error text, small metadata.",
+      "**Shape:** gently curved (10dp), minimum 48dp by 48dp.",
+      "**Primary:** filled with the primary fill (dark `#0a84ff` with black label, light `#0062cc` with white label), label body 600. One per screen.",
+      "**Secondary:** Surface with a 1px strong border and Text label.",
+      "**Destructive:** Surface with a 1px danger outline and a danger label. Used for deleting data and other irreversible actions; never a filled red block.",
+      "**Link:** no fill, accent-text color, underlined so it is not color-only (inside the password field it is the show/hide toggle).",
+      "**States:** pressed 0.8 opacity, disabled or busy 0.6 opacity with the busy label (\"Signing in…\"); no motion.",
+      "**Style:** Surface fill, 1px strong border, 10dp radius, 48dp minimum height, 16dp inner padding. Label sits above in callout, muted. The label is always visible; a placeholder never replaces it.",
+      "**Focus:** the border becomes 2px System Blue (the accent).",
+      "**Error:** the border becomes 2px danger and a caption error line appears below the field, announced politely. The text carries the message, the color only reinforces it.",
+      "**Password field:** the same field with a trailing link-style Show or Hide control.",
+      "**Notice:** Surface 2 fill, 10dp radius, body text. Calm information such as \"Your session expired\".",
+      "**Error:** Surface fill, 1px danger outline, prefixed \"Error:\" so it never relies on color. Always a live region.",
+      "Side-stripe borders are prohibited.",
+      "**Do** keep the web's iOS system colors as the brand and use the AA variants where text sits on the light theme (`#636366`, `#0062cc`, `#c4271c`).",
+      "**Do** use the spacing scale 4, 8, 12, 16, 24, 32, 48 and 16dp as the default padding. Prefer more space over more lines.",
+      "**Do** give every touch target at least 48dp and every field a visible label.",
+      "**Do** separate surfaces with tone and a hairline; keep one accent per screen.",
+      "**Do** pair every status color with a word or an icon (overdue, priority, error, sync).",
+      "**Do** let text wrap and grow with the system font size; test at 1.5x.",
+      "**Do** keep copy short and plain, in sentence case, with no exclamation marks.",
+      "**Don't** make dense, data-heavy screens in the style of Binance: crowded screens, many numbers and charts, heavy chrome, constant visual noise. Nothing should feel like a dashboard to monitor.",
+      "**Don't** use shadows, glassmorphism, gradients or gradient text.",
+      "**Don't** use a colored side stripe (`border-left` greater than 1px) on cards, notices or rows.",
+      "**Don't** put green, yellow or the web orange `#ff9500` into text on light grounds; they fail AA.",
+      "**Don't** use muted text on Surface 2.",
+      "**Don't** add a second font family, decorative motion, or identical card grids.",
+      "**Don't** convey state with color alone, or use em dashes in UI copy."
+    ],
+    "rules": [
+      {
+        "name": "The One Voice Rule",
+        "body": "The accent is used on the primary action, links and the focus ring. If two filled accent buttons share a screen, one is wrong.",
+        "section": "colors"
+      },
+      {
+        "name": "The Never Alone Rule",
+        "body": "Overdue, priority, error and sync state always carry a word or an icon next to the color. A color dot with no label is prohibited.",
+        "section": "colors"
+      },
+      {
+        "name": "The Surface 2 Rule",
+        "body": "Only primary text sits on Surface 2. Muted text there fails AA in dark.",
+        "section": "colors"
+      },
+      {
+        "name": "The Scale Is Closed Rule",
+        "body": "Only these five roles exist. A new size is a new role in `theme.ts` and here first, never a one-off number in a component.",
+        "section": "typography"
+      },
+      {
+        "name": "The No Truncation Rule",
+        "body": "Text wraps at large font sizes. Fixed heights on text containers are prohibited; use `minHeight`.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat-By-Default Rule",
+        "body": "If a surface needs a shadow to be seen, change its tone or add the hairline instead. If it looks like a 2014 card, the shadow is too dark.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** keep the web's iOS system colors as the brand and use the AA variants where text sits on the light theme (`#636366`, `#0062cc`, `#c4271c`).",
+      "**Do** use the spacing scale 4, 8, 12, 16, 24, 32, 48 and 16dp as the default padding. Prefer more space over more lines.",
+      "**Do** give every touch target at least 48dp and every field a visible label.",
+      "**Do** separate surfaces with tone and a hairline; keep one accent per screen.",
+      "**Do** pair every status color with a word or an icon (overdue, priority, error, sync).",
+      "**Do** let text wrap and grow with the system font size; test at 1.5x.",
+      "**Do** keep copy short and plain, in sentence case, with no exclamation marks."
+    ],
+    "donts": [
+      "**Don't** make dense, data-heavy screens in the style of Binance: crowded screens, many numbers and charts, heavy chrome, constant visual noise. Nothing should feel like a dashboard to monitor.",
+      "**Don't** use shadows, glassmorphism, gradients or gradient text.",
+      "**Don't** use a colored side stripe (`border-left` greater than 1px) on cards, notices or rows.",
+      "**Don't** put green, yellow or the web orange `#ff9500` into text on light grounds; they fail AA.",
+      "**Don't** use muted text on Surface 2.",
+      "**Don't** add a second font family, decorative motion, or identical card grids.",
+      "**Don't** convey state with color alone, or use em dashes in UI copy."
+    ]
+  }
+}
