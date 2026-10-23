@@ -14,6 +14,9 @@ import type { ImageStyle, TextStyle, ViewStyle } from 'react-native';
  *   white on light accent #007aff: 4.02 -> white on primary #0062cc: 5.80
  *   light red #ff3b30 as text: 3.18 / 3.55 -> danger #c4271c: 5.15 / 5.75
  *   dark: white on accent #0a84ff is 3.65, so the label is black (5.76)
+ *   light green #34c759 as text: 2.2 -> success #1d7a36: 5.40 / 4.84
+ *   countdown ring on Surface 2: light green/yellow/orange fail 3:1, so the
+ *   ring uses #1d7a36 / #7a5c00 / #a85400 / #c4271c (4.30 / 4.98 / 4.25 / 4.58)
  * Green and yellow stay canonical and are indicators only (never text, never
  * the only signal). `theme.test.ts` asserts every text and UI pairing.
  */
@@ -39,10 +42,23 @@ export interface Theme {
     onPrimary: string;
     /** Error text and error outline. */
     danger: string;
+    /** Text for a good state (completed counter). The web green fails on light. */
+    success: string;
     /** Always paired with an icon and a word, never used alone. */
     priority: { none: string; low: string; medium: string; high: string };
     /** Decorative status dots; never text and never the only signal. */
     indicator: { green: string; yellow: string };
+    /**
+     * The countdown ring on Surface 2 (at least 3:1 there). The time left is
+     * always written next to it; the color only reinforces how much is used.
+     */
+    ring: {
+      track: string;
+      ok: string;
+      caution: string;
+      warn: string;
+      danger: string;
+    };
   };
   spacing: typeof spacing;
   radii: typeof radii;
@@ -130,6 +146,7 @@ export const darkTheme: Theme = {
     primary: brand.dark.accent,
     onPrimary: '#000000',
     danger: brand.dark.red,
+    success: brand.dark.green,
     priority: {
       none: brand.dark.text2,
       low: brand.dark.accent,
@@ -137,6 +154,13 @@ export const darkTheme: Theme = {
       high: brand.dark.red,
     },
     indicator: { green: brand.dark.green, yellow: brand.dark.yellow },
+    ring: {
+      track: '#7a7a80',
+      ok: brand.dark.green,
+      caution: brand.dark.yellow,
+      warn: brand.dark.orange,
+      danger: brand.dark.red,
+    },
   },
 };
 
@@ -155,6 +179,7 @@ export const lightTheme: Theme = {
     primary: '#0062cc',
     onPrimary: '#ffffff',
     danger: '#c4271c',
+    success: '#1d7a36',
     priority: {
       none: '#636366',
       low: '#0062cc',
@@ -162,6 +187,13 @@ export const lightTheme: Theme = {
       high: '#c4271c',
     },
     indicator: { green: brand.light.green, yellow: brand.light.yellow },
+    ring: {
+      track: '#7c7c80',
+      ok: '#1d7a36',
+      caution: '#7a5c00',
+      warn: '#a85400',
+      danger: '#c4271c',
+    },
   },
 };
 

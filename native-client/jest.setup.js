@@ -4,6 +4,11 @@ jest.mock(
   () => require('react-native-safe-area-context/jest/mock').default,
 );
 
+// Async Storage's own in-memory implementation (the native module is absent).
+jest.mock('@react-native-async-storage/async-storage', () =>
+  require('@react-native-async-storage/async-storage/jest'),
+);
+
 jest.mock('@react-native-community/netinfo', () =>
   require('@react-native-community/netinfo/jest/netinfo-mock.js'),
 );

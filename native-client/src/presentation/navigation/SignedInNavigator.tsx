@@ -1,6 +1,10 @@
 import React, { useEffect, useLayoutEffect, useMemo } from 'react';
 import { useColorScheme } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
+import {
+  createBottomTabNavigator,
+  type BottomTabBarProps,
+} from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import type { NativeStackNavigationOptions } from '@react-navigation/native-stack';
 import type { ContainerSource } from '@/application/container';
@@ -9,18 +13,39 @@ import {
   type PlannerRuntime,
 } from '@/application/planner/createPlanner';
 import { MessageView } from '../components/molecules/MessageView';
+import { TabBar } from '../components/organisms/TabBar';
 import { ContainerProvider, useAcquiredContainer } from '../containerContext';
 import { PlannerProvider } from '../plannerContext';
-import { AccountScreen } from '../screens/AccountScreen';
+import { useT } from '../i18n/I18nProvider';
+import { ConfigScreen } from '../screens/ConfigScreen';
 import { ListEditScreen } from '../screens/ListEditScreen';
 import { ListsScreen } from '../screens/ListsScreen';
+import { PanelScreen } from '../screens/PanelScreen';
 import { TaskEditScreen } from '../screens/TaskEditScreen';
 import { TasksScreen } from '../screens/TasksScreen';
 import { useTheme } from '../theme';
 import { navigationTheme } from './navTheme';
-import type { RootStackParamList } from './routes';
+import type { RootStackParamList, TabParamList } from './routes';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+const Tabs = createBottomTabNavigator<TabParamList>();
+
+const renderTabBar = (props: BottomTabBarProps) => <TabBar {...props} />;
+
+/** Panel, Tasks and Config behind the web's mobile bottom bar. */
+function TabsNavigator() {
+  return (
+    <Tabs.Navigator
+      initialRouteName="Panel"
+      tabBar={renderTabBar}
+      screenOptions={{ headerShown: false }}
+    >
+      <Tabs.Screen name="Panel" component={PanelScreen} />
+      <Tabs.Screen name="Tasks" component={TasksScreen} />
+      <Tabs.Screen name="Config" component={ConfigScreen} />
+    </Tabs.Navigator>
+  );
+}
 
 /**
  * Screens draw their own header (large text, Back, actions) and change
@@ -33,8 +58,9 @@ export const screenOptions: NativeStackNavigationOptions = {
 
 /**
  * The signed-in app: holds the user's database open, builds the planner
- * services over it and shows the navigator. Android's back button pops the
- * stack (and leaves the app from the lists).
+ * services over it and shows the navigator: the tabs, with the edit screens
+ * and list management above them. Android's back button pops the stack, then
+ * returns to Panel from another tab, then leaves the app.
  */
 export function SignedInNavigator({
   containers,
@@ -48,6 +74,7 @@ export function SignedInNavigator({
     () => (container === null ? null : createPlanner(container, runtime)),
     [container, runtime],
   );
+  const t = useT();
   const design = useTheme();
   const dark = useColorScheme() === 'dark';
   const theme = useMemo(() => navigationTheme(design, dark), [design, dark]);
@@ -63,21 +90,20 @@ export function SignedInNavigator({
   useEffect(() => () => planner?.dispose(), [planner]);
 
   if (container === null || planner === null) {
-    return <MessageView title="Loading" />;
+    return <MessageView title={t('loading')} />;
   }
   return (
     <ContainerProvider value={container}>
       <PlannerProvider value={planner}>
         <NavigationContainer theme={theme}>
           <Stack.Navigator
-            initialRouteName="Lists"
+            initialRouteName="Tabs"
             screenOptions={screenOptions}
           >
-            <Stack.Screen name="Lists" component={ListsScreen} />
-            <Stack.Screen name="Tasks" component={TasksScreen} />
+            <Stack.Screen name="Tabs" component={TabsNavigator} />
             <Stack.Screen name="TaskEdit" component={TaskEditScreen} />
+            <Stack.Screen name="Lists" component={ListsScreen} />
             <Stack.Screen name="ListEdit" component={ListEditScreen} />
-            <Stack.Screen name="Account" component={AccountScreen} />
           </Stack.Navigator>
         </NavigationContainer>
       </PlannerProvider>

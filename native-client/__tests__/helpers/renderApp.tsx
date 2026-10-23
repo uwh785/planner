@@ -1,6 +1,11 @@
 import React from 'react';
 import { act, render, screen } from '@testing-library/react-native';
 import { SessionService } from '@/application/auth/SessionService';
+import {
+  InMemoryLocaleStore,
+  LocaleService,
+  type Locale,
+} from '@/application/i18n';
 import type { ContainerSource } from '@/application/container';
 import type { SyncStatusSource } from '@/application/sync/SyncStatus';
 import App from '@/presentation/App';
@@ -14,6 +19,8 @@ export interface Rendered {
   timer: FakeTimer;
   lifecycle: FakeLifecycle;
   session: SessionService;
+  locale: LocaleService;
+  localeStore: InMemoryLocaleStore;
   gateway: FakeAuthGateway;
   containers: ContainerSource & { acquire: jest.Mock; release: jest.Mock };
 }
@@ -46,7 +53,13 @@ function inAct<T extends object>(repo: T): T {
 export const NOW = new Date(2026, 9, 22, 10, 0).getTime();
 
 export async function renderSignedIn(
-  options: { sync?: SyncStatusSource; world?: TestWorld; now?: number } = {},
+  options: {
+    sync?: SyncStatusSource;
+    world?: TestWorld;
+    now?: number;
+    /** The saved language; English by default so most tests read plainly. */
+    locale?: Locale;
+  } = {},
 ): Promise<Rendered> {
   const world = options.world ?? (await openTestWorld());
   world.clock.current = options.now ?? NOW;
@@ -62,16 +75,22 @@ export async function renderSignedIn(
     acquire: jest.fn(async () => asContainer(world)),
     release: jest.fn(),
   };
+  const localeStore = new InMemoryLocaleStore(options.locale ?? 'en');
+  const locale = new LocaleService(localeStore);
+  await locale.restore();
   render(
     <App
       session={session}
       containers={containers}
       sync={options.sync}
+      locale={locale}
       runtime={{ clock: world.clock, timer, lifecycle }}
     />,
   );
   await act(() => session.restore());
-  await screen.findByRole('header', { name: 'Lists' });
+  await screen.findByRole('header', {
+    name: options.locale === 'es' ? 'Panel' : 'Dashboard',
+  });
   await act(async () => flushAsync());
   // The tests write through `world`; the app keeps the plain repositories.
   const written: TestWorld = {
@@ -80,5 +99,14 @@ export async function renderSignedIn(
     taskLists: inAct(world.taskLists),
     remoteChanges: inAct(world.remoteChanges),
   };
-  return { world: written, timer, lifecycle, session, gateway, containers };
+  return {
+    world: written,
+    timer,
+    lifecycle,
+    session,
+    locale,
+    localeStore,
+    gateway,
+    containers,
+  };
 }

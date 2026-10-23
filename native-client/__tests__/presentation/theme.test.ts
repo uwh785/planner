@@ -117,6 +117,8 @@ describe.each([
     ['error text on background', colors.danger, colors.background],
     ['error text on surface', colors.danger, colors.surface],
     ['button label on primary', colors.onPrimary, colors.primary],
+    ['success text on background', colors.success, colors.background],
+    ['success text on surface', colors.success, colors.surface],
   ])('%s is at least 4.5:1', (_label, fg, bg) => {
     expect(contrast(fg, bg)).toBeGreaterThanOrEqual(4.5);
   });
@@ -139,8 +141,45 @@ describe.each([
       colors.background,
     ],
     ['priority high on background', colors.priority.high, colors.background],
+    // The priority badge sits on Surface 2 (the card's remaining-time box too).
+    ['priority none on surface2', colors.priority.none, colors.surface2],
+    ['priority low on surface2', colors.priority.low, colors.surface2],
+    ['priority medium on surface2', colors.priority.medium, colors.surface2],
+    ['priority high on surface2', colors.priority.high, colors.surface2],
+    ['ring track on surface2', colors.ring.track, colors.surface2],
+    ['ring ok on surface2', colors.ring.ok, colors.surface2],
+    ['ring caution on surface2', colors.ring.caution, colors.surface2],
+    ['ring warn on surface2', colors.ring.warn, colors.surface2],
+    ['ring danger on surface2', colors.ring.danger, colors.surface2],
+    ['active chip border on background', colors.accent, colors.background],
   ])('%s is at least 3:1', (_label, fg, bg) => {
     expect(contrast(fg, bg)).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe('web values replaced for the Panel and task card', () => {
+  it('the web light green and the web light ring colors fail where the app uses them', () => {
+    expect(contrast(WEB.light.green, WEB.light.surface)).toBeLessThan(4.5);
+    expect(contrast(WEB.light.green, WEB.light.surface2)).toBeLessThan(3);
+    expect(contrast(WEB.light.yellow, WEB.light.surface2)).toBeLessThan(3);
+    expect(contrast(WEB.light.orange, WEB.light.surface2)).toBeLessThan(3);
+    expect(lightTheme.colors.success).not.toBe(WEB.light.green);
+    expect(lightTheme.colors.ring.ok).not.toBe(WEB.light.green);
+  });
+
+  it('dark keeps the web green, yellow and orange for the ring', () => {
+    expect(darkTheme.colors.success).toBe(WEB.dark.green);
+    expect(darkTheme.colors.ring.ok).toBe(WEB.dark.green);
+    expect(darkTheme.colors.ring.caution).toBe(WEB.dark.yellow);
+    expect(darkTheme.colors.ring.warn).toBe(WEB.dark.orange);
+    expect(darkTheme.colors.ring.danger).toBe(WEB.dark.red);
+  });
+
+  it('the web priority label (red on Surface 2) fails in dark, which is why the word uses the text color', () => {
+    expect(contrast(WEB.dark.red, WEB.dark.surface2)).toBeLessThan(4.5);
+    expect(
+      contrast(darkTheme.colors.text, darkTheme.colors.surface2),
+    ).toBeGreaterThanOrEqual(4.5);
   });
 });
 
