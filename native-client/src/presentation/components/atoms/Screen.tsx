@@ -10,6 +10,7 @@ const makeStyles = (t: Theme) => ({
     flexGrow: 1,
     justifyContent: 'center' as const,
     padding: t.spacing.lg,
+    paddingVertical: t.spacing.xl,
   },
 });
 

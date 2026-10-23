@@ -12,16 +12,11 @@ interface MessageViewProps {
 }
 
 const makeStyles = (t: Theme) => ({
-  title: {
-    fontSize: t.type.heading,
-    fontWeight: '600' as const,
-    color: t.colors.text,
-  },
+  title: { ...t.typography.headline, color: t.colors.text },
   body: {
-    fontSize: t.type.body,
-    lineHeight: 24,
+    ...t.typography.body,
     color: t.colors.textMuted,
-    marginTop: t.spacing.sm,
+    marginTop: t.spacing.xs,
   },
   action: { marginTop: t.spacing.lg },
 });

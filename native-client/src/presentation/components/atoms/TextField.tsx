@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Text, TextInput, View } from 'react-native';
 import type { TextInputProps } from 'react-native';
 import { useStyles, useTheme } from '../../theme';
@@ -19,31 +19,32 @@ export interface TextFieldProps
 const makeStyles = (t: Theme) => ({
   wrap: { marginBottom: t.spacing.md },
   label: {
-    fontSize: t.type.small,
+    ...t.typography.callout,
     color: t.colors.textMuted,
-    marginBottom: t.spacing.xs,
+    marginBottom: t.spacing.xxs,
   },
   row: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     minHeight: t.minTouch,
     borderWidth: 1,
-    borderColor: t.colors.border,
-    borderRadius: t.radius,
+    borderColor: t.colors.borderStrong,
+    borderRadius: t.radii.control,
     backgroundColor: t.colors.surface,
   },
+  rowFocused: { borderColor: t.colors.accent, borderWidth: 2 },
   rowError: { borderColor: t.colors.danger, borderWidth: 2 },
   input: {
     flex: 1,
     minHeight: t.minTouch,
     paddingHorizontal: t.spacing.md,
-    fontSize: t.type.body,
+    ...t.typography.body,
     color: t.colors.text,
   },
   error: {
-    fontSize: t.type.small,
+    ...t.typography.caption,
     color: t.colors.danger,
-    marginTop: t.spacing.xs,
+    marginTop: t.spacing.xxs,
   },
 });
 
@@ -57,18 +58,34 @@ export function TextField({
 }: TextFieldProps) {
   const styles = useStyles(makeStyles);
   const { colors } = useTheme();
+  const [focused, setFocused] = useState(false);
+  const { onFocus, onBlur } = inputProps;
   return (
     <View style={styles.wrap}>
       <Text importantForAccessibility="no" style={styles.label}>
         {label}
       </Text>
-      <View style={[styles.row, error ? styles.rowError : null]}>
+      <View
+        style={[
+          styles.row,
+          focused ? styles.rowFocused : null,
+          error ? styles.rowError : null,
+        ]}
+      >
         <TextInput
           ref={ref}
           accessibilityLabel={label}
           placeholderTextColor={colors.textMuted}
           style={styles.input}
           {...inputProps}
+          onFocus={event => {
+            setFocused(true);
+            onFocus?.(event);
+          }}
+          onBlur={event => {
+            setFocused(false);
+            onBlur?.(event);
+          }}
         />
         {trailing}
       </View>

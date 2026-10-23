@@ -3,7 +3,7 @@ import { Pressable, Text } from 'react-native';
 import { useStyles } from '../../theme';
 import type { Theme } from '../../theme';
 
-type Variant = 'primary' | 'secondary' | 'link';
+type Variant = 'primary' | 'secondary' | 'destructive' | 'link';
 
 interface ButtonProps {
   label: string;
@@ -21,24 +21,33 @@ const makeStyles = (t: Theme) => ({
     minHeight: t.minTouch,
     minWidth: t.minTouch,
     paddingHorizontal: t.spacing.md,
-    paddingVertical: t.spacing.sm,
-    borderRadius: t.radius,
+    paddingVertical: t.spacing.xs,
+    borderRadius: t.radii.control,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
   },
   primary: { backgroundColor: t.colors.primary },
   secondary: {
     borderWidth: 1,
-    borderColor: t.colors.border,
+    borderColor: t.colors.borderStrong,
+    backgroundColor: t.colors.surface,
+  },
+  destructive: {
+    borderWidth: 1,
+    borderColor: t.colors.danger,
     backgroundColor: t.colors.surface,
   },
   link: {},
   pressed: { opacity: 0.8 },
   inactive: { opacity: 0.6 },
-  label: { fontSize: t.type.body, fontWeight: '600' as const },
+  label: { ...t.typography.body, fontWeight: '600' as const },
   labelPrimary: { color: t.colors.onPrimary },
   labelPlain: { color: t.colors.text },
-  labelLink: { color: t.colors.text, textDecorationLine: 'underline' as const },
+  labelDanger: { color: t.colors.danger },
+  labelLink: {
+    color: t.colors.accentText,
+    textDecorationLine: 'underline' as const,
+  },
 });
 
 export function Button({
@@ -58,6 +67,8 @@ export function Button({
       ? styles.labelPrimary
       : variant === 'link'
       ? styles.labelLink
+      : variant === 'destructive'
+      ? styles.labelDanger
       : styles.labelPlain;
   return (
     <Pressable

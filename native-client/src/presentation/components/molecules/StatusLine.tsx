@@ -5,8 +5,7 @@ import type { Theme } from '../../theme';
 
 const makeStyles = (t: Theme) => ({
   text: {
-    fontSize: t.type.small,
-    lineHeight: 20,
+    ...t.typography.caption,
     color: t.colors.textMuted,
     marginTop: t.spacing.md,
   },

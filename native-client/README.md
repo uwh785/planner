@@ -68,6 +68,10 @@ Auth is the backend's own: `register`, `login`, `refresh`, `logout` under `/api/
 - `SessionService.state()` / `subscribe()` expose the UI state: `restoring`, `unreadable`, `signedOut`, `expired` (identity kept, tokens refused) and `signedIn`. `bootstrapApp` builds the services without throwing; a misconfigured build (e.g. release without `RELEASE_API_BASE_URL`) shows a plain startup error screen.
 - In development, `runAuthSmoke` (`devAuthSmoke.ts`, started from `index.js`) runs register, authenticated call, forced refresh and logout against the real backend using its own Keychain entry and throwaway database, and logs `auth smoke ok`.
 
+## Design
+
+The visual system is written up in [`DESIGN.md`](DESIGN.md) (Stitch format; `DESIGN.json` is its sidecar). It reuses the web app's iOS system palette, with a few darker light-mode values so every text pairing meets WCAG AA. The tokens (colors per scheme, spacing, radii, type scale, 48dp touch size) live in `src/presentation/theme.ts`, and `__tests__/presentation/theme.test.ts` asserts the contrast of every pairing. Components read tokens only from that module.
+
 ## Configuration
 
 The API origin is chosen in `src/infrastructure/config/apiConfig.ts`:

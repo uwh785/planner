@@ -11,21 +11,18 @@ interface InlineMessageProps {
 
 const makeStyles = (t: Theme) => ({
   box: {
-    borderLeftWidth: 4,
-    borderRadius: t.radius,
+    borderRadius: t.radii.control,
     paddingVertical: t.spacing.sm,
     paddingHorizontal: t.spacing.md,
     marginBottom: t.spacing.md,
   },
   error: {
-    borderLeftColor: t.colors.danger,
+    borderWidth: 1,
+    borderColor: t.colors.danger,
     backgroundColor: t.colors.surface,
   },
-  notice: {
-    borderLeftColor: t.colors.noticeBar,
-    backgroundColor: t.colors.noticeSurface,
-  },
-  text: { fontSize: t.type.body, lineHeight: 24, color: t.colors.text },
+  notice: { backgroundColor: t.colors.surface2 },
+  text: { ...t.typography.body, color: t.colors.text },
   errorText: { color: t.colors.danger },
 });
 

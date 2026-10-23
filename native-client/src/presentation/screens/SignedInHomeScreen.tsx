@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import type { ContainerSource } from '@/application/container';
 import type { AuthUser } from '@/domain/auth';
 import { Button } from '../components/atoms/Button';
@@ -12,25 +12,24 @@ import { SyncStatusLine } from './SyncStatusLine';
 import type { Theme } from '../theme';
 
 const makeStyles = (t: Theme) => ({
-  title: {
-    fontSize: t.type.title,
-    fontWeight: '600' as const,
-    color: t.colors.text,
-  },
-  caption: {
-    fontSize: t.type.small,
-    color: t.colors.textMuted,
+  title: { ...t.typography.title, color: t.colors.text },
+  group: {
     marginTop: t.spacing.lg,
+    padding: t.spacing.md,
+    borderRadius: t.radii.card,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: t.colors.border,
+    backgroundColor: t.colors.surface,
   },
+  caption: { ...t.typography.caption, color: t.colors.textMuted },
   name: {
-    fontSize: t.type.heading,
-    fontWeight: '600' as const,
+    ...t.typography.headline,
     color: t.colors.text,
+    marginTop: t.spacing.xxs,
   },
-  email: { fontSize: t.type.body, color: t.colors.textMuted },
+  email: { ...t.typography.callout, color: t.colors.textMuted },
   hint: {
-    fontSize: t.type.body,
-    lineHeight: 24,
+    ...t.typography.body,
     color: t.colors.textMuted,
     marginTop: t.spacing.lg,
   },
@@ -68,9 +67,11 @@ export function SignedInHomeScreen({
         <Text accessibilityRole="header" style={styles.title}>
           Planner
         </Text>
-        <Text style={styles.caption}>Signed in as</Text>
-        <Text style={styles.name}>{user.name}</Text>
-        <Text style={styles.email}>{user.email}</Text>
+        <View style={styles.group}>
+          <Text style={styles.caption}>Signed in as</Text>
+          <Text style={styles.name}>{user.name}</Text>
+          <Text style={styles.email}>{user.email}</Text>
+        </View>
         <Text style={styles.hint}>Your tasks will live here.</Text>
         <SyncStatusLine />
         <View style={styles.actions}>

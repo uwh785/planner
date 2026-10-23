@@ -47,13 +47,12 @@ const COPY = {
 
 const makeStyles = (t: Theme) => ({
   title: {
-    fontSize: t.type.title,
-    fontWeight: '600' as const,
+    ...t.typography.title,
     color: t.colors.text,
     marginBottom: t.spacing.lg,
   },
-  actions: { marginTop: t.spacing.sm },
-  switchRow: { marginTop: t.spacing.md, alignItems: 'center' as const },
+  actions: { marginTop: t.spacing.xs },
+  switchRow: { marginTop: t.spacing.sm, alignItems: 'center' as const },
   hidden: { height: 0 },
 });
 
