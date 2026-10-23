@@ -15,6 +15,8 @@ colors:
   dark-orange: "#ff9f0a"
   dark-green: "#30d158"
   dark-yellow: "#ffd60a"
+  dark-success: "#30d158"
+  dark-ring-track: "#7a7a80"
   light-background: "#f2f2f7"
   light-surface: "#ffffff"
   light-surface-2: "#e5e5ea"
@@ -29,6 +31,9 @@ colors:
   light-orange: "#a85400"
   light-green: "#34c759"
   light-yellow: "#ffcc00"
+  light-success: "#1d7a36"
+  light-ring-track: "#7c7c80"
+  light-ring-caution: "#7a5c00"
 typography:
   title:
     fontFamily: "System"
@@ -118,13 +123,61 @@ components:
     rounded: "{rounded.pill}"
     height: "48px"
     padding: "0 12px"
-  task-row:
+  tab-bar:
+    backgroundColor: "{colors.light-surface}"
+    textColor: "{colors.light-text-muted}"
+    typography: "{typography.caption}"
+    height: "56px"
+    padding: "6px 4px"
+  tab-bar-selected:
+    backgroundColor: "{colors.light-surface}"
+    textColor: "{colors.light-accent-text}"
+    typography: "{typography.caption}"
+    height: "56px"
+  stat-tile:
+    backgroundColor: "{colors.light-surface}"
+    textColor: "{colors.light-text}"
+    typography: "{typography.caption}"
+    rounded: "{rounded.card}"
+    padding: "16px"
+  task-card:
+    backgroundColor: "{colors.light-surface}"
+    textColor: "{colors.light-text}"
+    typography: "{typography.body}"
+    rounded: "{rounded.card}"
+    padding: "16px"
+  task-card-timer:
+    backgroundColor: "{colors.light-surface-2}"
+    textColor: "{colors.light-text}"
+    typography: "{typography.caption}"
+    rounded: "8px"
+    padding: "12px"
+  filter-chip:
+    backgroundColor: "{colors.light-background}"
+    textColor: "{colors.light-text-muted}"
+    typography: "{typography.callout}"
+    rounded: "{rounded.control}"
+    height: "48px"
+    padding: "0 16px"
+  filter-chip-selected:
+    backgroundColor: "{colors.light-surface}"
+    textColor: "{colors.light-accent-text}"
+    typography: "{typography.callout}"
+    rounded: "{rounded.control}"
+    height: "48px"
+    padding: "0 16px"
+  priority-badge:
+    backgroundColor: "{colors.light-surface-2}"
+    textColor: "{colors.light-text}"
+    typography: "{typography.caption}"
+    rounded: "6px"
+    padding: "2px 8px"
+  language-selector:
     backgroundColor: "{colors.light-surface}"
     textColor: "{colors.light-text}"
     typography: "{typography.body}"
     rounded: "{rounded.card}"
     height: "48px"
-    padding: "0 16px 0 0"
   radio-row:
     backgroundColor: "{colors.light-surface}"
     textColor: "{colors.light-text}"
@@ -146,7 +199,9 @@ The system is restrained. Surfaces are separated by tone and a hairline, never b
 
 It explicitly rejects the anti-reference in PRODUCT.md: "Dense, data-heavy apps in the style of Binance: crowded screens, many numbers and charts, heavy chrome, constant visual noise. Nothing should feel like a dashboard to monitor."
 
-The web palette is the brand, but two of its light-mode values fail WCAG AA for text (the app promises AA). Those few values are darkened in the app only; the web values stay canonical for surfaces, borders and non-text accents. The measured table in section 2 is the evidence.
+The app is the web app's mobile version, not a separate product (PRODUCT.md principle 2): the same bottom tab bar (Panel, Tasks, Config), the same four counters, the same task card with its countdown ring, the same words in Spanish first and English second. Where a web value fails WCAG AA it keeps its look and takes an AA-safe value from `theme.ts`, a translated word or an icon.
+
+The web palette is the brand, but a few of its light-mode values fail WCAG AA for text (the app promises AA). Those few values are darkened in the app only; the web values stay canonical for surfaces, borders and non-text accents. The measured table in section 2 is the evidence.
 
 **Key Characteristics:**
 - Flat: tone and hairline, zero shadows.
@@ -170,6 +225,8 @@ An iOS system palette: pure black or soft grey grounds, white or near-black surf
 ### Tertiary
 - **Amber** (dark `#ff9f0a`, light `#a85400`): the medium priority icon. The web orange `#ff9500` is 1.97:1 on light grounds; as a priority icon it needs 3:1, so light uses `#a85400`.
 - **Green and Yellow** (dark `#30d158` / `#ffd60a`, light `#34c759` / `#ffcc00`): decorative status dots only, canonical web values. They are never text and never the only signal; they always sit next to a word.
+- **Success Green** (dark `#30d158`, light `#1d7a36`): the Completed counter's number. The web green `#34c759` is 2.2:1 on white, so light mode darkens it to 5.40:1; dark keeps the web value.
+- **Ring colors** (dark: track `#7a7a80`, green `#30d158`, yellow `#ffd60a`, orange `#ff9f0a`, red `#ff453a`; light: track `#7c7c80`, green `#1d7a36`, yellow `#7a5c00`, orange `#a85400`, red `#c4271c`): the countdown ring on Surface 2. The web green, yellow and orange are under 3:1 on the light Surface 2, so light mode uses the darker values (still green, ochre, amber, red). The time left is always written next to the ring.
 
 ### Neutral
 - **Ground** (dark `#000000`, light `#f2f2f7`): screen background.
@@ -193,15 +250,21 @@ Text pairings need 4.5:1; borders, focus ring and icons need 3:1. Asserted in `_
 | Strong border on ground / surface | 4.14 / 3.36 | 3.29 / 3.67 |
 | Focus ring (accent) on ground / surface | 5.76 / 4.66 | 3.60 / 4.02 |
 | Priority icons on surface (none / low / medium / high) | 5.22 / 4.66 / 8.28 / 4.99 | 5.99 / 5.80 / 5.34 / 5.75 |
+| Priority icons on Surface 2, the badge (none / low / medium / high) | 4.27 / 3.82 / 6.78 / 4.09 | 4.77 / 4.62 / 4.25 / 4.58 |
+| Success text on ground / surface | 10.39 / 8.42 | 4.84 / 5.40 |
+| Ring on Surface 2 (track / green / yellow / orange / red) | 3.27 / 6.89 / 9.87 / 6.78 / 4.09 | 3.31 / 4.30 / 4.98 / 4.25 / 4.58 |
+| Selected chip border (accent) on ground | 5.76 | 3.60 |
 
-Adjusted from the web values: light `text2` `#8e8e93` to `#636366`; light accent as text and button fill `#007aff` to `#0062cc`; light red as text `#ff3b30` to `#c4271c`; light orange as icon `#ff9500` to `#a85400`; dark button label white to black (white on `#0a84ff` is 3.65:1). Everything else is the web value unchanged.
+Adjusted from the web values: light `text2` `#8e8e93` to `#636366`; light accent as text and button fill `#007aff` to `#0062cc`; light red as text `#ff3b30` to `#c4271c`; light orange as icon `#ff9500` to `#a85400`; dark button label white to black (white on `#0a84ff` is 3.65:1); light green as text `#34c759` to `#1d7a36`; the light ring green, yellow and orange (see Success Green and Ring colors). The web priority label (red 11px text on Surface 2, 4.09:1 in dark) is replaced by a flag icon plus the word in the text color. Everything else is the web value unchanged.
 
 ### Named Rules
 **The One Voice Rule.** The accent is used on the primary action, links and the focus ring. If two filled accent buttons share a screen, one is wrong.
 
 **The Never Alone Rule.** Overdue, priority, error and sync state always carry a word or an icon next to the color. A color dot with no label is prohibited.
 
-**The Surface 2 Rule.** Only primary text sits on Surface 2. Muted text there fails AA in dark.
+**The Surface 2 Rule.** Only primary text sits on Surface 2. Muted text there fails AA in dark. This holds for the priority badge and the remaining-time box too: their words use the text color, the color lives in icons and the ring.
+
+**The Active Card Rule.** The web marks an in-progress card with an accent border plus a 3dp left stripe (`border-left: 3px solid`), and an overdue card the same in red; the reference screenshot shows the stripe. The app reproduces the emphasis with the same colors on a full 1dp border all around (accent for in progress, danger for overdue, in progress wins when both apply, as in the web's CSS order), plus the status dot's shape and the words in the card. A thick one-sided stripe stays prohibited (section 6): it is the one place the app deliberately differs from the web's look, and it can be revisited if parity matters more than the rule.
 
 ## 3. Typography
 
@@ -259,33 +322,53 @@ One caption line in muted text under the main content, for example "Synced 5 min
 ### List row and grouped list
 Rows sit inside one Surface group with 12dp radius, a hairline outline and 16dp padding; rows are separated by a hairline inset 16dp. Row height at least 48dp. Title in body, detail in callout muted. No chevron decoration unless the row navigates.
 
-### Task row
-A list row with a leading complete toggle (48dp touch area around a 24dp circle, filled with the accent and a check mark when done). Title in body; due date in callout. Completed titles use a strikethrough in muted text, so state is never color alone. The body of the row is a second target that opens the task; the toggle and the body are separate controls so a screen reader reaches both.
+### Task card
+The web's card on a phone: Surface fill, 1dp hairline border, 12dp radius, 16dp padding, 12dp between its parts and between cards. The body (title row, due line, description, remaining-time box) is one 48dp-plus target that opens the task; the Complete action below it is a separate control so a screen reader reaches both.
 
-- **Overdue:** the due line reads "Overdue, Oct 20" in the danger color. The word carries the meaning, the color only reinforces it. Due text otherwise says "Today", "Tomorrow" or a short date, with 24-hour time when the task has one.
-- **Completing (undo window):** completing a task cannot be reversed once saved, because the backend has no way to reopen a task. Ticking a task only starts a window of about five seconds in which the row shows as done with a plain "Undo" link under the title; nothing is saved until the window ends, and leaving the screen or the app saves it at once. The announcement line says "Completed Call Ann. Undo is available."
-- **Completed:** a checked, disabled toggle (its label ends in "completed"), a struck-through muted title and "Completed Oct 21" instead of the due line. Completed rows live in their own collapsed section.
+- **Title row:** the status dot, the title (body, weight 600, wraps; never truncated), the priority badge on the right.
+- **Status dot:** 10dp. Pending is a hollow ring, in progress a filled accent dot, completed a filled muted dot, so the status is told by shape as well as color. It is decorative; the card's spoken label says the status ("Prepare slides, In progress, Today, 14:30, high priority, 1 h 58 min left").
+- **Due line:** callout muted ("Today, 14:30", "Dec 3"). Overdue reads "Overdue, Oct 20" in the danger color and weight 600; the words carry the meaning.
+- **Description:** callout muted, two lines at most.
+- **Edge:** a full 1dp accent border for in progress and danger for overdue (The Active Card Rule), otherwise the hairline. A completed card is not dimmed (the web's 0.6 opacity would drop its text below AA): the title is struck through and muted, and the due line says "Completed Oct 21".
+- **Actions (Tasks tab):** a secondary "Complete" button, spoken "Complete <title>". After a tap the card shows "Completed" and a link-style "Undo" for about five seconds (completion cannot be reopened once saved). The Panel's cards have no actions; Start and Pause arrive with the task detail.
+
+### Remaining-time box and countdown ring
+Inside the card when the task has a duration: a Surface 2 box (8dp radius, 12dp padding) with the ring on the left and, on the right, "Time left" (caption) over the time in headline weight 700 ("1 h 58 min"). Both texts use the text color (The Surface 2 Rule). A finished task says "Completed", a task past its duration says "Time over".
+
+The ring is a 40dp SVG: a 3dp track, an arc for the time used (round caps), the percent in the middle (a check when completed). The arc color follows the web thresholds (green up to 25%, yellow to 50%, orange to 75%, red above) with the ring colors of section 2. It is drawn once per tick (every 30 seconds), never animated, so reduced motion needs no special case. It is hidden from screen readers; the box is one spoken unit ("1 h 58 min left"). At large system font sizes the ring grows with the font (up to 1.6 times) so the percent never spills out.
+
+### Stat tile
+One Panel counter: Surface fill, hairline, 12dp radius, 16dp padding, centered. The number is 28dp, weight 700; below it the label in caption muted. Four tiles in a 2 by 2 grid with 12dp gaps. The number's color follows the web (text for pending, accent text for in progress, success for completed, danger for overdue) in AA-safe values, and the tile is read as one "Pending: 3", so color is never the only signal. The Panel stays a glance: the four counters and the active tasks, nothing more.
+
+### Tab bar
+The web's mobile bottom bar: Surface fill, a 1dp hairline on top, three equal tabs (Panel, Tasks, Config) with a 22dp Lucide icon over a caption label (LayoutDashboard, ListTodo, Settings; Schedule and Calendar join later). Each tab is at least 56dp tall and grows with the system font; the bar's bottom padding is the system safe-area inset. The selected tab uses accent text, a heavier label and a heavier icon stroke (so it is not color alone) and is announced as selected. No animation between tabs.
+
+### Filter chip
+The web's filter buttons as a horizontally scrolling row of 48dp-tall chips (10dp radius, 16dp padding, 8dp gaps), one choice at a time, announced as radios in a labelled group ("Filter by status", "Filter by list"). Unselected: 1dp strong border, muted label on the ground. Selected: a 2dp accent border, a Surface fill, an accent-text label in weight 700. The list row has a color dot before each list name and "All" first. The two rows sit under the quick add field.
+
+### Priority badge
+A pill on Surface 2 (6dp radius, 8dp by 2dp padding): a 12dp Lucide flag in the priority color (muted, accent, amber, red) and the translated word ("Low", "Medium", "High") in the text color, caption weight 600. None shows nothing. It replaces both the web's red-on-dark label and the earlier priority indicator.
+
+### Language selector
+Two radio rows in a grouped list, "Español" and "English", each written in its own language so it can be found from either. Selecting one re-words the app at once and saves the choice on the device. The sign-in screen has a one-tap link to the other language instead of the selector.
 
 ### Completed header
-A 48dp row above the completed tasks: "Completed (3)" in callout muted and the word "Show" or "Hide" in link style, so the state of the section is a word, not a chevron. The section is collapsed by default and, past 200 tasks, says "Showing the latest 200 of 340."
+A 48dp row above the completed cards: "Completed (3)" in callout muted and the word "Show" or "Hide" in link style, so the state of the section is a word, not a chevron. The section is collapsed by default and, past 200 tasks, says "Showing the latest 200 of 340."
 
 ### Radio row
 A single-choice row in a grouped list: a 22dp ring (filled dot when chosen, weight 600 label), an optional decorative marker (color dot, flag) and the label in body. 48dp tall, announced as a radio with its selected state. Used for priority, list and list color. A list color is always chosen by name ("Green"), never by swatch alone.
 
 ### Quick add field
-The text field component with the label always visible ("Add a task", "Add a list"), the keyboard's done key as the primary way to add, and a link-style "Add" inside the field for people who do not use the key. It clears itself on success and keeps the keyboard open for the next entry; a refusal ("Name is required") appears as the field error line.
+The text field component with the label always visible ("Add a task", "Add a list"; "Agregar una tarea" in Spanish), the keyboard's done key as the primary way to add, and a link-style "Add" inside the field for people who do not use the key. It clears itself on success and keeps the keyboard open for the next entry; a refusal ("Name is required") appears as the field error line.
 
 ### Screen header
 Back (link) on the left and the screen's actions (link) on the right in one wrapping row, then the Title below it. The title wraps; nothing is truncated at large text sizes. Screens change without animation.
 
 ### Announcement line
-One caption in muted text under the quick add field, a polite live region: "Added Buy milk", "Deleted Buy milk", "Saved Buy milk". It clears itself after five seconds.
+One caption in muted text under the quick add field, a polite live region: "Added Buy milk", "Deleted Buy milk", "Saved Buy milk" (in the current language). It clears itself after five seconds.
 
 ### Tag chip
 Surface 2 fill, pill radius, callout label in Text color, 12dp horizontal padding, 48dp touch height when interactive (visual height 32dp inside it). No border.
-
-### Priority indicator
-An icon plus a word: none shows nothing, low, medium and high show a flag icon in the matching priority color (muted, accent, amber, red) next to the label "Low", "Medium" or "High" in Text color. Color is reinforcement only.
 
 ### Empty state
 Centered column: a headline, one muted body line saying what belongs here, and at most one primary button. Generous 48dp spacing above. No illustrations, no jokes.
@@ -299,12 +382,14 @@ Centered column: a headline, one muted body line saying what belongs here, and a
 - **Do** separate surfaces with tone and a hairline; keep one accent per screen.
 - **Do** pair every status color with a word or an icon (overdue, priority, error, sync).
 - **Do** let text wrap and grow with the system font size; test at 1.5x.
-- **Do** keep copy short and plain, in sentence case, with no exclamation marks.
+- **Do** keep copy short and plain with no exclamation marks. Keys the web already has keep the web's wording (Spanish first, then English); app-only copy is neutral Latin American Spanish ("tú") and plain English in sentence case.
+- **Do** put every word the user reads through the message catalog, so the language switch reaches it; format dates and times with `Intl` and the chosen language.
 
 ### Don't:
 - **Don't** make dense, data-heavy screens in the style of Binance: crowded screens, many numbers and charts, heavy chrome, constant visual noise. Nothing should feel like a dashboard to monitor.
 - **Don't** use shadows, glassmorphism, gradients or gradient text.
-- **Don't** use a colored side stripe (`border-left` greater than 1px) on cards, notices or rows.
+- **Don't** use a colored side stripe (`border-left` greater than 1px) on cards, notices or rows, even though the web's active card has one (The Active Card Rule).
+- **Don't** dim a card with opacity to say it is done; text contrast would drop below AA.
 - **Don't** put green, yellow or the web orange `#ff9500` into text on light grounds; they fail AA.
 - **Don't** use muted text on Surface 2.
 - **Don't** add a second font family, decorative motion, or identical card grids.

@@ -9,12 +9,15 @@ import {
 } from '../components/organisms/ListEditForm';
 import { useDiscardGuard } from '../hooks/useDiscardGuard';
 import type { ScreenProps } from '../navigation/routes';
-import { errorSentence, useLiveQuery, usePlanner } from '../plannerContext';
+import { errorSentence } from '../errorMessages';
+import { useI18n } from '../i18n/I18nProvider';
+import { useLiveQuery, usePlanner } from '../plannerContext';
 
 /** Rename, recolor or delete one list. Explicit Save, confirmed Delete. */
 export function ListEditScreen({ navigation, route }: ScreenProps<'ListEdit'>) {
   const { listId } = route.params;
   const planner = usePlanner();
+  const { t } = useI18n();
   const loaded = useLiveQuery(p => p.queries.watchList(listId), [listId]);
   const [values, setValues] = useState<ListEditValues | null>(null);
   const initial = useRef<ListEditValues | null>(null);
@@ -40,9 +43,9 @@ export function ListEditScreen({ navigation, route }: ScreenProps<'ListEdit'>) {
   if (loaded.status === 'ready' && loaded.data === null && !busy) {
     return (
       <MessageView
-        title="This list no longer exists"
-        body="It was deleted. Nothing is left to edit."
-        action={{ label: 'Back', onPress: () => navigation.popToTop() }}
+        title={t('listGoneTitle')}
+        body={t('listGoneBody')}
+        action={{ label: t('back'), onPress: () => navigation.goBack() }}
       />
     );
   }
@@ -66,39 +69,35 @@ export function ListEditScreen({ navigation, route }: ScreenProps<'ListEdit'>) {
       allowLeaving();
       goBack();
     } catch (problem) {
-      setError(errorSentence(problem));
+      setError(errorSentence(problem, t));
       setBusy(false);
     }
   }
 
   function confirmDelete() {
-    Alert.alert(
-      'Delete this list?',
-      'Its tasks stay and move out of any list.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            setBusy(true);
-            try {
-              await planner.lists.remove(listId);
-              allowLeaving();
-              navigation.popToTop();
-            } catch (problem) {
-              setError(errorSentence(problem));
-              setBusy(false);
-            }
-          },
+    Alert.alert(t('listDeleteConfirm'), t('listDeleteBody'), [
+      { text: t('cancel'), style: 'cancel' },
+      {
+        text: t('delete'),
+        style: 'destructive',
+        onPress: async () => {
+          setBusy(true);
+          try {
+            await planner.lists.remove(listId);
+            allowLeaving();
+            navigation.goBack();
+          } catch (problem) {
+            setError(errorSentence(problem, t));
+            setBusy(false);
+          }
         },
-      ],
-    );
+      },
+    ]);
   }
 
   return (
     <Frame>
-      <ScreenHeader title="Edit list" onBack={goBack} />
+      <ScreenHeader title={t('listEditTitle')} onBack={goBack} />
       <ListEditForm
         values={values}
         error={error}

@@ -1,10 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { validateCredentials } from '@/application/auth/credentials';
 import type { CredentialErrors } from '@/application/auth/credentials';
 import { Screen } from '../components/atoms/Screen';
 import { AuthForm } from '../components/organisms/AuthForm';
 import type { AuthFormValues } from '../components/organisms/AuthForm';
 import { useSession } from '../sessionContext';
+import { useI18n } from '../i18n/I18nProvider';
 import { authErrorMessage } from './authMessages';
 import type { AuthMode } from './authMessages';
 
@@ -17,9 +18,11 @@ interface AuthScreenProps {
 /** Container: validates, calls the session use cases and maps their errors. */
 export function AuthScreen({ notice, initialEmail }: AuthScreenProps) {
   const { login, register } = useSession();
+  const { t } = useI18n();
   const [mode, setMode] = useState<AuthMode>('signIn');
   const [busy, setBusy] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
+  // The failure itself: it is worded at render, so a language switch applies.
+  const [formError, setFormError] = useState<unknown>(null);
   const [fieldErrors, setFieldErrors] = useState<CredentialErrors>({});
   // The ref closes the gap before `busy` re-renders, so a fast double tap
   // cannot send two requests.
@@ -31,6 +34,15 @@ export function AuthScreen({ notice, initialEmail }: AuthScreenProps) {
       mounted.current = false;
     };
   }, []);
+
+  // A new object per failed check, so the form moves focus to the field.
+  const shownErrors = useMemo(
+    () => ({
+      email: fieldErrors.email ? t('authEmailRequired') : undefined,
+      password: fieldErrors.password ? t('authPasswordRequired') : undefined,
+    }),
+    [fieldErrors, t],
+  );
 
   async function submit(values: AuthFormValues) {
     if (inFlight.current) {
@@ -58,7 +70,7 @@ export function AuthScreen({ notice, initialEmail }: AuthScreenProps) {
       }
     } catch (error) {
       if (mounted.current) {
-        setFormError(authErrorMessage(error, mode));
+        setFormError(error);
       }
     } finally {
       inFlight.current = false;
@@ -81,8 +93,10 @@ export function AuthScreen({ notice, initialEmail }: AuthScreenProps) {
         busy={busy}
         initialEmail={initialEmail}
         notice={notice}
-        formError={formError}
-        fieldErrors={fieldErrors}
+        formError={
+          formError === null ? null : authErrorMessage(formError, mode, t)
+        }
+        fieldErrors={shownErrors}
         onSubmit={submit}
         onSwitchMode={switchMode}
       />

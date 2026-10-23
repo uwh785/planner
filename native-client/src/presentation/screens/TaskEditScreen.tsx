@@ -7,11 +7,13 @@ import {
   TaskEditForm,
   type TaskEditValues,
 } from '../components/organisms/TaskEditForm';
+import { errorSentence } from '../errorMessages';
 import { dueDateTimeText } from '../format/dueText';
+import { useI18n } from '../i18n/I18nProvider';
 import { useDiscardGuard } from '../hooks/useDiscardGuard';
 import type { ScreenProps } from '../navigation/routes';
 import { pickDate, pickTime } from '../pickers';
-import { errorSentence, useLiveQuery, usePlanner } from '../plannerContext';
+import { useLiveQuery, usePlanner } from '../plannerContext';
 
 const DEFAULT_HOUR = 9;
 const startOfDay = (d: Date) =>
@@ -29,6 +31,8 @@ const same = (a: TaskEditValues, b: TaskEditValues) =>
 export function TaskEditScreen({ navigation, route }: ScreenProps<'TaskEdit'>) {
   const { taskId } = route.params;
   const planner = usePlanner();
+  const i18n = useI18n();
+  const { t } = i18n;
   const loaded = useLiveQuery(p => p.queries.watchTaskEdit(taskId), [taskId]);
   const [values, setValues] = useState<TaskEditValues | null>(null);
   const initial = useRef<TaskEditValues | null>(null);
@@ -63,9 +67,9 @@ export function TaskEditScreen({ navigation, route }: ScreenProps<'TaskEdit'>) {
     if (loaded.status === 'ready' && loaded.data === null) {
       return (
         <MessageView
-          title="This task no longer exists"
-          body="It was deleted. Nothing is left to edit."
-          action={{ label: 'Back', onPress: goBack }}
+          title={t('taskGoneTitle')}
+          body={t('taskGoneBody')}
+          action={{ label: t('back'), onPress: goBack }}
         />
       );
     }
@@ -74,9 +78,9 @@ export function TaskEditScreen({ navigation, route }: ScreenProps<'TaskEdit'>) {
   if (loaded.data === null && initial.current !== null && !busy) {
     return (
       <MessageView
-        title="This task no longer exists"
-        body="It was deleted. Nothing is left to edit."
-        action={{ label: 'Back', onPress: goBack }}
+        title={t('taskGoneTitle')}
+        body={t('taskGoneBody')}
+        action={{ label: t('back'), onPress: goBack }}
       />
     );
   }
@@ -160,16 +164,16 @@ export function TaskEditScreen({ navigation, route }: ScreenProps<'TaskEdit'>) {
       allowLeaving();
       goBack();
     } catch (problem) {
-      setError(errorSentence(problem));
+      setError(errorSentence(problem, t));
       setBusy(false);
     }
   }
 
   function confirmDelete() {
-    Alert.alert('Delete this task?', "This can't be undone.", [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('taskDeleteConfirm'), t('taskDeleteHint'), [
+      { text: t('cancel'), style: 'cancel' },
       {
-        text: 'Delete',
+        text: t('delete'),
         style: 'destructive',
         onPress: async () => {
           setBusy(true);
@@ -178,7 +182,7 @@ export function TaskEditScreen({ navigation, route }: ScreenProps<'TaskEdit'>) {
             allowLeaving();
             goBack();
           } catch (problem) {
-            setError(errorSentence(problem));
+            setError(errorSentence(problem, t));
             setBusy(false);
           }
         },
@@ -188,14 +192,19 @@ export function TaskEditScreen({ navigation, route }: ScreenProps<'TaskEdit'>) {
 
   return (
     <Frame>
-      <ScreenHeader title="Edit task" onBack={goBack} />
+      <ScreenHeader title={t('taskEditTitle')} onBack={goBack} />
       <TaskEditForm
         values={values}
         lists={loaded.data?.lists ?? []}
         dueText={
           values.dueDate === null
             ? null
-            : dueDateTimeText(values.dueDate, values.dueAllDay, planner.now())
+            : dueDateTimeText(
+                values.dueDate,
+                values.dueAllDay,
+                planner.now(),
+                i18n,
+              )
         }
         error={error}
         busy={busy}

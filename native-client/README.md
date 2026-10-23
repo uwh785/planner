@@ -15,7 +15,18 @@ npm run android      # build, install and launch (second terminal)
 
 On an emulator, if the app cannot reach Metro, run `adb reverse tcp:8081 tcp:8081`.
 
-Auth screens (sign in, create account) gate the app: signed out shows them, a stored session restores offline straight into the lists screen. Signed in, React Navigation (native stack) shows Lists, Tasks, Task edit, List edit and Account; every screen reads the local database and never waits for the network. Completing a task has an undo window of about five seconds because the backend cannot reopen a task (see `src/application/README.md`). The look lives in one module, `src/presentation/theme.ts`.
+Auth screens (sign in, create account) gate the app: signed out shows them, a stored session restores offline straight into the Panel. The signed-in app is the web app's mobile version (React Navigation: a native stack over bottom tabs):
+
+- **Panel**: the four counters (pending, in progress, completed, overdue, computed locally with the web's rules) and the active tasks as cards with a countdown ring and the time left.
+- **Tasks**: quick add (into the selected list), the web's status filters (All, Pending, In Progress, Completed, Overdue), a list filter (chips), open task cards and a collapsed Completed section.
+- **Config**: language, list management (create, rename, recolor, delete), the account and Sign out, the discreet sync status line and, in debug builds, the development items.
+- Above the tabs: the task edit screen and the list screens. Android's back button pops them, returns to Panel from another tab, then leaves the app.
+
+Every screen reads the local database and never waits for the network. Completing a task has an undo window of about five seconds because the backend cannot reopen a task (see `src/application/README.md`). The look lives in one module, `src/presentation/theme.ts`.
+
+### Language
+
+Spanish is the default, as on the web, with English as an option. Open **Config** (Settings in English) and pick **Español** or **English** under **Idioma** (Language); the app is re-worded at once and the choice is saved on the device (Async Storage, `planner.locale`), so it survives restarts and sign-out. The sign-in screen has a one-tap link to the other language. The catalogs are `src/application/i18n/messages/{es,en}.ts` (keys the web already has keep its wording, the rest is neutral Latin American Spanish and plain English); every user-visible string goes through `t(key)` (`useT()` in components), and `__tests__/application/i18n/catalog.test.ts` checks that both languages have the same keys and the same placeholders. Dates and times use `Intl` with the chosen language (24-hour time, like the web), falling back to built-in month names if `Intl` is unavailable. To add a language: add its catalog, add the code to `LOCALES` and a row to the language selector.
 
 Checks: `npm run typecheck`, `npm run lint`, `npm test`.
 
@@ -30,7 +41,8 @@ Source lives in `src/`; the `@/*` alias maps to `src/*`.
   - `infrastructure/db/repositories`: SQLite implementations of the repository ports. Every mutation writes the row and its `outbox` entry in one transaction. `infrastructure/system` holds the id generator (needs `crypto.getRandomValues`, installed by `react-native-get-random-values` in `index.js`) and the clock.
   - `infrastructure/composition`: `createAppServices` wires HTTP, the Keychain session and the per-user database; `createContainer` builds one user's repositories. Only `index.js` calls them.
   - `infrastructure/http`: `FetchHttpClient` (global `fetch`, JSON, timeout) and `HttpAuthGateway` (the backend's own `/api/auth/*`). `infrastructure/security`: `KeychainSessionStore` (`react-native-keychain`, Android Keystore-backed).
-- `presentation`: screens and atomic components, talks to application only; it never imports `infrastructure` (enforced by a Jest test). `index.js` hands `App` the `SessionService` and the container source.
+  - `infrastructure/storage`: `AsyncStorageLocaleStore` keeps the chosen language on the device behind the `LocaleStore` port.
+- `presentation`: screens and atomic components, talks to application only; it never imports `infrastructure` (enforced by a Jest test). `index.js` hands `App` the `SessionService`, the container source and the language service.
 
 ### Local-first writes and the outbox
 
@@ -70,7 +82,7 @@ Auth is the backend's own: `register`, `login`, `refresh`, `logout` under `/api/
 
 ## Design
 
-The visual system is written up in [`DESIGN.md`](DESIGN.md) (Stitch format; `DESIGN.json` is its sidecar). It reuses the web app's iOS system palette, with a few darker light-mode values so every text pairing meets WCAG AA. The tokens (colors per scheme, spacing, radii, type scale, 48dp touch size) live in `src/presentation/theme.ts`, and `__tests__/presentation/theme.test.ts` asserts the contrast of every pairing. Components read tokens only from that module.
+The visual system is written up in [`DESIGN.md`](DESIGN.md) (Stitch format; `DESIGN.json` is its sidecar). It reuses the web app's iOS system palette, with a few darker light-mode values so every text pairing meets WCAG AA, and follows the web's mobile screens (tab bar, stat tiles, task card with countdown ring, filter chips). Icons are Lucide (`lucide-react-native` over `react-native-svg`), imported one by one in `components/atoms/icons.ts`. The tokens (colors per scheme, spacing, radii, type scale, 48dp touch size) live in `src/presentation/theme.ts`, and `__tests__/presentation/theme.test.ts` asserts the contrast of every pairing. Components read tokens only from that module.
 
 ## Configuration
 

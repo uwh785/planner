@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { InMemoryLocaleStore, LocaleService } from '@/application/i18n';
 import type { SessionService } from '@/application/auth/SessionService';
 import type { ContainerSource } from '@/application/container';
 import type { PlannerRuntime } from '@/application/planner/createPlanner';
 import type { SyncStatusSource } from '@/application/sync/SyncStatus';
+import { I18nProvider } from './i18n/I18nProvider';
 import { SessionGate } from './screens/SessionGate';
 import { SessionProvider } from './sessionContext';
 import { SyncProvider } from './syncContext';
@@ -17,6 +19,8 @@ interface AppProps {
   sync?: SyncStatusSource;
   /** Clock, timer and app lifecycle for the screens; plain globals if omitted. */
   runtime?: PlannerRuntime;
+  /** The chosen language; Spanish and not saved anywhere if omitted. */
+  locale?: LocaleService;
 }
 
 const DEFAULT_RUNTIME: PlannerRuntime = {
@@ -34,15 +38,26 @@ function App({
   containers,
   sync,
   runtime = DEFAULT_RUNTIME,
+  locale,
 }: AppProps) {
+  const language = useMemo(() => {
+    if (locale) {
+      return locale;
+    }
+    const fallback = new LocaleService(new InMemoryLocaleStore());
+    fallback.restore();
+    return fallback;
+  }, [locale]);
   return (
-    <SessionProvider session={session}>
-      <SyncProvider source={sync}>
-        <SafeAreaProvider>
-          <SessionGate containers={containers} runtime={runtime} />
-        </SafeAreaProvider>
-      </SyncProvider>
-    </SessionProvider>
+    <I18nProvider service={language}>
+      <SessionProvider session={session}>
+        <SyncProvider source={sync}>
+          <SafeAreaProvider>
+            <SessionGate containers={containers} runtime={runtime} />
+          </SafeAreaProvider>
+        </SyncProvider>
+      </SessionProvider>
+    </I18nProvider>
   );
 }
 

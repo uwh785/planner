@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-22T23:25:20.301Z",
+  "generatedAt": "2026-10-23T00:00:00.000Z",
   "title": "Design System: Planner",
   "extensions": {
     "colorMeta": {
@@ -153,6 +153,36 @@
           "#d4d4d6",
           "#f2f2f2"
         ]
+      },
+      "light-success": {
+        "role": "tertiary",
+        "displayName": "Success Green (light, AA text)",
+        "canonical": "#1d7a36",
+        "tonalRamp": [
+          "#00250a",
+          "#004019",
+          "#005c28",
+          "#177a39",
+          "#41983f",
+          "#74b46a",
+          "#aed2a2",
+          "#e6f3e1"
+        ]
+      },
+      "light-ring-caution": {
+        "role": "tertiary",
+        "displayName": "Ring ochre (light, 3:1 on Surface 2)",
+        "canonical": "#7a5c00",
+        "tonalRamp": [
+          "#2e2200",
+          "#4a3800",
+          "#664b00",
+          "#8a6400",
+          "#ac7d00",
+          "#d2a000",
+          "#f0c64a",
+          "#fdf0c4"
+        ]
       }
     },
     "typographyMeta": {
@@ -253,25 +283,73 @@
       "css": ".ds-group{background:#fff;border:1px solid #d1d1d6;border-radius:12px;font:400 17px/24px system-ui,sans-serif;color:#000}.ds-row{padding:12px 16px;min-height:48px;box-sizing:border-box}.ds-row+.ds-row{border-top:1px solid #d1d1d6;margin-left:16px;padding-left:0}"
     },
     {
-      "name": "Task Row",
-      "kind": "card",
-      "refersTo": "task-row",
-      "description": "Complete toggle, title, due text and priority; Undo while completing.",
-      "html": "<div class=\"ds-task\"><span class=\"ds-toggle\"></span><div><div>Call Ann</div><div class=\"ds-meta\">Overdue, Oct 20 &nbsp; Medium</div></div></div>",
-      "css": ".ds-task{display:flex;align-items:flex-start;background:#fff;border:1px solid #d1d1d6;border-radius:12px;color:#000;font:400 17px/24px system-ui,sans-serif;min-height:48px}.ds-toggle{box-sizing:border-box;flex:none;width:24px;height:24px;margin:12px;border:2px solid #85858a;border-radius:50%}.ds-meta{font:500 15px/21px system-ui,sans-serif;color:#c4271c;padding-bottom:8px}"
-    },
-    {
       "name": "Radio Row",
       "kind": "card",
       "refersTo": "radio-row",
       "description": "A single choice in a grouped list: ring, optional marker, label.",
       "html": "<div class=\"ds-radio\"><span class=\"ds-ring\"></span>Green</div>",
       "css": ".ds-radio{display:flex;align-items:center;gap:12px;min-height:48px;padding:8px 16px;background:#fff;border:1px solid #d1d1d6;border-radius:12px;color:#000;font:600 17px/24px system-ui,sans-serif}.ds-ring{box-sizing:border-box;width:22px;height:22px;border:2px solid #0062cc;border-radius:50%}"
+    },
+    {
+      "name": "Tab Bar",
+      "kind": "navigation",
+      "refersTo": "tab-bar",
+      "description": "Bottom bar of the web's mobile version: icon over label for Panel, Tasks and Config; the selected tab uses accent text, a heavier label and stroke.",
+      "html": "<nav class=\"ds-tabs\"><div class=\"ds-tab on\">Panel</div><div class=\"ds-tab\">Tasks</div><div class=\"ds-tab\">Config</div></nav>",
+      "css": ".ds-tabs{display:flex;background:#fff;border-top:1px solid #d1d1d6}.ds-tab{flex:1;min-height:56px;display:flex;align-items:center;justify-content:center;font:400 13px/18px system-ui;color:#636366}.ds-tab.on{color:#0062cc;font-weight:700}"
+    },
+    {
+      "name": "Stat Tile",
+      "kind": "card",
+      "refersTo": "stat-tile",
+      "description": "One Panel counter: a big number and its label; the number's color only reinforces the label.",
+      "html": "<div class=\"ds-stat\"><div class=\"ds-n\">3</div><div class=\"ds-l\">Pending</div></div>",
+      "css": ".ds-stat{background:#fff;border:1px solid #d1d1d6;border-radius:12px;padding:16px;text-align:center}.ds-n{font:700 28px/34px system-ui;color:#000}.ds-l{font:400 13px/18px system-ui;color:#636366}"
+    },
+    {
+      "name": "Task Card",
+      "kind": "card",
+      "refersTo": "task-card",
+      "description": "Status dot, title, priority badge, due line, description and remaining-time box; a full accent border when in progress (no side stripe).",
+      "html": "<div class=\"ds-card\"><div class=\"ds-row\"><span class=\"ds-dot\"></span><b>Prepare slides</b><span class=\"ds-badge\">High</span></div><div class=\"ds-meta\">Today, 14:30</div></div>",
+      "css": ".ds-card{background:#fff;border:1px solid #007aff;border-radius:12px;padding:16px;display:grid;gap:12px}.ds-row{display:flex;align-items:center;gap:8px}.ds-dot{width:10px;height:10px;border-radius:50%;background:#007aff}.ds-meta{font:500 15px/21px system-ui;color:#636366}"
+    },
+    {
+      "name": "Remaining-time Box",
+      "kind": "card",
+      "refersTo": "task-card-timer",
+      "description": "The ring and the time left on Surface 2; both texts use the text color.",
+      "html": "<div class=\"ds-timer\"><span class=\"ds-ring\">1%</span><div><div class=\"ds-l\">Time left</div><b>1 h 58 min</b></div></div>",
+      "css": ".ds-timer{display:flex;align-items:center;gap:12px;padding:12px;background:#e5e5ea;border-radius:8px;color:#000}.ds-ring{width:40px;height:40px;border-radius:50%;border:3px solid #7c7c80;display:grid;place-items:center;font:600 13px system-ui}"
+    },
+    {
+      "name": "Filter Chip",
+      "kind": "chip",
+      "refersTo": "filter-chip",
+      "description": "One choice in a scrolling row; selected has a 2dp accent border, a surface fill and a heavier label.",
+      "html": "<span class=\"ds-chip on\">In Progress</span><span class=\"ds-chip\">Pending</span>",
+      "css": ".ds-chip{display:inline-flex;align-items:center;min-height:48px;padding:0 16px;border:1px solid #85858a;border-radius:10px;font:500 15px/21px system-ui;color:#636366}.ds-chip.on{border:2px solid #007aff;background:#fff;color:#0062cc;font-weight:700}"
+    },
+    {
+      "name": "Priority Badge",
+      "kind": "chip",
+      "refersTo": "priority-badge",
+      "description": "A flag in the priority color and the translated word in the text color, on Surface 2.",
+      "html": "<span class=\"ds-badge\">High</span>",
+      "css": ".ds-badge{display:inline-flex;gap:4px;align-items:center;padding:2px 8px;border-radius:6px;background:#e5e5ea;color:#000;font:600 13px/18px system-ui}"
+    },
+    {
+      "name": "Language Selector",
+      "kind": "card",
+      "refersTo": "language-selector",
+      "description": "Two radio rows, each language written in itself.",
+      "html": "<div class=\"ds-lang\"><div class=\"ds-radio\">Español</div><div class=\"ds-radio\">English</div></div>",
+      "css": ".ds-lang{background:#fff;border:1px solid #d1d1d6;border-radius:12px}.ds-radio{min-height:48px;padding:8px 16px;display:flex;align-items:center;font:400 17px/24px system-ui}"
     }
   ],
   "narrative": {
     "northStar": "The Quiet Notebook",
-    "overview": "Planner is a notebook you can open in a basement classroom or on a plane: flat paper-like surfaces, one blue accent, plain words. It reuses the web app's palette on purpose, the iOS system colors, so a person who uses both sees one product. PRODUCT.md asks for \"calm, minimal, light\" and for a screen that \"lowers the user's stress, not adds to it\". Every rule below serves that line: show one main thing per screen, let empty space do work, and keep color for the few things that need to be found.\n\nThe system is restrained. Surfaces are separated by tone and a hairline, never by shadow. There is one accent, and it appears on the primary action, links and the focus ring only. Type is the platform font at a short, named scale; hierarchy comes from size and weight, not from color or decoration. Lists are grouped rows on a rounded surface, like iOS settings, with generous 16dp padding and 48dp touch height.\n\nIt explicitly rejects the anti-reference in PRODUCT.md: \"Dense, data-heavy apps in the style of Binance: crowded screens, many numbers and charts, heavy chrome, constant visual noise. Nothing should feel like a dashboard to monitor.\"\n\nThe web palette is the brand, but two of its light-mode values fail WCAG AA for text (the app promises AA). Those few values are darkened in the app only; the web values stay canonical for surfaces, borders and non-text accents. The measured table in section 2 is the evidence.",
+    "overview": "Planner is a notebook you can open in a basement classroom or on a plane: flat paper-like surfaces, one blue accent, plain words. It reuses the web app's palette on purpose, the iOS system colors, so a person who uses both sees one product. PRODUCT.md asks for \"calm, minimal, light\" and for a screen that \"lowers the user's stress, not adds to it\". Every rule below serves that line: show one main thing per screen, let empty space do work, and keep color for the few things that need to be found.\n\nThe system is restrained. Surfaces are separated by tone and a hairline, never by shadow. There is one accent, and it appears on the primary action, links and the focus ring only. Type is the platform font at a short, named scale; hierarchy comes from size and weight, not from color or decoration. Lists are grouped rows on a rounded surface, like iOS settings, with generous 16dp padding and 48dp touch height.\n\nIt explicitly rejects the anti-reference in PRODUCT.md: \"Dense, data-heavy apps in the style of Binance: crowded screens, many numbers and charts, heavy chrome, constant visual noise. Nothing should feel like a dashboard to monitor.\"\n\nThe app is the web app's mobile version, not a separate product (PRODUCT.md principle 2): the same bottom tab bar (Panel, Tasks, Config), the same four counters, the same task card with its countdown ring, the same words in Spanish first and English second. Where a web value fails WCAG AA it keeps its look and takes an AA-safe value from `theme.ts`, a translated word or an icon.\n\nThe web palette is the brand, but a few of its light-mode values fail WCAG AA for text (the app promises AA). Those few values are darkened in the app only; the web values stay canonical for surfaces, borders and non-text accents. The measured table in section 2 is the evidence.",
     "keyCharacteristics": [
       "Flat: tone and hairline, zero shadows.",
       "One accent (iOS blue), used on at most one control per screen plus links and focus.",
@@ -315,14 +393,22 @@
       "**Do** separate surfaces with tone and a hairline; keep one accent per screen.",
       "**Do** pair every status color with a word or an icon (overdue, priority, error, sync).",
       "**Do** let text wrap and grow with the system font size; test at 1.5x.",
-      "**Do** keep copy short and plain, in sentence case, with no exclamation marks.",
+      "**Do** keep copy short and plain with no exclamation marks. Keys the web already has keep the web's wording (Spanish first, then English); app-only copy is neutral Latin American Spanish and plain English.",
       "**Don't** make dense, data-heavy screens in the style of Binance: crowded screens, many numbers and charts, heavy chrome, constant visual noise. Nothing should feel like a dashboard to monitor.",
       "**Don't** use shadows, glassmorphism, gradients or gradient text.",
-      "**Don't** use a colored side stripe (`border-left` greater than 1px) on cards, notices or rows.",
+      "**Don't** use a colored side stripe (`border-left` greater than 1px) on cards, notices or rows, even though the web's active card has one.",
       "**Don't** put green, yellow or the web orange `#ff9500` into text on light grounds; they fail AA.",
       "**Don't** use muted text on Surface 2.",
       "**Don't** add a second font family, decorative motion, or identical card grids.",
-      "**Don't** convey state with color alone, or use em dashes in UI copy."
+      "**Don't** convey state with color alone, or use em dashes in UI copy.",
+      "**Success Green** (dark `#30d158`, light `#1d7a36`): the Completed counter's number. The web green `#34c759` is 2.2:1 on white, so light mode darkens it to 5.40:1.",
+      "**Ring colors** (dark: track `#7a7a80`, green `#30d158`, yellow `#ffd60a`, orange `#ff9f0a`, red `#ff453a`; light: track `#7c7c80`, green `#1d7a36`, yellow `#7a5c00`, orange `#a85400`, red `#c4271c`): the countdown ring on Surface 2, at least 3:1 there.",
+      "**Task card:** status dot, title, priority badge, due line, description, remaining-time box; a full 1dp accent border when in progress, danger when overdue; a completed card is struck through, never dimmed.",
+      "**Tab bar:** icon over label for Panel, Tasks and Config, at least 56dp tall; the selected tab uses accent text, a heavier label and a heavier stroke.",
+      "**Stat tile:** a 28dp number over a caption label, read as one \"Pending: 3\".",
+      "**Filter chip:** 48dp chips in a scrolling row; selected has a 2dp accent border and a heavier label.",
+      "**Priority badge:** a flag icon in the priority color plus the word in the text color on Surface 2.",
+      "**Language selector:** Español and English as radio rows, each in its own language."
     ],
     "rules": [
       {
@@ -354,6 +440,11 @@
         "name": "The Flat-By-Default Rule",
         "body": "If a surface needs a shadow to be seen, change its tone or add the hairline instead. If it looks like a 2014 card, the shadow is too dark.",
         "section": "elevation"
+      },
+      {
+        "name": "The Active Card Rule",
+        "body": "The web marks an in-progress card with an accent border plus a 3dp left stripe, and an overdue card the same in red. The app reproduces the emphasis with the same colors on a full 1dp border all around (in progress wins when both apply), plus the status dot's shape and the words in the card. A thick one-sided stripe stays prohibited.",
+        "section": "colors"
       }
     ],
     "dos": [

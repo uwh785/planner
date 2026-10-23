@@ -1,42 +1,67 @@
 import React, { useEffect, useState } from 'react';
 import { Frame } from '../components/atoms/Screen';
+import { ColorDot } from '../components/atoms/ColorDot';
+import { InlineMessage } from '../components/atoms/InlineMessage';
 import { Announcement } from '../components/molecules/Announcement';
-import { MessageView } from '../components/molecules/MessageView';
+import {
+  FilterChips,
+  type ChipOption,
+} from '../components/molecules/FilterChips';
 import { QuickAddField } from '../components/molecules/QuickAddField';
 import { ScreenHeader } from '../components/molecules/ScreenHeader';
-import type { TaskRowModel } from '../components/molecules/TaskRow';
-import { TasksView } from '../components/organisms/TasksView';
-import { dueText } from '../format/dueText';
-import type { ScreenProps } from '../navigation/routes';
 import {
-  errorSentence,
+  TasksView,
+  type CompletedMode,
+} from '../components/organisms/TasksView';
+import { errorSentence } from '../errorMessages';
+import { taskCardModel } from '../format/taskCardModel';
+import { useI18n } from '../i18n/I18nProvider';
+import type { TabScreenProps } from '../navigation/routes';
+import {
   useCompleting,
   useLiveQuery,
   useNotice,
+  useNow,
   usePlanner,
 } from '../plannerContext';
-import type { Task } from '@/domain';
+import type { StatusFilter } from '@/application/planner/PlannerQueries';
 
-const rowModel = (task: Task, now: number): TaskRowModel => ({
-  id: task.id,
-  title: task.title,
-  completed: task.status === 'completed',
-  due: dueText(task, now),
-  priority: task.priority,
-});
+/** Time-dependent text (due, overdue, time left) is refreshed this often. */
+const REFRESH_MS = 30_000;
 
-/** Tasks of one list, or of all lists. Container. */
-export function TasksScreen({ navigation, route }: ScreenProps<'Tasks'>) {
-  const listId = route.params?.listId;
+const COMPLETED_MODE: Record<StatusFilter, CompletedMode> = {
+  all: 'collapsible',
+  pending: 'none',
+  in_progress: 'none',
+  overdue: 'none',
+  completed: 'open',
+};
+
+/** Tasks: quick add, the web's status filters, a list filter, the cards. Container. */
+export function TasksScreen({ navigation }: TabScreenProps<'Tasks'>) {
+  const i18n = useI18n();
+  const { t } = i18n;
   const planner = usePlanner();
+  const [status, setStatus] = useState<StatusFilter>('all');
+  const [pickedList, setPickedList] = useState<string | undefined>(undefined);
+  const [completedExpanded, setCompletedExpanded] = useState(false);
+  const overview = useLiveQuery(p => p.queries.watchOverview(), []);
+  const lists = overview.status === 'loading' ? [] : overview.data?.lists ?? [];
+  // A list that was deleted meanwhile drops back to every list.
+  const listId =
+    pickedList !== undefined &&
+    (overview.status === 'loading' ||
+      lists.some(({ list }) => list.id === pickedList))
+      ? pickedList
+      : undefined;
   const sections = useLiveQuery(
-    p => p.queries.watchTasks({ listId }),
-    [listId],
+    p => p.queries.watchTasks({ listId, status }),
+    [listId, status],
   );
-  const list = useLiveQuery(p => p.queries.watchList(listId ?? ''), [listId]);
   const completing = useCompleting();
   const notice = useNotice();
-  const [completedExpanded, setCompletedExpanded] = useState(false);
+  const now = useNow(REFRESH_MS);
+  const data = sections.status === 'loading' ? null : sections.data;
   const { completion } = planner;
 
   // Leaving the screen completes what is still in its undo window.
@@ -47,77 +72,84 @@ export function TasksScreen({ navigation, route }: ScreenProps<'Tasks'>) {
     [completion],
   );
 
-  const goBack = () => navigation.goBack();
-  if (listId !== undefined && list.status === 'ready' && list.data === null) {
-    return (
-      <MessageView
-        title="This list no longer exists"
-        body="It was deleted. Its tasks are still in All tasks."
-        action={{ label: 'Back to lists', onPress: goBack }}
-      />
-    );
-  }
-
-  const title =
-    listId === undefined
-      ? 'All tasks'
-      : list.status === 'ready' && list.data
-      ? list.data.name
-      : '';
-  const now = planner.now();
-  const data = sections.status === 'loading' ? null : sections.data;
-
   async function addTask(text: string): Promise<string | null> {
     try {
       await planner.tasks.addQuick(text, listId ?? null);
       return null;
     } catch (error) {
-      return errorSentence(error);
+      return errorSentence(error, t);
     }
   }
 
-  function toggle(id: string) {
-    if (completion.has(id)) {
-      completion.undo(id);
-      return;
-    }
-    const task = data?.open.find(t => t.id === id);
+  function completeTask(id: string) {
+    const task = data?.open.find(candidate => candidate.id === id);
     if (task) {
       completion.begin(task);
     }
   }
 
-  return (
-    <Frame>
-      <ScreenHeader
-        title={title}
-        onBack={goBack}
-        actions={
-          listId === undefined
-            ? []
-            : [
-                {
-                  label: 'Edit list',
-                  onPress: () => navigation.navigate('ListEdit', { listId }),
-                },
-              ]
-        }
-      />
-      <QuickAddField label="Add a task" onSubmit={addTask} />
+  const statusOptions: ChipOption<StatusFilter>[] = [
+    { value: 'all', label: t('tasksAll') },
+    { value: 'pending', label: t('tasksPending') },
+    { value: 'in_progress', label: t('tasksInProgress') },
+    { value: 'completed', label: t('tasksCompleted') },
+    { value: 'overdue', label: t('dashboardOverdue') },
+  ];
+  const listOptions: ChipOption<string>[] = [
+    { value: '', label: t('tasksAll'), leading: <ColorDot color={null} /> },
+    ...lists.map(({ list }) => ({
+      value: list.id,
+      label: list.name,
+      leading: <ColorDot color={list.color} />,
+    })),
+  ];
+
+  const header = (
+    <>
+      <ScreenHeader title={t('tasksTitle')} />
+      <QuickAddField label={t('taskQuickAdd')} onSubmit={addTask} />
       <Announcement notice={notice} />
-      {data ? (
-        <TasksView
-          open={data.open.map(t => rowModel(t, now))}
-          completed={data.completed.map(t => rowModel(t, now))}
-          completedTotal={data.completedTotal}
-          completing={completing}
-          completedExpanded={completedExpanded}
-          onToggleCompleted={() => setCompletedExpanded(open => !open)}
-          onToggleTask={toggle}
-          onUndo={id => completion.undo(id)}
-          onOpenTask={taskId => navigation.navigate('TaskEdit', { taskId })}
+      <FilterChips
+        label={t('tasksFilterStatus')}
+        options={statusOptions}
+        value={status}
+        onChange={next => {
+          setStatus(next);
+          setCompletedExpanded(false);
+        }}
+      />
+      {lists.length > 0 ? (
+        <FilterChips
+          label={t('tasksFilterList')}
+          options={listOptions}
+          value={listId ?? ''}
+          onChange={next => setPickedList(next === '' ? undefined : next)}
         />
       ) : null}
+      {sections.status === 'error' && !data ? (
+        <InlineMessage kind="error" message={t('tasksLoadError')} />
+      ) : null}
+    </>
+  );
+
+  return (
+    <Frame>
+      <TasksView
+        header={header}
+        open={(data?.open ?? []).map(task => taskCardModel(task, now, i18n))}
+        completed={(data?.completed ?? []).map(task =>
+          taskCardModel(task, now, i18n),
+        )}
+        completedTotal={data?.completedTotal ?? 0}
+        completedMode={COMPLETED_MODE[status]}
+        filtered={status !== 'all'}
+        completing={completing}
+        completedExpanded={completedExpanded}
+        onToggleCompleted={() => setCompletedExpanded(open => !open)}
+        onCompleteTask={completeTask}
+        onUndo={id => completion.undo(id)}
+        onOpenTask={taskId => navigation.navigate('TaskEdit', { taskId })}
+      />
     </Frame>
   );
 }

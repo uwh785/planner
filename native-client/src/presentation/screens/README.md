@@ -1,8 +1,9 @@
 Screens are containers that wire application use cases to presentational components.
 
 - `SessionGate` picks the screen from the session state (`useSession`): loading, retry when the saved session is unreadable, the auth flow when signed out or expired, `SignedInNavigator` otherwise.
-- `navigation/SignedInNavigator` opens the user's database, builds the planner services and shows a native stack (`routes.ts` has the typed route map; screens draw their own header and change without animation; Android's back button pops the stack).
-- `ListsScreen` (home: All tasks and the lists with open counts, quick add a list, the sync status line), `TasksScreen` (quick add, Open, collapsed Completed, undo window), `TaskEditScreen` and `ListEditScreen` (explicit Save, confirmed Delete, a guard on unsaved changes), `AccountScreen` (who is signed in, Sign out, development-only controls).
+- `navigation/SignedInNavigator` opens the user's database, builds the planner services and shows a native stack whose first screen is the bottom tabs (`routes.ts` has the typed route map; `TabBar` is the web's mobile bar; screens draw their own header and change without animation; Android's back button pops the stack, then returns to Panel, then leaves the app).
+- Tabs: `PanelScreen` (the four counters and the active task cards, refreshed every 30 seconds for the clock), `TasksScreen` (quick add into the selected list, status and list filters, task cards, collapsed Completed, undo window), `ConfigScreen` (language, Lists entry, account and Sign out, sync status line, development-only controls).
+- Above the tabs: `ListsScreen` (list management, opened from Config), `TaskEditScreen` and `ListEditScreen` (explicit Save, confirmed Delete, a guard on unsaved changes).
 - `AuthScreen` validates, calls `login`/`register` and maps typed errors to short messages (`authMessages.ts`).
-- `StartupErrorScreen` explains a misconfigured build instead of crashing.
-- `SyncStatusLine` reads the sync status (`useSyncStatus`); `DevTaskButton` (development builds only, on the Account screen) queues a sample task for manual sync tests.
+- `StartupErrorScreen` explains a misconfigured build instead of crashing (in the saved language).
+- `SyncStatusLine` reads the sync status (`useSyncStatus`); `DevTaskButton` (development builds only, on the Config screen) queues a sample task for manual sync tests.

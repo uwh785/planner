@@ -4,9 +4,9 @@ import {
   NetworkError,
 } from '@/application/auth/errors';
 
-export type AuthMode = 'signIn' | 'register';
+import type { Translate } from '../i18n/I18nProvider';
 
-const GENERIC = 'Something went wrong. Please try again.';
+export type AuthMode = 'signIn' | 'register';
 
 /** Longest server text we show as is; anything longer is not a short refusal. */
 const MAX_SERVER_TEXT = 120;
@@ -32,18 +32,28 @@ function serverRefusal(error: HttpError): string | null {
   return /[.!?]$/.test(sentence) ? sentence : `${sentence}.`;
 }
 
-/** Turns a failed sign-in or registration into one short, calm sentence. */
-export function authErrorMessage(error: unknown, mode: AuthMode): string {
+/**
+ * Turns a failed sign-in or registration into one short, calm sentence. The
+ * server's own refusal text (registration only) is shown as the server
+ * words it, which is English.
+ */
+export function authErrorMessage(
+  error: unknown,
+  mode: AuthMode,
+  t: Translate,
+): string {
   if (error instanceof InvalidCredentialsError) {
-    return 'Email or password is incorrect.';
+    return t('authInvalidCredentials');
   }
   if (error instanceof NetworkError) {
-    return mode === 'register'
-      ? 'No connection. Creating an account needs the internet.'
-      : 'No connection. Signing in needs the internet the first time.';
+    return t(
+      mode === 'register'
+        ? 'authNoConnectionRegister'
+        : 'authNoConnectionSignIn',
+    );
   }
   if (error instanceof HttpError && mode === 'register') {
-    return serverRefusal(error) ?? GENERIC;
+    return serverRefusal(error) ?? t('authGeneric');
   }
-  return GENERIC;
+  return t('authGeneric');
 }
