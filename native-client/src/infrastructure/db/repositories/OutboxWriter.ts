@@ -2,6 +2,7 @@ import type { Clock } from '@/application/ports/Clock';
 import type { IdGenerator } from '@/application/ports/IdGenerator';
 import type {
   OutboxEntity,
+  OutboxOp,
   OutboxOrigin,
 } from '@/application/ports/OutboxRepository';
 import type { SqlDatabase } from '@/application/ports/SqlDatabase';
@@ -20,9 +21,12 @@ interface EntryRow {
  * - at most one upsert per entity, updated in place so its id (the ordering
  *   key) and change id stay stable; if it was parked (blocked or rejected) the
  *   edit revives it as pending with its attempts reset;
+ * - a task's `complete` is queued at most once (a parked one stays as it is);
+ *   it never touches the task's upsert, which keeps its place before it;
  * - deleting an entity whose upsert has origin `create` (the server never saw
  *   it, parked or not) drops every entry for it and reports `dropped`;
- * - deleting any other entity drops its upserts and queues one delete.
+ * - deleting any other entity drops its upserts and completions and queues
+ *   one delete.
  *
  * Parked entries are included everywhere below, so an entity never ends up
  * with a parked entry and a second one beside it.
@@ -49,7 +53,7 @@ export class OutboxWriter {
   private insert(
     tx: SqlDatabase,
     entity: OutboxEntity,
-    op: 'upsert' | 'delete',
+    op: OutboxOp,
     entityId: string,
     payload: Record<string, unknown>,
     origin: OutboxOrigin,
@@ -108,6 +112,19 @@ export class OutboxWriter {
   }
 
   /**
+   * Queues the timer op `complete` of a task, with the moment it happened.
+   * Does nothing when a completion is already queued, parked or not: the
+   * first moment wins, and a parked one waits for the user's retry.
+   */
+  async complete(tx: SqlDatabase, entityId: string, at: number): Promise<void> {
+    const entries = await this.entries(tx, 'task', entityId);
+    if (entries.some(e => e.op === 'complete')) {
+      return;
+    }
+    await this.insert(tx, 'task', 'complete', entityId, { at }, 'update');
+  }
+
+  /**
    * Queues the deletion of an entity. Returns `dropped` when the server never
    * saw it (nothing queued, the caller hard-deletes the local row) or
    * `queued` when a delete entry now waits for a push.
@@ -131,7 +148,9 @@ export class OutboxWriter {
     }
     await this.remove(
       tx,
-      entries.filter(e => e.op === 'upsert').map(e => e.id),
+      entries
+        .filter(e => e.op === 'upsert' || e.op === 'complete')
+        .map(e => e.id),
     );
     if (!entries.some(e => e.op === 'delete' && e.status === 'pending')) {
       await this.insert(tx, entity, 'delete', entityId, payload, 'update');

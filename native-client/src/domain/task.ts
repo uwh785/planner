@@ -29,3 +29,19 @@ export interface Task extends SyncMeta {
   completedAt: number | null;
   sortOrder: number;
 }
+
+/**
+ * The web app's rule (web/src/lib/utils.js isOverdue): a timed task is
+ * overdue once its due moment has passed; an all-day task only once its
+ * whole day (24 h from the stored midnight) has ended. A completed task is
+ * never overdue.
+ */
+export function isOverdue(
+  task: Pick<Task, 'status' | 'dueDate' | 'dueAllDay'>,
+  now: number,
+): boolean {
+  if (task.dueDate === null || task.status === 'completed') {
+    return false;
+  }
+  return task.dueAllDay ? task.dueDate + 86_400_000 <= now : task.dueDate < now;
+}

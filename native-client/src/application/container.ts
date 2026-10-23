@@ -24,6 +24,11 @@ export interface AppContainer {
   remoteChanges: ApplyRemoteChanges;
   /** Fires after a local write has committed (the sync scheduler listens). */
   changes: ChangeSource;
+  /**
+   * Fires after a local write has committed and after a pull applied rows,
+   * so screens re-read. Unlike `changes` it never triggers a sync.
+   */
+  dataChanges: ChangeSource;
   schemaVersion: number;
   /** Releases the database handle. Call once, via ContainerSource.release. */
   close(): Promise<void>;

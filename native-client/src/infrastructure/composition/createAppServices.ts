@@ -73,18 +73,28 @@ export function createAppServices(
   // restore() never rejects: a storage failure becomes the `unreadable` state.
   restoring = session.restore().then(() => undefined);
   const adapters = options.syncAdapters ?? {};
+  const clock = new SystemClock();
+  const lifecycle = adapters.lifecycle ?? new AppStateLifecycle();
+  const timer = adapters.timer ?? new SystemTimer();
   const sync = new SyncCoordinator({
     session,
     containers,
     http: authenticated,
     connectivity: adapters.connectivity ?? new NetInfoConnectivity(),
-    lifecycle: adapters.lifecycle ?? new AppStateLifecycle(),
-    timer: adapters.timer ?? new SystemTimer(),
-    clock: new SystemClock(),
+    lifecycle,
+    timer,
+    clock,
     random: Math.random,
     log:
       options.syncLog ??
       (__DEV__ ? message => console.log(`sync: ${message}`) : undefined),
   });
-  return { session, http: authenticated, containers, sync, ready: restoring };
+  return {
+    session,
+    http: authenticated,
+    containers,
+    sync,
+    runtime: { clock, timer, lifecycle },
+    ready: restoring,
+  };
 }

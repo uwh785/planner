@@ -59,14 +59,28 @@ export class EntityStore<T extends SyncMeta, R extends object> {
     where: string,
     params: readonly SqlValue[],
     orderBy: string,
+    limit?: number,
   ): Promise<T[]> {
+    const capped = limit === undefined ? '' : ' LIMIT ?';
     const rows = await this.db.query<R>(
       `SELECT * FROM ${this.def.table} WHERE deleted = 0${
         where ? ` AND ${where}` : ''
-      } ORDER BY ${orderBy}`,
-      params,
+      } ORDER BY ${orderBy}${capped}`,
+      limit === undefined
+        ? params
+        : [...params, Math.max(0, Math.floor(limit))],
     );
     return rows.map(r => this.def.fromRow(r));
+  }
+
+  async count(where: string, params: readonly SqlValue[]): Promise<number> {
+    const [row] = await this.db.query<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM ${this.def.table} WHERE deleted = 0${
+        where ? ` AND ${where}` : ''
+      }`,
+      params,
+    );
+    return row?.n ?? 0;
   }
 
   async create(
@@ -127,6 +141,42 @@ export class EntityStore<T extends SyncMeta, R extends object> {
       'update',
     );
     return next;
+  }
+
+  /**
+   * Changes a live row and queues something other than an upsert for it (a
+   * timer op), in one transaction. `apply` returns the next state, or null
+   * when there is nothing to do (the current row is returned, nothing is
+   * queued). Resolves to null when the row does not exist.
+   */
+  transition(
+    id: string,
+    apply: (current: T) => T | null,
+    queue: (tx: SqlDatabase, next: T) => Promise<void>,
+  ): Promise<T | null> {
+    return this.db.transaction(async tx => {
+      const current = await this.findIn(tx, id);
+      if (current === null) {
+        return null;
+      }
+      const changed = apply(current);
+      if (changed === null) {
+        return current;
+      }
+      const next = this.def.normalize({
+        ...changed,
+        updatedAt: this.clock.now(),
+        deleted: false,
+      });
+      await updateRow(
+        tx,
+        this.def.table,
+        this.def.idColumn,
+        this.def.toRow(next),
+      );
+      await queue(tx, next);
+      return next;
+    });
   }
 
   delete(id: string, hooks: DeleteHooks<T> = {}): Promise<boolean> {

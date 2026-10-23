@@ -1,6 +1,7 @@
 import type { AuthenticatedHttp } from './auth/AuthenticatedHttp';
 import type { SessionService } from './auth/SessionService';
 import type { ContainerSource } from './container';
+import type { PlannerRuntime } from './planner/createPlanner';
 import type { SyncCoordinator } from './sync/SyncCoordinator';
 
 /** Everything the app needs once built: session, authenticated HTTP, data. */
@@ -16,6 +17,8 @@ export interface AppServices {
    * create their own services never sync by accident.
    */
   sync: SyncCoordinator;
+  /** Clock, timer and app lifecycle for the screens' planner services. */
+  runtime: PlannerRuntime;
   /** Settles once the stored session has been restored (never rejects). */
   ready: Promise<void>;
 }

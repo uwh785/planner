@@ -37,8 +37,10 @@ export interface Repositories {
   outbox: OutboxRepository;
   syncState: SyncStateRepository;
   remoteChanges: ApplyRemoteChanges;
-  /** Fires after each committed local write. */
+  /** Fires after each committed local write (the sync scheduler listens). */
   changes: ChangeFeed;
+  /** Fires after each committed local write and each pull that applied rows. */
+  dataChanges: ChangeFeed;
 }
 
 export interface RepositoryDeps {
@@ -59,8 +61,14 @@ export function createRepositories(
   },
 ): Repositories {
   const feed = new ChangeFeed();
+  const dataFeed = new ChangeFeed();
   const shared = {
-    db: new NotifyingDatabase(db, feed),
+    db: new NotifyingDatabase(db, {
+      notifyChange: () => {
+        feed.notifyChange();
+        dataFeed.notifyChange();
+      },
+    }),
     ids: deps.ids,
     clock: deps.clock,
     outbox: new OutboxWriter(deps.ids, deps.clock),
@@ -75,7 +83,9 @@ export function createRepositories(
     events: new EventSqlRepository(shared),
     outbox: new OutboxSqlRepository(db),
     syncState: new SyncStateSqlRepository(db),
-    remoteChanges: new RemoteChangesApplier(db),
+    // A pull never wakes the sync scheduler (`feed`), only the screens.
+    remoteChanges: new RemoteChangesApplier(db, () => dataFeed.notifyChange()),
     changes: feed,
+    dataChanges: dataFeed,
   };
 }

@@ -8,8 +8,11 @@ export type OutboxEntity =
   | 'class'
   | 'event';
 
-/** Timer ops (start, pause, complete) arrive with M6. */
-export type OutboxOp = 'upsert' | 'delete';
+/**
+ * `complete` is a task timer transition (payload `{at}`); the other timer ops
+ * (start, pause) arrive with M6.
+ */
+export type OutboxOp = 'upsert' | 'delete' | 'complete';
 
 /**
  * `create`: the entity was made on this device and the server has not seen

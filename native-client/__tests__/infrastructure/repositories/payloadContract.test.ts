@@ -4,6 +4,8 @@ import {
   DELETE_FIELDS,
   ENTITIES,
   PUSH_OPS,
+  TIMER_FIELDS,
+  TIMER_OPS,
 } from '../../helpers/backendContract';
 import {
   openTestWorld,
@@ -38,6 +40,7 @@ async function buildEverything() {
   await w.events.create({ title: 'E', startAt: 5, endAt: 9 });
   await w.taskLists.update(list.id, { name: 'L2' });
   await w.tasks.update(task.id, { title: 'T2', priority: 3 });
+  await w.tasks.complete(task.id, 1_700_000_000_000);
   return { list, task, tag };
 }
 
@@ -45,7 +48,7 @@ it('every upsert body uses only fields the backend decodes, with the right JSON 
   await buildEverything();
   const rows = await outboxRows(w.db);
   expect(new Set(rows.map(r => r.entity))).toEqual(new Set(ENTITIES));
-  for (const row of rows) {
+  for (const row of rows.filter(r => r.op === 'upsert')) {
     const body = JSON.parse(row.payload) as Record<string, unknown>;
     const spec = ACCEPTED_FIELDS[row.entity]!;
     expect(Object.keys(body).sort()).toEqual(Object.keys(spec).sort());
@@ -60,9 +63,29 @@ it('every upsert body uses only fields the backend decodes, with the right JSON 
   }
 });
 
+it('a complete is the timer op the backend replays: task only, data {at}', async () => {
+  const { task } = await buildEverything();
+  const timers = (await outboxRows(w.db)).filter(r => r.op !== 'upsert');
+  const complete = timers.find(r => r.op === 'complete')!;
+  expect(TIMER_OPS.complete).toContain(complete.entity);
+  expect(complete.entity_id).toBe(task.id);
+  const body = JSON.parse(complete.payload) as Record<string, unknown>;
+  expect(Object.keys(body)).toEqual(Object.keys(TIMER_FIELDS));
+  expect(TIMER_FIELDS.at!(body.at)).toBe(true);
+  expect(complete.change_id).toMatch(/^[\x21-\x7e]{1,64}$/);
+});
+
+it('a task completed here is described as pending in its upsert body', async () => {
+  const { task } = await buildEverything();
+  const upsert = (await outboxRows(w.db)).find(
+    r => r.entity === 'task' && r.op === 'upsert' && r.entity_id === task.id,
+  )!;
+  expect(JSON.parse(upsert.payload).status).toBe('pending');
+});
+
 it('every upsert body passes the backend validation', async () => {
   await buildEverything();
-  for (const row of await outboxRows(w.db)) {
+  for (const row of (await outboxRows(w.db)).filter(r => r.op === 'upsert')) {
     expect({
       entity: row.entity,
       error: backendValidate(row.entity, JSON.parse(row.payload)),
@@ -75,7 +98,7 @@ it('every upsert body passes the backend validation', async () => {
 
 it('never puts server-managed or local-only keys in a body', async () => {
   await buildEverything();
-  for (const row of await outboxRows(w.db)) {
+  for (const row of (await outboxRows(w.db)).filter(r => r.op === 'upsert')) {
     const keys = Object.keys(JSON.parse(row.payload));
     for (const banned of [
       'id',

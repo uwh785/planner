@@ -1,6 +1,7 @@
 import type {
   NewTask,
   TaskFilter,
+  TaskOrder,
   TaskPatch,
   TaskRepository,
 } from '@/application/ports/repositories';
@@ -13,6 +14,13 @@ import type { RepoDeps } from './deps';
 import { EntityStore } from './EntityStore';
 import { taskPayload } from './payloads';
 import { merge } from './sqlHelpers';
+
+const ORDER_BY: Record<TaskOrder, string> = {
+  default: 'sort_order, updated_at, task_id',
+  // rowid is insertion order: the closest thing to "created order" locally.
+  plan: 'sort_order, due_date IS NULL, due_date, rowid',
+  recentlyCompleted: 'completed_at DESC, rowid DESC',
+};
 
 export class TaskSqlRepository implements TaskRepository {
   private readonly store: EntityStore<Task, TaskRow>;
@@ -80,6 +88,62 @@ export class TaskSqlRepository implements TaskRepository {
   }
 
   list(filter: TaskFilter = {}) {
+    const { where, params } = this.whereOf(filter);
+    return this.store.select(
+      where,
+      params,
+      ORDER_BY[filter.order ?? 'default'],
+      filter.limit,
+    );
+  }
+
+  count(filter: TaskFilter = {}) {
+    const { where, params } = this.whereOf(filter);
+    return this.store.count(where, params);
+  }
+
+  async countOpenByList() {
+    const rows = await this.deps.db.query<{
+      list_id: string | null;
+      n: number;
+    }>(
+      `SELECT list_id, COUNT(*) AS n FROM tasks
+       WHERE deleted = 0 AND status <> 'completed' GROUP BY list_id`,
+    );
+    return new Map(rows.map(row => [row.list_id, row.n] as const));
+  }
+
+  /**
+   * Local state and the queued `complete` change together. A task the server
+   * has never seen keeps its pending create in front of the completion (the
+   * create body says "pending"), so the server creates it and then completes
+   * it at the real moment. An in-progress task folds its running segment into
+   * the elapsed time, as the backend does.
+   */
+  complete(id: string, at: number) {
+    return this.store.transition(
+      id,
+      task => {
+        if (task.status === 'completed') {
+          return null;
+        }
+        const running =
+          task.status === 'in_progress' && task.startedAt !== null
+            ? Math.max(at - task.startedAt, 0)
+            : 0;
+        return {
+          ...task,
+          status: 'completed',
+          completedAt: at,
+          startedAt: null,
+          elapsedMs: task.elapsedMs + running,
+        };
+      },
+      (tx, task) => this.deps.outbox.complete(tx, task.id, at),
+    );
+  }
+
+  private whereOf(filter: TaskFilter) {
     const where: string[] = [];
     const params: SqlValue[] = [];
     if (filter.listId === null) {
@@ -92,11 +156,12 @@ export class TaskSqlRepository implements TaskRepository {
       where.push('status = ?');
       params.push(filter.status);
     }
-    return this.store.select(
-      where.join(' AND '),
-      params,
-      'sort_order, updated_at, task_id',
-    );
+    if (filter.completion === 'open') {
+      where.push("status <> 'completed'");
+    } else if (filter.completion === 'completed') {
+      where.push("status = 'completed'");
+    }
+    return { where: where.join(' AND '), params };
   }
 
   /** Moves every live task of a list to "no list", queuing each update. */

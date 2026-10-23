@@ -23,12 +23,22 @@ export const listPayload = (l: TaskList): Body => ({
   sort_order: l.sortOrder,
 });
 
+/**
+ * A task completed here travels as the timer op `complete` (see
+ * OutboxWriter.complete), never as a status in an upsert: a create that
+ * already said `completed` would make the server refuse the later `complete`
+ * as a conflict and lose the real moment. So a task with a `completedAt`
+ * is described as pending; the server ignores the status of an update anyway.
+ */
+const wireStatus = (t: Task): string =>
+  t.status === 'completed' && t.completedAt !== null ? 'pending' : t.status;
+
 export const taskPayload = (t: Task): Body => ({
   list_id: t.listId,
   title: t.title,
   description: t.description,
   priority: t.priority,
-  status: t.status,
+  status: wireStatus(t),
   due_date: t.dueDate,
   due_all_day: t.dueAllDay,
   duration_ms: t.durationMs,

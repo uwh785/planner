@@ -27,7 +27,11 @@ import { CURSOR_KEY, writeSyncState } from './SyncStateSqlRepository';
  * pull reconciles. There are no foreign keys, so rows may arrive children first.
  */
 export class RemoteChangesApplier implements ApplyRemoteChanges {
-  constructor(private readonly db: SqlDatabase) {}
+  constructor(
+    private readonly db: SqlDatabase,
+    /** Called after a pull that changed local rows has committed. */
+    private readonly onApplied: () => void = () => undefined,
+  ) {}
 
   async applyRemoteChanges(response: unknown): Promise<ApplyResult> {
     const pull = parsePullResponse(response);
@@ -119,6 +123,9 @@ export class RemoteChangesApplier implements ApplyRemoteChanges {
         await writeSyncState(tx, CURSOR_KEY, pull.cursor);
       }
     });
+    if (result.applied > 0) {
+      this.onApplied();
+    }
     return result;
   }
 }

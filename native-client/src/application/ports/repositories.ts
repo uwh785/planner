@@ -12,7 +12,8 @@ import type {
 /**
  * Local-first repositories. Every mutation changes the local row and queues
  * the matching outbox entry in one transaction; reads never return
- * tombstones. Timer transitions (start, pause, complete) are not here yet.
+ * tombstones. Of the timer transitions only `complete` exists so far
+ * (start and pause arrive with M6).
  *
  * `update` resolves to the new state, or null when the entity does not exist
  * (or is deleted). `delete` resolves to whether anything was deleted.
@@ -63,15 +64,42 @@ export interface TaskFilter {
   /** A list id, or null for tasks without a list. Omit for any list. */
   listId?: string | null;
   status?: TaskStatus;
+  /** `open`: pending or in progress. `completed`: done. Omit for both. */
+  completion?: 'open' | 'completed';
+  /**
+   * `default`: sort order, then update time. `plan`: sort order, then due
+   * date (undated last), then creation order. `recentlyCompleted`: latest
+   * completion first.
+   */
+  order?: TaskOrder;
+  /** At most this many rows. */
+  limit?: number;
 }
 
+export type TaskOrder = 'default' | 'plan' | 'recentlyCompleted';
+
 export interface TaskRepository extends Repository<Task, NewTask, TaskPatch> {
-  /** By sort order, then update time. */
+  /** In `filter.order` (default: sort order, then update time). */
   list(filter?: TaskFilter): Promise<Task[]>;
+  /** How many live tasks match; `order` and `limit` are ignored. */
+  count(filter?: TaskFilter): Promise<number>;
+  /** Open (not completed) live tasks per list id; `null` is "no list". */
+  countOpenByList(): Promise<Map<string | null, number>>;
+  /**
+   * Completes the task at `at` (epoch ms, the moment the user did it) and
+   * queues the timer op `complete` with `{at}`. There is no way back: the
+   * backend has no reopen transition and ignores status on update.
+   *
+   * Resolves to the completed task; to null when it does not exist (or is
+   * deleted). Completing a task that is already completed changes and queues
+   * nothing and resolves to the existing row.
+   */
+  complete(id: string, at: number): Promise<Task | null>;
   /**
    * Like the backend, deleting a task does not touch its subtasks or tag
    * links. The exception is a task the server never saw: its pending
    * subtasks and links go with it, since they could never be pushed.
+   * A pending or parked `complete` of the task is dropped with it.
    */
   delete(id: string): Promise<boolean>;
 }

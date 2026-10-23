@@ -31,6 +31,8 @@ export type EntryOutcome =
  * The entry as the server wants it. A task/tag link's entity id is the pair
  * `<task_id>:<tag_id>`; the server ignores the id for links and reads
  * `{task_id, tag_id}` from the data, which the payload already holds.
+ * A task `complete` is the backend's timer op: `{entity: 'task', op:
+ * 'complete', id, data: {at}, change_id}`; its payload is exactly `{at}`.
  */
 export const toPushChange = (entry: OutboxEntry): PushChange => ({
   entity: entry.entity,
@@ -81,7 +83,9 @@ function outcomeOf(entry: OutboxEntry, result: Wire | undefined): EntryOutcome {
       return { kind: 'sent' };
     case 'not_found':
       // A delete of something already gone is done. An upsert is missing a
-      // parent (list, tag, task) that may still arrive: retry a few times.
+      // parent (list, tag, task) that may still arrive, and a `complete`
+      // waits for its task (its create may be parked or still behind it):
+      // retry a few times, then park as blocked so it stays visible.
       return entry.op === 'delete'
         ? { kind: 'sent' }
         : {
@@ -99,6 +103,19 @@ function outcomeOf(entry: OutboxEntry, result: Wire | undefined): EntryOutcome {
         error: message(result.error, 'A plan limit was reached'),
       };
     case 'conflict':
+      // For a `complete`, the server answers conflict when the task cannot
+      // leave its current status: it is already completed (the only way a
+      // task we completed locally can be refused). The outcome the user asked
+      // for already holds, so the entry is cleared instead of parked forever.
+      // For an upsert it still means the id belongs to someone else.
+      if (entry.op === 'complete') {
+        return { kind: 'sent' };
+      }
+      return {
+        kind: 'park',
+        status: 'rejected',
+        error: message(result.error, 'The server refused this change'),
+      };
     case 'invalid':
       return {
         kind: 'park',

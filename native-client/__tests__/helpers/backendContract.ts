@@ -118,4 +118,15 @@ export const DELETE_FIELDS: Record<string, string[]> = {
 };
 
 export const ENTITIES = Object.keys(ACCEPTED_FIELDS);
-export const PUSH_OPS = ['upsert', 'delete'];
+export const PUSH_OPS = ['upsert', 'delete', 'complete'];
+
+/**
+ * Timer ops (sync_push.go pushTransition): only on `task`, the id travels in
+ * the change and `data` is `{"at": <positive unix ms>}`. `at` may be at most
+ * five minutes ahead of the server clock (store.MaxClockSkewMs), so it is the
+ * moment the user acted, never a later one.
+ */
+export const TIMER_OPS: Record<string, string[]> = { complete: ['task'] };
+export const TIMER_FIELDS: Record<string, Check> = {
+  at: v => typeof v === 'number' && Number.isInteger(v) && v > 0,
+};
