@@ -11,6 +11,7 @@ import App from '@/presentation/App';
 import { SyncProvider, useSyncStatus } from '@/presentation/syncContext';
 import { syncStatusText } from '@/presentation/syncStatusText';
 import { asContainer } from '../helpers/plannerWorld';
+import { withLocale, words } from '../helpers/i18n';
 import { openTestWorld } from '../helpers/testRepositories';
 import {
   active,
@@ -44,16 +45,45 @@ describe('syncStatusText', () => {
     [{ lastSyncAt: NOW - 3 * 3_600_000 }, 'Synced 3 h ago'],
     [{ lastSyncAt: NOW - 49 * 3_600_000 }, 'Synced 2 d ago'],
   ] as [Partial<SyncSnapshot>, string][])('%j -> %s', (patch, text) => {
-    expect(syncStatusText(snap(patch), NOW)).toBe(text);
+    expect(syncStatusText(snap(patch), NOW, words('en').t)).toBe(text);
   });
 
   it('puts a paused session before everything and attention before syncing', () => {
     expect(
-      syncStatusText(snap({ phase: 'paused', blockedCount: 4 }), NOW),
+      syncStatusText(
+        snap({ phase: 'paused', blockedCount: 4 }),
+        NOW,
+        words('en').t,
+      ),
     ).toBe('Sync paused. Sign in again.');
     expect(
-      syncStatusText(snap({ phase: 'syncing', rejectedCount: 1 }), NOW),
+      syncStatusText(
+        snap({ phase: 'syncing', rejectedCount: 1 }),
+        NOW,
+        words('en').t,
+      ),
     ).toBe('1 change needs attention');
+  });
+});
+
+describe('syncStatusText in Spanish', () => {
+  it.each([
+    [{ phase: 'syncing' }, 'Sincronizando…'],
+    [
+      { phase: 'offline', pendingCount: 3 },
+      'Sin conexión. 3 cambios en espera.',
+    ],
+    [
+      { phase: 'offline', pendingCount: 1 },
+      'Sin conexión. 1 cambio en espera.',
+    ],
+    [{ blockedCount: 1 }, '1 cambio necesita atención'],
+    [{ blockedCount: 1, rejectedCount: 2 }, '3 cambios necesitan atención'],
+    [{ lastSyncAt: NOW - 5_000 }, 'Sincronizado hace un momento'],
+    [{ lastSyncAt: NOW - 61_000 }, 'Sincronizado hace 1 min'],
+    [{ lastSyncAt: NOW - 3 * 3_600_000 }, 'Sincronizado hace 3 h'],
+  ] as [Partial<SyncSnapshot>, string][])('%j -> %s', (patch, text) => {
+    expect(syncStatusText(snap(patch), NOW, words('es').t)).toBe(text);
   });
 });
 
@@ -88,11 +118,20 @@ async function renderHome(source?: SyncStatus) {
     acquire: jest.fn(async () => asContainer(world)),
     release: jest.fn(),
   };
-  render(<App session={session} containers={containers} sync={source} />);
+  const { service, ready } = withLocale('en');
+  await ready;
+  render(
+    <App
+      session={session}
+      containers={containers}
+      sync={source}
+      locale={service}
+    />,
+  );
   return act(() => session.restore());
 }
 
-describe('status line on the lists home', () => {
+describe('status line on the Panel', () => {
   beforeEach(() =>
     jest.spyOn(console, 'log').mockImplementation(() => undefined),
   );
@@ -121,7 +160,7 @@ describe('status line on the lists home', () => {
 
   it('is absent when no sync status is provided', async () => {
     await renderHome(undefined);
-    await screen.findByRole('header', { name: 'Lists' });
+    await screen.findByRole('header', { name: 'Dashboard' });
     expect(screen.queryByText(/sync/i)).toBeNull();
   });
 

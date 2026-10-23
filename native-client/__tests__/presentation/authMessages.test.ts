@@ -3,7 +3,14 @@ import {
   InvalidCredentialsError,
   NetworkError,
 } from '@/application/auth/errors';
-import { authErrorMessage } from '@/presentation/screens/authMessages';
+import {
+  authErrorMessage as message,
+  type AuthMode,
+} from '@/presentation/screens/authMessages';
+import { words } from '../helpers/i18n';
+
+const authErrorMessage = (error: unknown, mode: AuthMode) =>
+  message(error, mode, words('en').t);
 
 const GENERIC = 'Something went wrong. Please try again.';
 
@@ -47,5 +54,18 @@ it('does not surface server text that is unsafe or from other flows', () => {
   ).toBe(GENERIC);
   expect(authErrorMessage(new HttpError(400, 'bad request'), 'signIn')).toBe(
     GENERIC,
+  );
+});
+
+it('speaks Spanish too', () => {
+  const t = words('es').t;
+  expect(message(new InvalidCredentialsError(), 'signIn', t)).toBe(
+    'El correo o la contraseña no son correctos.',
+  );
+  expect(message(new NetworkError(), 'register', t)).toBe(
+    'Sin conexión. Crear una cuenta necesita internet.',
+  );
+  expect(message(new Error('boom'), 'signIn', t)).toBe(
+    'Algo salió mal. Inténtalo de nuevo.',
   );
 });

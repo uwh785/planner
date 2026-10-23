@@ -6,7 +6,6 @@ import {
   waitFor,
   within,
 } from '@testing-library/react-native';
-import { SyncStatus } from '@/application/sync/SyncStatus';
 import { flushAsync } from '../helpers/plannerWorld';
 import { renderSignedIn } from '../helpers/renderApp';
 
@@ -17,23 +16,27 @@ afterEach(() => jest.restoreAllMocks());
 
 const settle = () => act(async () => flushAsync());
 
-describe('lists home', () => {
-  it('shows the empty state and the all-tasks row on a fresh account', async () => {
+async function openLists() {
+  fireEvent.press(await screen.findByRole('tab', { name: 'Settings' }));
+  fireEvent.press(await screen.findByRole('button', { name: /^Lists/ }));
+  await screen.findByRole('header', { name: 'Lists' });
+}
+
+describe('list management (opened from Settings)', () => {
+  it('shows the empty state on a fresh account, without an "All tasks" row', async () => {
     await renderSignedIn();
-    expect(
-      screen.getByRole('button', { name: 'All tasks, no open tasks' }),
-    ).toBeTruthy();
+    await openLists();
     expect(screen.getByText('No lists yet')).toBeTruthy();
     expect(
       screen.getByText('Lists group your tasks. Add one above.'),
     ).toBeTruthy();
     expect(screen.getByLabelText('Add a list')).toBeTruthy();
-    expect(screen.queryByText('Planner')).toBeNull();
-    expect(screen.queryByRole('button', { name: /sample task/i })).toBeNull();
+    expect(screen.queryByText(/All tasks/)).toBeNull();
   });
 
   it('quick adds a list with the keyboard action and shows it with its count', async () => {
     const { world } = await renderSignedIn();
+    await openLists();
     const field = screen.getByLabelText('Add a list');
     expect(field.props.returnKeyType).toBe('done');
     fireEvent.changeText(field, '  Home ');
@@ -50,8 +53,8 @@ describe('lists home', () => {
 
   it('adds with the Add button too, and refuses a blank name with a message', async () => {
     await renderSignedIn();
-    const field = screen.getByLabelText('Add a list');
-    fireEvent.changeText(field, 'Work');
+    await openLists();
+    fireEvent.changeText(screen.getByLabelText('Add a list'), 'Work');
     fireEvent.press(screen.getByRole('button', { name: 'Add' }));
     expect(
       await screen.findByRole('button', { name: 'Work, no open tasks' }),
@@ -61,16 +64,13 @@ describe('lists home', () => {
     expect(await screen.findByText('Name is required')).toBeTruthy();
   });
 
-  it('counts open tasks per list and for all tasks, and follows changes', async () => {
+  it('counts open tasks per list and follows changes', async () => {
     const { world } = await renderSignedIn();
     const list = await world.taskLists.create({ name: 'Home' });
+    await openLists();
     await world.tasks.create({ title: 'a', listId: list.id });
-    await world.tasks.create({ title: 'b' });
     expect(
       await screen.findByRole('button', { name: 'Home, 1 open task' }),
-    ).toBeTruthy();
-    expect(
-      screen.getByRole('button', { name: 'All tasks, 2 open tasks' }),
     ).toBeTruthy();
     expect(
       within(
@@ -82,6 +82,7 @@ describe('lists home', () => {
   it('shows the list color as a marker next to its name, never alone', async () => {
     const { world } = await renderSignedIn();
     await world.taskLists.create({ name: 'Home', color: '#30D158' });
+    await openLists();
     const row = await screen.findByRole('button', {
       name: 'Home, no open tasks',
     });
@@ -94,31 +95,13 @@ describe('lists home', () => {
     ).toMatchObject({ backgroundColor: '#30D158' });
   });
 
-  it('shows the discreet sync status line', async () => {
-    const sync = new SyncStatus();
-    sync.update({ phase: 'offline', pendingCount: 2 });
-    await renderSignedIn({ sync });
-    const line = screen.getByText('Offline. 2 changes waiting.');
-    expect(line.props.accessibilityLiveRegion).toBe('polite');
-  });
-
-  it('opens the all-tasks screen, a list, and the account', async () => {
-    const { world } = await renderSignedIn();
-    await world.taskLists.create({ name: 'Home' });
-    fireEvent.press(
-      await screen.findByRole('button', { name: 'Home, no open tasks' }),
-    );
-    expect(await screen.findByRole('header', { name: 'Home' })).toBeTruthy();
+  it('goes back to Settings', async () => {
+    await renderSignedIn();
+    await openLists();
     fireEvent.press(screen.getByRole('button', { name: 'Back' }));
-    fireEvent.press(
-      await screen.findByRole('button', { name: 'All tasks, no open tasks' }),
-    );
     expect(
-      await screen.findByRole('header', { name: 'All tasks' }),
+      await screen.findByRole('header', { name: 'Settings' }),
     ).toBeTruthy();
-    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
-    fireEvent.press(await screen.findByRole('button', { name: 'Account' }));
-    expect(await screen.findByRole('header', { name: 'Account' })).toBeTruthy();
   });
 
   it('marks the title as a header and lets the rows wrap at large text', async () => {
@@ -126,12 +109,86 @@ describe('lists home', () => {
     await world.taskLists.create({
       name: 'A very long list name that must wrap instead of clipping at large font sizes',
     });
-    await settle();
+    await openLists();
     await waitFor(() =>
       expect(
         screen.getByText(/A very long list name/).props.numberOfLines,
       ).toBeUndefined(),
     );
     expect(screen.getByRole('header', { name: 'Lists' })).toBeTruthy();
+  });
+
+  it('words everything in Spanish', async () => {
+    await renderSignedIn({ locale: 'es' });
+    fireEvent.press(await screen.findByRole('tab', { name: 'Config' }));
+    fireEvent.press(await screen.findByRole('button', { name: /^Listas/ }));
+    expect(await screen.findByRole('header', { name: 'Listas' })).toBeTruthy();
+    expect(screen.getByText('Aún no hay listas')).toBeTruthy();
+    expect(screen.getByLabelText('Agregar una lista')).toBeTruthy();
+  });
+});
+
+describe('editing a list', () => {
+  it('renames, recolors and deletes the list from its edit screen', async () => {
+    const env = await renderSignedIn();
+    const list = await env.world.taskLists.create({ name: 'Old' });
+    const task = await env.world.tasks.create({
+      title: 'inside',
+      listId: list.id,
+    });
+    await openLists();
+    fireEvent.press(await screen.findByRole('button', { name: /^Old/ }));
+    expect(
+      await screen.findByRole('header', { name: 'Edit list' }),
+    ).toBeTruthy();
+    expect(screen.getByLabelText('Name').props.value).toBe('Old');
+    fireEvent.changeText(screen.getByLabelText('Name'), 'New name');
+    fireEvent.press(screen.getByRole('radio', { name: 'Green' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Save' }));
+    await screen.findByRole('header', { name: 'Lists' });
+    expect(await env.world.taskLists.get(list.id)).toMatchObject({
+      name: 'New name',
+      color: '#30D158',
+    });
+
+    fireEvent.press(await screen.findByRole('button', { name: /^New name/ }));
+    await screen.findByRole('header', { name: 'Edit list' });
+    const alert = jest.spyOn(require('react-native').Alert, 'alert');
+    fireEvent.press(screen.getByRole('button', { name: 'Delete list' }));
+    expect(alert).toHaveBeenCalledWith(
+      'Delete this list?',
+      'Its tasks stay and move out of any list.',
+      expect.any(Array),
+    );
+    const buttons = alert.mock.calls[0]![2] as {
+      text: string;
+      onPress?: () => void;
+    }[];
+    expect(buttons.map(b => b.text)).toEqual(['Cancel', 'Delete']);
+    expect(await env.world.taskLists.get(list.id)).not.toBeNull();
+    await act(async () => buttons[1]!.onPress!());
+    await screen.findByRole('header', { name: 'Lists' });
+    await settle();
+    expect(await env.world.taskLists.get(list.id)).toBeNull();
+    expect((await env.world.tasks.get(task.id))?.listId).toBeNull();
+    expect(screen.getByText('Deleted list New name')).toBeTruthy();
+  });
+
+  it('names the colors and the confirm dialog in Spanish', async () => {
+    const env = await renderSignedIn({ locale: 'es' });
+    const list = await env.world.taskLists.create({ name: 'Casa' });
+    fireEvent.press(await screen.findByRole('tab', { name: 'Config' }));
+    fireEvent.press(await screen.findByRole('button', { name: /^Listas/ }));
+    fireEvent.press(await screen.findByRole('button', { name: /^Casa/ }));
+    await screen.findByRole('header', { name: 'Editar lista' });
+    expect(screen.getByRole('radio', { name: 'Verde' })).toBeTruthy();
+    const alert = jest.spyOn(require('react-native').Alert, 'alert');
+    fireEvent.press(screen.getByRole('button', { name: 'Eliminar lista' }));
+    expect(alert).toHaveBeenCalledWith(
+      '¿Eliminar esta lista?',
+      'Sus tareas se quedan y salen de cualquier lista.',
+      expect.any(Array),
+    );
+    expect(list.id).toBeTruthy();
   });
 });

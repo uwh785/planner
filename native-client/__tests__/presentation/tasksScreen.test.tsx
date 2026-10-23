@@ -16,16 +16,19 @@ afterEach(() => jest.restoreAllMocks());
 
 const settle = () => act(async () => flushAsync());
 
-async function openList(name: string) {
-  fireEvent.press(
-    await screen.findByRole('button', { name: new RegExp(`^${name}`) }),
-  );
-  await screen.findByRole('header', { name });
+async function openTasks() {
+  fireEvent.press(await screen.findByRole('tab', { name: 'Tasks' }));
+  await screen.findByRole('header', { name: 'Tasks' });
+  await settle();
 }
-async function openAll() {
-  fireEvent.press(await screen.findByRole('button', { name: /^All tasks/ }));
-  await screen.findByRole('header', { name: 'All tasks' });
-}
+const chip = (name: string, group: string) =>
+  within(screen.getByLabelText(group)).getByRole('radio', { name });
+const status = (name: string) => chip(name, 'Filter by status');
+const list = (name: string) => chip(name, 'Filter by list');
+const card = (title: string | RegExp) =>
+  screen.findByRole('button', {
+    name: typeof title === 'string' ? new RegExp(`^${title}`) : title,
+  });
 const add = async (text: string) => {
   const field = screen.getByLabelText('Add a task');
   fireEvent.changeText(field, text);
@@ -37,47 +40,43 @@ const advance = async (env: Rendered, ms: number) => {
   await settle();
 };
 
-describe('tasks screen', () => {
+describe('tasks tab', () => {
   it('starts empty with a plain prompt and a quick add field', async () => {
-    const env = await renderSignedIn();
-    await env.world.taskLists.create({ name: 'Home' });
-    await openList('Home');
-    expect(await screen.findByText('No tasks yet')).toBeTruthy();
-    expect(screen.getByText('Add your first task above.')).toBeTruthy();
+    await renderSignedIn();
+    await openTasks();
+    expect(await screen.findByText('No tasks')).toBeTruthy();
+    expect(screen.getByText('Type above to add your first task.')).toBeTruthy();
     const field = screen.getByLabelText('Add a task');
     expect(field.props.returnKeyType).toBe('done');
     expect(field.props.blurOnSubmit).toBe(false);
   });
 
-  it('quick adds into the list on the keyboard action and clears the field', async () => {
+  it('quick adds on the keyboard action, clears the field and says so', async () => {
     const env = await renderSignedIn();
-    const list = await env.world.taskLists.create({ name: 'Home' });
-    await openList('Home');
+    await openTasks();
     await add('Buy milk');
-    expect(
-      await screen.findByRole('button', { name: /^Buy milk/ }),
-    ).toBeTruthy();
+    expect(await card('Buy milk')).toBeTruthy();
     expect(screen.getByLabelText('Add a task').props.value).toBe('');
     expect((await env.world.tasks.list())[0]).toMatchObject({
       title: 'Buy milk',
-      listId: list.id,
+      listId: null,
     });
-    expect(
-      screen.getByText('Added Buy milk').props.accessibilityLiveRegion ??
-        'polite',
-    ).toBe('polite');
-    expect(screen.queryByText('No tasks yet')).toBeNull();
+    expect(screen.getByText('Added Buy milk')).toBeTruthy();
+    expect(screen.queryByText('No tasks')).toBeNull();
   });
 
-  it('adds to no list from "All tasks"', async () => {
-    const env = await renderSignedIn();
-    await openAll();
-    await add('Loose task');
-    await screen.findByRole('button', { name: /^Loose task/ });
-    expect((await env.world.tasks.list())[0]!.listId).toBeNull();
+  it('explains a refused add in the user language', async () => {
+    await renderSignedIn({ locale: 'es' });
+    fireEvent.press(await screen.findByRole('tab', { name: 'Tareas' }));
+    await screen.findByRole('header', { name: 'Tareas' });
+    const field = screen.getByLabelText('Agregar una tarea');
+    fireEvent.changeText(field, '   ');
+    fireEvent(field, 'submitEditing');
+    await settle();
+    expect(screen.getByText('El título es obligatorio')).toBeTruthy();
   });
 
-  it('shows open tasks in plan order with due text and a priority icon with its word', async () => {
+  it('shows the web card: status dot, title, priority badge, due text and description', async () => {
     const env = await renderSignedIn();
     const at = (d: number) => new Date(2026, 11, d).getTime(); // Dec, after NOW
     await env.world.tasks.create({
@@ -88,34 +87,37 @@ describe('tasks screen', () => {
     });
     await env.world.tasks.create({
       title: 'sooner',
+      description: 'Slides for Friday',
       dueDate: at(2),
       dueAllDay: true,
       priority: 3,
     });
     await env.world.tasks.create({ title: 'nodate' });
-    await openAll();
-    const rows = await screen.findAllByRole('checkbox');
-    expect(rows.map(r => r.props.accessibilityLabel)).toEqual([
-      'Mark sooner as done',
-      'Mark later as done',
-      'Mark nodate as done',
-    ]);
-    const sooner = screen.getByRole('button', { name: /^sooner/ });
-    expect(within(sooner).getByText('Dec 2')).toBeTruthy();
-    expect(within(sooner).getByText('High')).toBeTruthy();
+    await openTasks();
+    const cards = await screen.findAllByTestId(/^task-card-/);
+    expect(cards).toHaveLength(3);
+    const soon = screen.getByRole('button', { name: /^sooner/ });
+    expect(within(soon).getByText('Dec 2')).toBeTruthy();
+    expect(within(soon).getByText('High')).toBeTruthy();
+    expect(within(soon).getByText('Slides for Friday')).toBeTruthy();
     expect(
-      within(sooner).getByTestId('priority-flag', {
+      within(soon).getByTestId('status-dot-pending', {
         includeHiddenElements: true,
       }),
     ).toBeTruthy();
-    expect(sooner.props.accessibilityLabel).toBe(
-      'sooner, Dec 2, High priority',
+    expect(soon.props.accessibilityLabel).toBe(
+      'sooner, Pending, Dec 2, high priority',
     );
-    const none = screen.getByRole('button', { name: /^nodate/ });
+    // Plan order: sooner, later, no date.
     expect(
-      within(none).queryByTestId('priority-flag', {
-        includeHiddenElements: true,
-      }),
+      screen
+        .getAllByRole('button', { name: /^(sooner|later|nodate)/ })
+        .map(b => b.props.accessibilityLabel.split(',')[0]),
+    ).toEqual(['sooner', 'later', 'nodate']);
+    expect(
+      within(screen.getByRole('button', { name: /^nodate/ })).queryByText(
+        'High',
+      ),
     ).toBeNull();
   });
 
@@ -126,143 +128,42 @@ describe('tasks screen', () => {
       dueDate: new Date(2020, 0, 5).getTime(),
       dueAllDay: true,
     });
-    await openAll();
-    expect(await screen.findByText('Overdue, Jan 5, 2020')).toBeTruthy();
-  });
-
-  describe('completing', () => {
-    async function withTask() {
-      const env = await renderSignedIn();
-      await env.world.tasks.create({ title: 'Call Ann' });
-      await env.world.outbox.markSent(
-        (await env.world.outbox.peekPending(9)).map(e => e.id),
-      );
-      await openAll();
-      await screen.findByRole('button', { name: /^Call Ann/ });
-      return env;
-    }
-
-    it('has a real checkbox with a 48dp target', async () => {
-      await withTask();
-      const box = screen.getByRole('checkbox', {
-        name: 'Mark Call Ann as done',
-      });
-      expect(box.props.accessibilityState).toMatchObject({ checked: false });
-      expect(StyleSheet.flatten(box.props.style)).toEqual(
-        expect.objectContaining({ minWidth: 48, minHeight: 48 }),
-      );
-    });
-
-    it('shows the row as completing with Undo, and writes nothing yet', async () => {
-      const env = await withTask();
-      fireEvent.press(
-        screen.getByRole('checkbox', { name: 'Mark Call Ann as done' }),
-      );
-      await settle();
-      expect(
-        screen.getByRole('checkbox', { name: 'Mark Call Ann as done' }).props
-          .accessibilityState,
-      ).toMatchObject({ checked: true });
-      expect(screen.getByRole('button', { name: 'Undo' })).toBeTruthy();
-      expect(
-        screen.getByText('Completed Call Ann. Undo is available.'),
-      ).toBeTruthy();
-      expect((await env.world.tasks.list())[0]!.status).toBe('pending');
-      expect(await env.world.outbox.pendingCount()).toBe(0);
-    });
-
-    it('Undo cancels the completion for good', async () => {
-      const env = await withTask();
-      fireEvent.press(
-        screen.getByRole('checkbox', { name: 'Mark Call Ann as done' }),
-      );
-      await settle();
-      fireEvent.press(screen.getByRole('button', { name: 'Undo' }));
-      await settle();
-      expect(screen.queryByRole('button', { name: 'Undo' })).toBeNull();
-      await advance(env, 10_000);
-      expect((await env.world.tasks.list())[0]!.status).toBe('pending');
-      expect(await env.world.outbox.pendingCount()).toBe(0);
-      expect(
-        screen.getByRole('checkbox', { name: 'Mark Call Ann as done' }).props
-          .accessibilityState,
-      ).toMatchObject({ checked: false });
-    });
-
-    it('when the window elapses the task is completed, queued, and moves to Completed', async () => {
-      const env = await withTask();
-      fireEvent.press(
-        screen.getByRole('checkbox', { name: 'Mark Call Ann as done' }),
-      );
-      await settle();
-      await advance(env, 5_000);
-      expect((await env.world.tasks.list())[0]!.status).toBe('completed');
-      expect((await env.world.outbox.peekPending(9))[0]).toMatchObject({
-        op: 'complete',
-      });
-      await waitFor(() =>
-        expect(screen.queryByRole('button', { name: 'Undo' })).toBeNull(),
-      );
-      expect(
-        screen.queryByRole('checkbox', { name: 'Mark Call Ann as done' }),
-      ).toBeNull();
-      const header = screen.getByRole('button', { name: /^Completed, 1 task/ });
-      expect(within(header).getByText('Completed (1)')).toBeTruthy();
-      expect(within(header).getByText('Show')).toBeTruthy();
-    });
-
-    it('keeps completed tasks collapsed until asked, struck through with the word and date', async () => {
-      const env = await renderSignedIn();
-      const t = await env.world.tasks.create({ title: 'Done thing' });
-      await env.world.tasks.complete(t.id, new Date(2026, 9, 21, 8).getTime());
-      await openAll();
-      expect(screen.queryByText('Done thing')).toBeNull();
-      fireEvent.press(
-        await screen.findByRole('button', { name: /^Completed, 1 task/ }),
-      );
-      const row = await screen.findByRole('button', { name: /^Done thing/ });
-      expect(
-        StyleSheet.flatten(within(row).getByText('Done thing').props.style),
-      ).toMatchObject({ textDecorationLine: 'line-through' });
-      expect(within(row).getByText('Completed Oct 21')).toBeTruthy();
-      const box = screen.getByRole('checkbox', {
-        name: 'Done thing, completed',
-      });
-      expect(box.props.accessibilityState).toMatchObject({
-        checked: true,
-        disabled: true,
-      });
-      expect(screen.getByText('Hide')).toBeTruthy();
-    });
-
-    it('flushes a pending completion when the screen goes away', async () => {
-      const env = await withTask();
-      fireEvent.press(
-        screen.getByRole('checkbox', { name: 'Mark Call Ann as done' }),
-      );
-      await settle();
-      fireEvent.press(screen.getByRole('button', { name: 'Back' }));
-      await settle();
-      expect((await env.world.tasks.list())[0]!.status).toBe('completed');
-    });
-
-    it('flushes when the app goes to the background', async () => {
-      const env = await withTask();
-      fireEvent.press(
-        screen.getByRole('checkbox', { name: 'Mark Call Ann as done' }),
-      );
-      await settle();
-      act(() => env.lifecycle.set(false));
-      await settle();
-      expect((await env.world.tasks.list())[0]!.status).toBe('completed');
+    await openTasks();
+    const text = await screen.findByText('Overdue, Jan 5, 2020');
+    expect(StyleSheet.flatten(text.props.style)).toMatchObject({
+      fontWeight: '600',
     });
   });
 
-  it('opens the edit screen from a row', async () => {
+  it('shows the remaining-time box with its spoken equivalent', async () => {
+    const env = await renderSignedIn();
+    await env.world.tasks.create({
+      title: 'Timed',
+      status: 'in_progress',
+      durationMs: 2 * 3_600_000,
+    });
+    await openTasks();
+    await card('Timed');
+    expect(screen.getByLabelText('2 h left')).toBeTruthy();
+    expect(screen.getByText('Time left')).toBeTruthy();
+  });
+
+  it('wraps long titles instead of clipping them', async () => {
+    const env = await renderSignedIn();
+    await env.world.tasks.create({
+      title:
+        'A really long task title that needs several lines on a small screen with large text',
+    });
+    await openTasks();
+    const title = await screen.findByText(/A really long task title/);
+    expect(title.props.numberOfLines).toBeUndefined();
+  });
+
+  it('opens the edit screen from a card', async () => {
     const env = await renderSignedIn();
     await env.world.tasks.create({ title: 'Edit me' });
-    await openAll();
-    fireEvent.press(await screen.findByRole('button', { name: /^Edit me/ }));
+    await openTasks();
+    fireEvent.press(await card('Edit me'));
     expect(
       await screen.findByRole('header', { name: 'Edit task' }),
     ).toBeTruthy();
@@ -271,7 +172,7 @@ describe('tasks screen', () => {
 
   it('follows tasks that arrive from a pull while it is open', async () => {
     const env = await renderSignedIn();
-    await openAll();
+    await openTasks();
     await act(async () => {
       await env.world.remoteChanges.applyRemoteChanges({
         cursor: 1,
@@ -296,65 +197,293 @@ describe('tasks screen', () => {
         ],
       });
     });
-    expect(
-      await screen.findByRole('button', { name: /^From the server/ }),
-    ).toBeTruthy();
-  });
-
-  it('wraps long titles instead of clipping them', async () => {
-    const env = await renderSignedIn();
-    await env.world.tasks.create({
-      title:
-        'A really long task title that needs several lines on a small screen with large text',
-    });
-    await openAll();
-    const title = await screen.findByText(/A really long task title/);
-    expect(title.props.numberOfLines).toBeUndefined();
+    expect(await card('From the server')).toBeTruthy();
   });
 });
 
-describe('list header actions', () => {
-  it('renames, recolors and deletes the list from the edit list screen', async () => {
-    const env = await renderSignedIn();
-    const list = await env.world.taskLists.create({ name: 'Old' });
-    const task = await env.world.tasks.create({
-      title: 'inside',
-      listId: list.id,
+describe('filters', () => {
+  async function seed(env: Rendered) {
+    const home = await env.world.taskLists.create({ name: 'Home' });
+    await env.world.taskLists.create({ name: 'Work' });
+    await env.world.tasks.create({ title: 'pending home', listId: home.id });
+    await env.world.tasks.create({ title: 'pending loose' });
+    await env.world.tasks.create({
+      title: 'running',
+      status: 'in_progress',
     });
-    await openList('Old');
-    fireEvent.press(screen.getByRole('button', { name: 'Edit list' }));
-    expect(
-      await screen.findByRole('header', { name: 'Edit list' }),
-    ).toBeTruthy();
-    expect(screen.getByLabelText('Name').props.value).toBe('Old');
-    fireEvent.changeText(screen.getByLabelText('Name'), 'New name');
-    fireEvent.press(screen.getByRole('radio', { name: 'Green' }));
-    fireEvent.press(screen.getByRole('button', { name: 'Save' }));
-    await screen.findByRole('header', { name: 'New name' });
-    expect(await env.world.taskLists.get(list.id)).toMatchObject({
-      name: 'New name',
-      color: '#30D158',
+    await env.world.tasks.create({
+      title: 'late one',
+      dueDate: new Date(2020, 0, 5).getTime(),
+      dueAllDay: true,
     });
+    const done = await env.world.tasks.create({ title: 'done one' });
+    await env.world.tasks.complete(done.id, 5);
+    return home;
+  }
+  const titles = () =>
+    screen
+      .queryAllByRole('button', {
+        name: /^(pending home|pending loose|running|late one|done one)/,
+      })
+      .map(b => b.props.accessibilityLabel.split(',')[0])
+      .sort();
 
-    fireEvent.press(screen.getByRole('button', { name: 'Edit list' }));
-    await screen.findByRole('header', { name: 'Edit list' });
-    const alert = jest.spyOn(require('react-native').Alert, 'alert');
-    fireEvent.press(screen.getByRole('button', { name: 'Delete list' }));
-    expect(alert).toHaveBeenCalledWith(
-      'Delete this list?',
-      'Its tasks stay and move out of any list.',
-      expect.any(Array),
+  it('offers the web filters, All selected first, announced as radios', async () => {
+    const env = await renderSignedIn();
+    await seed(env);
+    await openTasks();
+    const group = screen.getByLabelText('Filter by status');
+    expect(group.props.accessibilityRole).toBe('radiogroup');
+    expect(
+      within(group)
+        .getAllByRole('radio')
+        .map(r => r.props.accessibilityLabel),
+    ).toEqual(['All', 'Pending', 'In Progress', 'Completed', 'Overdue']);
+    expect(status('All').props.accessibilityState).toMatchObject({
+      selected: true,
+    });
+  });
+
+  it('filters by status like the web', async () => {
+    const env = await renderSignedIn();
+    await seed(env);
+    await openTasks();
+    await card('pending home');
+    expect(titles()).toEqual([
+      'late one',
+      'pending home',
+      'pending loose',
+      'running',
+    ]);
+
+    fireEvent.press(status('Pending'));
+    await settle();
+    expect(titles()).toEqual(['late one', 'pending home', 'pending loose']);
+
+    fireEvent.press(status('In Progress'));
+    await settle();
+    expect(titles()).toEqual(['running']);
+
+    fireEvent.press(status('Overdue'));
+    await settle();
+    expect(titles()).toEqual(['late one']);
+
+    fireEvent.press(status('Completed'));
+    await settle();
+    expect(titles()).toEqual(['done one']);
+    expect(status('Completed').props.accessibilityState).toMatchObject({
+      selected: true,
+    });
+  });
+
+  it('says so when a filter matches nothing', async () => {
+    const env = await renderSignedIn();
+    await env.world.tasks.create({ title: 'only pending' });
+    await openTasks();
+    fireEvent.press(status('In Progress'));
+    await settle();
+    expect(await screen.findByText('No tasks')).toBeTruthy();
+    expect(screen.getByText('No task matches this filter.')).toBeTruthy();
+  });
+
+  it('filters by list with one chip per list and All first', async () => {
+    const env = await renderSignedIn();
+    await seed(env);
+    await openTasks();
+    const group = screen.getByLabelText('Filter by list');
+    expect(
+      within(group)
+        .getAllByRole('radio')
+        .map(r => r.props.accessibilityLabel),
+    ).toEqual(['All', 'Home', 'Work']);
+    fireEvent.press(list('Home'));
+    await settle();
+    expect(titles()).toEqual(['pending home']);
+    expect(list('Home').props.accessibilityState).toMatchObject({
+      selected: true,
+    });
+    fireEvent.press(list('Work'));
+    await settle();
+    expect(titles()).toEqual([]);
+    fireEvent.press(list('All'));
+    await settle();
+    expect(titles()).toContain('pending loose');
+  });
+
+  it('combines the list filter with a status filter', async () => {
+    const env = await renderSignedIn();
+    const home = await seed(env);
+    await env.world.tasks.create({
+      title: 'running home',
+      status: 'in_progress',
+      listId: home.id,
+    });
+    await openTasks();
+    fireEvent.press(list('Home'));
+    fireEvent.press(status('In Progress'));
+    await settle();
+    expect(
+      screen
+        .getAllByRole('button', { name: /^running/ })
+        .map(b => b.props.accessibilityLabel.split(',')[0]),
+    ).toEqual(['running home']);
+  });
+
+  it('has no list chips until there is a list', async () => {
+    await renderSignedIn();
+    await openTasks();
+    expect(screen.queryByLabelText('Filter by list')).toBeNull();
+  });
+
+  it('quick add creates in the selected list', async () => {
+    const env = await renderSignedIn();
+    const home = await seed(env);
+    await openTasks();
+    fireEvent.press(list('Home'));
+    await settle();
+    await add('Water plants');
+    await card('Water plants');
+    expect(
+      (await env.world.tasks.list()).find(t => t.title === 'Water plants'),
+    ).toMatchObject({ listId: home.id });
+    fireEvent.press(list('All'));
+    await settle();
+    await add('Loose again');
+    await card('Loose again');
+    expect(
+      (await env.world.tasks.list()).find(t => t.title === 'Loose again'),
+    ).toMatchObject({ listId: null });
+  });
+
+  it('falls back to every list when the selected list is deleted', async () => {
+    const env = await renderSignedIn();
+    const home = await seed(env);
+    await openTasks();
+    fireEvent.press(list('Home'));
+    await settle();
+    await act(async () => {
+      await env.world.taskLists.delete(home.id);
+    });
+    await settle();
+    expect(screen.queryByRole('radio', { name: 'Home' })).toBeNull();
+    expect(titles()).toContain('pending home');
+    expect(titles()).toContain('pending loose');
+  });
+});
+
+describe('completing', () => {
+  async function withTask() {
+    const env = await renderSignedIn();
+    await env.world.tasks.create({ title: 'Call Ann' });
+    await env.world.outbox.markSent(
+      (await env.world.outbox.peekPending(9)).map(e => e.id),
     );
-    const buttons = alert.mock.calls[0]![2] as {
-      text: string;
-      onPress?: () => void;
-    }[];
-    expect(buttons.map(b => b.text)).toEqual(['Cancel', 'Delete']);
-    expect(await env.world.taskLists.get(list.id)).not.toBeNull();
-    await act(async () => buttons[1]!.onPress!());
-    await screen.findByRole('header', { name: 'Lists' });
-    expect(await env.world.taskLists.get(list.id)).toBeNull();
-    expect((await env.world.tasks.get(task.id))?.listId).toBeNull();
-    expect(screen.getByText('Deleted list New name')).toBeTruthy();
+    await openTasks();
+    await card('Call Ann');
+    return env;
+  }
+  const completeButton = () =>
+    screen.getByRole('button', { name: 'Complete Call Ann' });
+
+  it('has a Complete action with a 48dp target, labelled with the task', async () => {
+    await withTask();
+    expect(within(completeButton()).getByText('Complete')).toBeTruthy();
+    expect(StyleSheet.flatten(completeButton().props.style)).toEqual(
+      expect.objectContaining({ minHeight: 48 }),
+    );
+  });
+
+  it('shows the card as completing with Undo, and writes nothing yet', async () => {
+    const env = await withTask();
+    fireEvent.press(completeButton());
+    await settle();
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeTruthy();
+    expect(
+      within(screen.getByTestId(/^task-card-/)).getByText('Completed'),
+    ).toBeTruthy();
+    expect(
+      screen.getByText('Completed Call Ann. Undo is available.'),
+    ).toBeTruthy();
+    expect(
+      StyleSheet.flatten(screen.getByText('Call Ann').props.style),
+    ).toMatchObject({ textDecorationLine: 'line-through' });
+    expect((await env.world.tasks.list())[0]!.status).toBe('pending');
+    expect(await env.world.outbox.pendingCount()).toBe(0);
+  });
+
+  it('Undo cancels the completion for good', async () => {
+    const env = await withTask();
+    fireEvent.press(completeButton());
+    await settle();
+    fireEvent.press(screen.getByRole('button', { name: 'Undo' }));
+    await settle();
+    expect(screen.queryByRole('button', { name: 'Undo' })).toBeNull();
+    await advance(env, 10_000);
+    expect((await env.world.tasks.list())[0]!.status).toBe('pending');
+    expect(await env.world.outbox.pendingCount()).toBe(0);
+    expect(completeButton()).toBeTruthy();
+  });
+
+  it('when the window elapses the task is completed, queued, and moves to Completed', async () => {
+    const env = await withTask();
+    fireEvent.press(completeButton());
+    await settle();
+    await advance(env, 5_000);
+    expect((await env.world.tasks.list())[0]!.status).toBe('completed');
+    expect((await env.world.outbox.peekPending(9))[0]).toMatchObject({
+      op: 'complete',
+    });
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Undo' })).toBeNull(),
+    );
+    expect(
+      screen.queryByRole('button', { name: 'Complete Call Ann' }),
+    ).toBeNull();
+    const header = screen.getByRole('button', { name: /^Completed, 1 task/ });
+    expect(within(header).getByText('Completed (1)')).toBeTruthy();
+    expect(within(header).getByText('Show')).toBeTruthy();
+  });
+
+  it('keeps completed tasks collapsed until asked, struck through with the word and date', async () => {
+    const env = await renderSignedIn();
+    const t = await env.world.tasks.create({ title: 'Done thing' });
+    await env.world.tasks.complete(t.id, new Date(2026, 9, 21, 8).getTime());
+    await openTasks();
+    expect(screen.queryByText('Done thing')).toBeNull();
+    fireEvent.press(
+      await screen.findByRole('button', { name: /^Completed, 1 task/ }),
+    );
+    const done = await card('Done thing');
+    expect(
+      StyleSheet.flatten(within(done).getByText('Done thing').props.style),
+    ).toMatchObject({ textDecorationLine: 'line-through' });
+    expect(within(done).getByText('Completed Oct 21')).toBeTruthy();
+    expect(done.props.accessibilityLabel).toBe(
+      'Done thing, Completed, Completed Oct 21',
+    );
+    // A finished task has no Complete action.
+    expect(screen.queryByRole('button', { name: /^Complete Done/ })).toBeNull();
+    expect(screen.getByText('Hide')).toBeTruthy();
+  });
+
+  it('flushes a pending completion when the app goes to the background', async () => {
+    const env = await withTask();
+    fireEvent.press(completeButton());
+    await settle();
+    act(() => env.lifecycle.set(false));
+    await settle();
+    expect((await env.world.tasks.list())[0]!.status).toBe('completed');
+  });
+
+  it('flushes when the Tasks tab goes away (sign out unmounts it)', async () => {
+    const env = await withTask();
+    fireEvent.press(completeButton());
+    await settle();
+    fireEvent.press(screen.getByRole('tab', { name: 'Settings' }));
+    await settle();
+    // The tab stays mounted and the window keeps running; sign-out flushes.
+    fireEvent.press(await screen.findByRole('button', { name: 'Sign Out' }));
+    await settle();
+    expect((await env.world.tasks.list())[0]!.status).toBe('completed');
   });
 });

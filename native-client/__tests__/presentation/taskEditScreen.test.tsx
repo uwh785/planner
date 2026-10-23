@@ -36,7 +36,7 @@ async function openEdit(
   await env.world.outbox.markSent(
     (await env.world.outbox.peekPending(9)).map(e => e.id),
   );
-  fireEvent.press(await screen.findByRole('button', { name: /^All tasks/ }));
+  fireEvent.press(await screen.findByRole('tab', { name: 'Tasks' }));
   fireEvent.press(
     await screen.findByRole('button', { name: new RegExp(`^${title}`) }),
   );
@@ -48,7 +48,7 @@ describe('edit task', () => {
   it('shows the task in labeled fields, in reading order', async () => {
     await openEdit({ description: 'Quarterly', priority: 2 });
     expect(screen.getByLabelText('Title').props.value).toBe('Write report');
-    expect(screen.getByLabelText('Notes').props.value).toBe('Quarterly');
+    expect(screen.getByLabelText('Description').props.value).toBe('Quarterly');
     expect(
       screen.getByRole('radio', { name: 'Medium' }).props.accessibilityState,
     ).toMatchObject({ selected: true });
@@ -65,11 +65,11 @@ describe('edit task', () => {
   it('saves only when asked, then goes back to the list with a message', async () => {
     const task = await openEdit();
     fireEvent.changeText(screen.getByLabelText('Title'), ' Write the report ');
-    fireEvent.changeText(screen.getByLabelText('Notes'), 'Draft first');
+    fireEvent.changeText(screen.getByLabelText('Description'), 'Draft first');
     fireEvent.press(screen.getByRole('radio', { name: 'High' }));
     expect((await env.world.tasks.get(task.id))?.title).toBe('Write report');
     fireEvent.press(screen.getByRole('button', { name: 'Save' }));
-    await screen.findByRole('header', { name: 'All tasks' });
+    await screen.findByRole('header', { name: 'Tasks' });
     expect(await env.world.tasks.get(task.id)).toMatchObject({
       title: 'Write the report',
       description: 'Draft first',
@@ -96,7 +96,7 @@ describe('edit task', () => {
   it('sets a date and an optional time with the native pickers', async () => {
     const task = await openEdit();
     pickNext(new Date(2026, 11, 25));
-    fireEvent.press(screen.getByRole('button', { name: 'Set date' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Pick date' }));
     expect(openPicker).toHaveBeenCalledWith(
       expect.objectContaining({ mode: 'date' }),
     );
@@ -111,7 +111,7 @@ describe('edit task', () => {
     );
     expect(await screen.findByText('Dec 25, 14:30')).toBeTruthy();
     fireEvent.press(screen.getByRole('button', { name: 'Save' }));
-    await screen.findByRole('header', { name: 'All tasks' });
+    await screen.findByRole('header', { name: 'Tasks' });
     expect(await env.world.tasks.get(task.id)).toMatchObject({
       dueDate: new Date(2026, 11, 25, 14, 30).getTime(),
       dueAllDay: false,
@@ -128,7 +128,7 @@ describe('edit task', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Change date' }));
     await screen.findByText('Dec 3');
     fireEvent.press(screen.getByRole('button', { name: 'Save' }));
-    await screen.findByRole('header', { name: 'All tasks' });
+    await screen.findByRole('header', { name: 'Tasks' });
     expect((await env.world.tasks.get(task.id))?.dueDate).toBe(
       new Date(2026, 11, 3).getTime(),
     );
@@ -140,14 +140,14 @@ describe('edit task', () => {
     expect(screen.getByText('No due date')).toBeTruthy();
     expect(screen.queryByRole('switch', { name: 'All day' })).toBeNull();
     fireEvent.press(screen.getByRole('button', { name: 'Save' }));
-    await screen.findByRole('header', { name: 'All tasks' });
+    await screen.findByRole('header', { name: 'Tasks' });
     expect((await env.world.tasks.get(task.id))?.dueDate).toBeNull();
   });
 
   it('leaves the date alone when the picker is dismissed', async () => {
     await openEdit();
     pickNext(null);
-    fireEvent.press(screen.getByRole('button', { name: 'Set date' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Pick date' }));
     await settle();
     expect(screen.getByText('No due date')).toBeTruthy();
   });
@@ -157,7 +157,7 @@ describe('edit task', () => {
     const home = await env.world.taskLists.create({ name: 'Home' });
     fireEvent.press(await screen.findByRole('radio', { name: 'Home' }));
     fireEvent.press(screen.getByRole('button', { name: 'Save' }));
-    await screen.findByRole('header', { name: 'All tasks' });
+    await screen.findByRole('header', { name: 'Tasks' });
     expect((await env.world.tasks.get(task.id))?.listId).toBe(home.id);
   });
 
@@ -165,7 +165,7 @@ describe('edit task', () => {
     it('going back with nothing changed just goes back', async () => {
       await openEdit();
       fireEvent.press(screen.getByRole('button', { name: 'Back' }));
-      await screen.findByRole('header', { name: 'All tasks' });
+      await screen.findByRole('header', { name: 'Tasks' });
       expect(alert).not.toHaveBeenCalled();
     });
 
@@ -185,7 +185,7 @@ describe('edit task', () => {
       expect(buttons.map(b => b.text)).toEqual(['Keep editing', 'Discard']);
       expect(screen.getByRole('header', { name: 'Edit task' })).toBeTruthy();
       await act(async () => buttons[1]!.onPress!());
-      await screen.findByRole('header', { name: 'All tasks' });
+      await screen.findByRole('header', { name: 'Tasks' });
       expect((await env.world.tasks.get(task.id))?.title).toBe('Write report');
     });
 
@@ -210,7 +210,7 @@ describe('edit task', () => {
       fireEvent.press(screen.getByRole('button', { name: 'Delete task' }));
       expect(alert).toHaveBeenCalledWith(
         'Delete this task?',
-        "This can't be undone.",
+        'This action cannot be undone.',
         expect.any(Array),
       );
       const buttons = alert.mock.calls[0]![2] as {
@@ -222,7 +222,7 @@ describe('edit task', () => {
       expect(buttons[1]!.style).toBe('destructive');
       expect(await env.world.tasks.get(task.id)).not.toBeNull();
       await act(async () => buttons[1]!.onPress!());
-      await screen.findByRole('header', { name: 'All tasks' });
+      await screen.findByRole('header', { name: 'Tasks' });
       expect(await env.world.tasks.get(task.id)).toBeNull();
       expect(
         screen.queryByRole('button', { name: /^Write report/ }),
@@ -240,7 +240,7 @@ describe('edit task', () => {
       }[];
       alert.mockClear();
       await act(async () => buttons[1]!.onPress!());
-      await screen.findByRole('header', { name: 'All tasks' });
+      await screen.findByRole('header', { name: 'Tasks' });
       expect(alert).not.toHaveBeenCalled();
     });
   });
@@ -254,6 +254,6 @@ describe('edit task', () => {
       expect(screen.getByText('This task no longer exists')).toBeTruthy(),
     );
     fireEvent.press(screen.getByRole('button', { name: 'Back' }));
-    await screen.findByRole('header', { name: 'All tasks' });
+    await screen.findByRole('header', { name: 'Tasks' });
   });
 });

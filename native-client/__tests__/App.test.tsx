@@ -32,7 +32,8 @@ async function fakeSource(
   };
 }
 
-const lists = () => screen.findByRole('header', { name: 'Lists' });
+/** Spanish is the default language, so the Panel is titled "Panel". */
+const lists = () => screen.findByRole('header', { name: 'Panel' });
 
 let logSpy: jest.SpyInstance;
 beforeEach(() => {
@@ -40,18 +41,19 @@ beforeEach(() => {
 });
 afterEach(() => jest.restoreAllMocks());
 
-test('shows the lists once signed in and the database is open', async () => {
+test('shows the Panel once signed in and the database is open', async () => {
   render(
     <App session={await signedInSession()} containers={await fakeSource()} />,
   );
   expect(await lists()).toBeTruthy();
   expect(screen.queryByText('Planner')).toBeNull();
+  expect(await screen.findByText('No hay tareas activas')).toBeTruthy();
 });
 
 test('acquires the container once on mount and says Loading until it opens', async () => {
   const source = await fakeSource(() => new Promise(() => undefined));
   render(<App session={await signedInSession()} containers={source} />);
-  expect(await screen.findByText('Loading')).toBeTruthy();
+  expect(await screen.findByText('Cargando…')).toBeTruthy();
   expect(source.acquire).toHaveBeenCalledTimes(1);
 });
 
@@ -100,7 +102,7 @@ test('reports a failed open instead of crashing', async () => {
     .mockImplementation(() => undefined);
   const source = await fakeSource(() => Promise.reject(new Error('disk full')));
   render(<App session={await signedInSession()} containers={source} />);
-  expect(await screen.findByText('Loading')).toBeTruthy();
+  expect(await screen.findByText('Cargando…')).toBeTruthy();
   await new Promise(resolve => setImmediate(resolve));
   expect(errorSpy).toHaveBeenCalledWith('db init failed', expect.any(Error));
 });
@@ -111,7 +113,6 @@ test('renders in dark mode too', async () => {
     <App session={await signedInSession()} containers={await fakeSource()} />,
   );
   expect(await lists()).toBeTruthy();
-  expect(
-    screen.getByRole('button', { name: 'All tasks, no open tasks' }),
-  ).toBeTruthy();
+  expect(await screen.findByLabelText('Pendientes: 0')).toBeTruthy();
+  expect(screen.getByRole('tab', { name: 'Tareas' })).toBeTruthy();
 });

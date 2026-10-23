@@ -17,6 +17,7 @@ import type { ContainerSource } from '@/application/container';
 import type { AuthSession } from '@/domain/auth';
 import App from '@/presentation/App';
 import { asContainer } from '../helpers/plannerWorld';
+import { withLocale } from '../helpers/i18n';
 import { openTestWorld } from '../helpers/testRepositories';
 import {
   active,
@@ -45,16 +46,25 @@ function setup(initial: AuthSession | null = null) {
   return { store, gateway, users, session, containers };
 }
 
+/** The app in English (what these tests read), language already restored. */
+async function renderApp(env: ReturnType<typeof setup>) {
+  const { service, ready } = withLocale('en');
+  await ready;
+  render(
+    <App session={env.session} containers={env.containers} locale={service} />,
+  );
+}
+
 async function open(initial: AuthSession | null = null) {
   const env = setup(initial);
-  render(<App session={env.session} containers={env.containers} />);
+  await renderApp(env);
   await act(() => env.session.restore());
   return env;
 }
 
 const type = (label: string, text: string) =>
   fireEvent.changeText(screen.getByLabelText(label), text);
-const lists = () => screen.findByRole('header', { name: 'Lists' });
+const lists = () => screen.findByRole('header', { name: 'Dashboard' });
 const press = (name: string) =>
   act(async () => {
     fireEvent.press(screen.getByRole('button', { name }));
@@ -73,12 +83,12 @@ describe('loading', () => {
     const env = setup(active());
     let finish!: (s: AuthSession | null) => void;
     env.store.get = () => new Promise(resolve => (finish = resolve));
-    render(<App session={env.session} containers={env.containers} />);
+    await renderApp(env);
     let restoring!: Promise<unknown>;
     act(() => {
       restoring = env.session.restore();
     });
-    expect(await screen.findByText('Loading')).toBeTruthy();
+    expect(await screen.findByText('Loading…')).toBeTruthy();
     expect(screen.queryByRole('button')).toBeNull();
     finish(active());
     await act(() => restoring);
@@ -89,7 +99,7 @@ describe('loading', () => {
 describe('sign in', () => {
   it('shows labeled, autofill-ready fields', async () => {
     await open();
-    expect(screen.getByRole('header')).toHaveTextContent('Welcome back');
+    expect(screen.getByRole('header')).toHaveTextContent('Sign In');
     const email = screen.getByLabelText('Email');
     expect(email.props.keyboardType).toBe('email-address');
     expect(email.props.autoComplete).toBe('email');
@@ -106,9 +116,9 @@ describe('sign in', () => {
 
   it('validates required fields client-side and sends nothing', async () => {
     const env = await open();
-    await press('Sign in');
-    expect(await screen.findByText('Email is required')).toBeTruthy();
-    expect(screen.getByText('Password is required')).toBeTruthy();
+    await press('Sign In');
+    expect(await screen.findByText('Enter your email')).toBeTruthy();
+    expect(screen.getByText('Enter your password')).toBeTruthy();
     expect(env.gateway.login).not.toHaveBeenCalled();
   });
 
@@ -116,7 +126,7 @@ describe('sign in', () => {
     const env = await open();
     type('Email', ' a@b.co ');
     type('Password', 'pw');
-    await press('Sign in');
+    await press('Sign In');
     expect(await lists()).toBeTruthy();
     expect(env.gateway.login).toHaveBeenCalledWith({
       email: 'a@b.co',
@@ -136,7 +146,7 @@ describe('sign in', () => {
     );
     type('Email', 'a@b.co');
     type('Password', 'pw');
-    await press('Sign in');
+    await press('Sign In');
     const busy = await screen.findByRole('button', { name: 'Signing in…' });
     expect(busy.props.accessibilityState).toMatchObject({ disabled: true });
     fireEvent.press(busy);
@@ -160,22 +170,22 @@ describe('sign in', () => {
       env.gateway.login.mockRejectedValueOnce(error as never);
       type('Email', 'a@b.co');
       type('Password', 'pw');
-      await press('Sign in');
+      await press('Sign In');
       const message = await screen.findByText(`Error: ${text}`);
       expect(message).toBeTruthy();
       expect(
-        screen.getByRole('button', { name: 'Sign in' }).props
+        screen.getByRole('button', { name: 'Sign In' }).props
           .accessibilityState,
       ).toMatchObject({ disabled: false });
-      await press('Sign in');
+      await press('Sign In');
       expect(await lists()).toBeTruthy();
     },
   );
 
   it('puts messages in a polite live region', async () => {
     await open();
-    await press('Sign in');
-    const note = await screen.findByText('Email is required');
+    await press('Sign In');
+    const note = await screen.findByText('Enter your email');
     let node = note.parent;
     let live: string | undefined;
     while (node && !live) {
@@ -197,13 +207,13 @@ describe('sign in', () => {
 describe('create account', () => {
   async function toRegister() {
     const env = await open();
-    await press('Create account');
+    await press('Create Account');
     return env;
   }
 
   it('switches to the register form and back', async () => {
     await toRegister();
-    expect(screen.getByRole('header')).toHaveTextContent('Create your account');
+    expect(screen.getByRole('header')).toHaveTextContent('Create Account');
     expect(screen.getByLabelText('Name (optional)')).toBeTruthy();
     expect(screen.getByLabelText('Password').props.autoComplete).toBe(
       'new-password',
@@ -211,8 +221,8 @@ describe('create account', () => {
     expect(screen.getByLabelText('Password').props.textContentType).toBe(
       'newPassword',
     );
-    await press('Sign in');
-    expect(screen.getByRole('header')).toHaveTextContent('Welcome back');
+    await press('Sign In');
+    expect(screen.getByRole('header')).toHaveTextContent('Sign In');
   });
 
   it('registers with email, name and password', async () => {
@@ -220,7 +230,7 @@ describe('create account', () => {
     type('Email', 'new@b.co');
     type('Name (optional)', ' Nia ');
     type('Password', 'pw');
-    await press('Create account');
+    await press('Create Account');
     await waitFor(() => expect(env.gateway.register).toHaveBeenCalled());
     expect(env.gateway.register).toHaveBeenCalledWith({
       email: 'new@b.co',
@@ -237,7 +247,7 @@ describe('create account', () => {
     );
     type('Email', 'a@b.co');
     type('Password', 'pw');
-    await press('Create account');
+    await press('Create Account');
     expect(
       await screen.findByText('Error: Email already registered.'),
     ).toBeTruthy();
@@ -253,7 +263,7 @@ describe('session states', () => {
       ),
     ).toBeTruthy();
     expect(screen.getByLabelText('Email').props.value).toBe('a@b.co');
-    expect(screen.getByRole('button', { name: 'Sign in' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Sign In' })).toBeTruthy();
   });
 
   it('shows a retry, not the sign-in form, when the saved session is unreadable', async () => {
@@ -262,7 +272,7 @@ describe('session states', () => {
     env.store.get = async () => {
       throw new SessionStoreUnreadableError();
     };
-    render(<App session={env.session} containers={env.containers} />);
+    await renderApp(env);
     await act(() => env.session.restore());
     expect(
       await screen.findByText("Can't read your saved session"),
@@ -275,7 +285,7 @@ describe('session states', () => {
 });
 
 describe('signed in', () => {
-  it('shows the lists, holds the user database and keeps the account one tap away', async () => {
+  it('shows the Panel, holds the user database and keeps the account one tap away in Settings', async () => {
     const env = await open(active());
     expect(await lists()).toBeTruthy();
     expect(env.containers.acquire).toHaveBeenCalledTimes(1);
@@ -283,7 +293,7 @@ describe('signed in', () => {
       expect(logSpy).toHaveBeenCalledWith('db ready (schema v2)'),
     );
     expect(screen.queryByText('Your tasks will live here.')).toBeNull();
-    await press('Account');
+    fireEvent.press(screen.getByRole('tab', { name: 'Settings' }));
     expect(await screen.findByText('Ann')).toBeTruthy();
     expect(screen.getByText('a@b.co')).toBeTruthy();
   });
@@ -291,9 +301,9 @@ describe('signed in', () => {
   it('signs out: clears secure storage, closes the database, keeps local data', async () => {
     const env = await open(active());
     await lists();
-    await press('Account');
-    await press('Sign out');
-    expect(await screen.findByText('Welcome back')).toBeTruthy();
+    fireEvent.press(screen.getByRole('tab', { name: 'Settings' }));
+    await press('Sign Out');
+    expect(await screen.findByRole('header', { name: 'Sign In' })).toBeTruthy();
     expect(env.store.value).toBeNull();
     expect(env.users.setUser).toHaveBeenLastCalledWith(null);
     expect(env.containers.release).toHaveBeenCalledTimes(1);
@@ -305,5 +315,29 @@ describe('signed in', () => {
     await lists();
     act(() => env.session.handleExpired());
     expect(await screen.findByText(/Your session expired/)).toBeTruthy();
+  });
+});
+
+describe('language on the sign-in screen', () => {
+  it('speaks the saved language and switches with one tap, then remembers it', async () => {
+    const env = setup();
+    const { service, ready } = withLocale('es');
+    await ready;
+    render(
+      <App
+        session={env.session}
+        containers={env.containers}
+        locale={service}
+      />,
+    );
+    await act(() => env.session.restore());
+    expect(screen.getByRole('header')).toHaveTextContent('Iniciar Sesión');
+    expect(screen.getByLabelText('Correo electrónico')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Entrar' })).toBeTruthy();
+    await press('English');
+    expect(screen.getByRole('header')).toHaveTextContent('Sign In');
+    expect(service.getSnapshot().locale).toBe('en');
+    await press('Español');
+    expect(screen.getByRole('header')).toHaveTextContent('Iniciar Sesión');
   });
 });
