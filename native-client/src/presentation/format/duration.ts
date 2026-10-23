@@ -12,3 +12,14 @@ export function formatDuration(ms: number, t: Translate): string {
     ? t('durationHours', { hours })
     : t('durationHoursMinutes', { hours, minutes });
 }
+
+/**
+ * Like `formatDuration`, but the last minute counts in seconds ("42 s"), for
+ * the detail screen's card that ticks every second while a task runs.
+ */
+export function formatRemaining(ms: number, t: Translate): string {
+  if (ms > 0 && ms < 60_000) {
+    return t('durationSeconds', { seconds: Math.floor(ms / 1000) });
+  }
+  return formatDuration(ms, t);
+}

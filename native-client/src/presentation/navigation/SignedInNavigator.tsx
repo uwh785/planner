@@ -21,6 +21,7 @@ import { ConfigScreen } from '../screens/ConfigScreen';
 import { ListEditScreen } from '../screens/ListEditScreen';
 import { ListsScreen } from '../screens/ListsScreen';
 import { PanelScreen } from '../screens/PanelScreen';
+import { TaskDetailScreen } from '../screens/TaskDetailScreen';
 import { TaskEditScreen } from '../screens/TaskEditScreen';
 import { TasksScreen } from '../screens/TasksScreen';
 import { useTheme } from '../theme';
@@ -58,8 +59,8 @@ export const screenOptions: NativeStackNavigationOptions = {
 
 /**
  * The signed-in app: holds the user's database open, builds the planner
- * services over it and shows the navigator: the tabs, with the edit screens
- * and list management above them. Android's back button pops the stack, then
+ * services over it and shows the navigator: the tabs, with the task detail,
+ * the edit screens and list management above them. Android's back button pops the stack, then
  * returns to Panel from another tab, then leaves the app.
  */
 export function SignedInNavigator({
@@ -83,7 +84,8 @@ export function SignedInNavigator({
   // still in its undo window is written first.
   useLayoutEffect(
     () => () => {
-      planner?.completion.flush();
+      // Never rejects; the catch only keeps a surprise from going unhandled.
+      planner?.completion.flush().catch(() => undefined);
     },
     [planner],
   );
@@ -101,6 +103,7 @@ export function SignedInNavigator({
             screenOptions={screenOptions}
           >
             <Stack.Screen name="Tabs" component={TabsNavigator} />
+            <Stack.Screen name="TaskDetail" component={TaskDetailScreen} />
             <Stack.Screen name="TaskEdit" component={TaskEditScreen} />
             <Stack.Screen name="Lists" component={ListsScreen} />
             <Stack.Screen name="ListEdit" component={ListEditScreen} />

@@ -51,17 +51,24 @@ export function useLiveQuery<T>(
   return useSyncExternalStore(query.subscribe, query.getSnapshot);
 }
 
-/** The current time, refreshed every `intervalMs` on the planner's timer. */
-export function useNow(intervalMs: number): number {
+/**
+ * The current time, refreshed every `intervalMs` on the planner's timer.
+ * `null` stops the refreshing (nothing on screen is running): the time is
+ * read once when the interval changes and then holds still.
+ */
+export function useNow(intervalMs: number | null): number {
   const planner = usePlanner();
   const [now, setNow] = useState(() => planner.now());
   useEffect(() => {
+    setNow(planner.now());
+    if (intervalMs === null) {
+      return undefined;
+    }
     let cancel = () => {};
     const tick = () => {
       setNow(planner.now());
       cancel = planner.schedule(tick, intervalMs);
     };
-    setNow(planner.now());
     cancel = planner.schedule(tick, intervalMs);
     return () => cancel();
   }, [planner, intervalMs]);

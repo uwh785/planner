@@ -17,6 +17,9 @@ import type { ImageStyle, TextStyle, ViewStyle } from 'react-native';
  *   light green #34c759 as text: 2.2 -> success #1d7a36: 5.40 / 4.84
  *   countdown ring on Surface 2: light green/yellow/orange fail 3:1, so the
  *   ring uses #1d7a36 / #7a5c00 / #a85400 / #c4271c (4.30 / 4.98 / 4.25 / 4.58)
+ *   white label on light orange #ff9500 / green #34c759 fills: 2.2 / 2.2 ->
+ *   the actions use #a85400 / #1d7a36 (5.34 / 5.40 with white); dark keeps
+ *   the web #ff9f0a / #30d158 with a black label (10.22 / 10.39)
  * Green and yellow stay canonical and are indicators only (never text, never
  * the only signal). `theme.test.ts` asserts every text and UI pairing.
  */
@@ -58,6 +61,17 @@ export interface Theme {
       caution: string;
       warn: string;
       danger: string;
+    };
+    /**
+     * The timer actions. Start is the primary button. Pause (orange) and
+     * Complete (green) are fills with a label (`onPause`, `onComplete`, at
+     * least 4.5:1), or outlined with the fill color as text on Surface.
+     */
+    action: {
+      pause: string;
+      onPause: string;
+      complete: string;
+      onComplete: string;
     };
   };
   spacing: typeof spacing;
@@ -161,6 +175,12 @@ export const darkTheme: Theme = {
       warn: brand.dark.orange,
       danger: brand.dark.red,
     },
+    action: {
+      pause: brand.dark.orange,
+      onPause: '#000000',
+      complete: brand.dark.green,
+      onComplete: '#000000',
+    },
   },
 };
 
@@ -193,6 +213,12 @@ export const lightTheme: Theme = {
       caution: '#7a5c00',
       warn: '#a85400',
       danger: '#c4271c',
+    },
+    action: {
+      pause: '#a85400',
+      onPause: '#ffffff',
+      complete: '#1d7a36',
+      onComplete: '#ffffff',
     },
   },
 };

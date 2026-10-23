@@ -13,6 +13,12 @@ const TOO_LONG: Record<string, MessageKey> = {
   description: 'errorDescriptionTooLong',
 };
 
+const NOT_FOUND = {
+  task: 'errorTaskNotFound',
+  list: 'errorListNotFound',
+  subtask: 'errorSubtaskNotFound',
+} as const satisfies Record<string, MessageKey>;
+
 /**
  * Maps an error from a use case to one short sentence in the user's
  * language. A rule the app knows is worded precisely; anything else is the
@@ -27,9 +33,7 @@ export function errorSentence(error: unknown, t: Translate): string {
     }
   }
   if (error instanceof NotFoundError && error.entity !== undefined) {
-    return t(
-      error.entity === 'task' ? 'errorTaskNotFound' : 'errorListNotFound',
-    );
+    return t(NOT_FOUND[error.entity]);
   }
   return t('errorSave');
 }

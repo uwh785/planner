@@ -19,6 +19,8 @@ export type TabParamList = {
  */
 export type RootStackParamList = {
   Tabs: NavigatorScreenParams<TabParamList> | undefined;
+  /** A task as on the web: ring card, timer actions, subtasks. */
+  TaskDetail: { taskId: string };
   TaskEdit: { taskId: string };
   /** List management: create, then open one to rename, recolor or delete. */
   Lists: undefined;
