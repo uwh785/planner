@@ -1,3 +1,4 @@
+import { translate } from '@/application/i18n';
 import {
   COMPLETION_WINDOW_MS,
   CompletionWindow,
@@ -9,6 +10,14 @@ import {
 } from '../../helpers/plannerWorld';
 
 let w: PlannerWorld;
+
+/** What the notice line currently says, in English. */
+const said = (): string | undefined => {
+  const notice = w.planner.notices.getSnapshot();
+  return notice
+    ? translate('en', notice.message.key, notice.message.params)
+    : undefined;
+};
 beforeEach(async () => {
   w = await openPlannerWorld();
 });
@@ -93,11 +102,9 @@ describe('the undo window', () => {
   it('announces both steps', async () => {
     const t = await w.tasks.create({ title: 'Call Ann' });
     completion().begin(t);
-    expect(w.planner.notices.getSnapshot()?.text).toBe(
-      'Completed Call Ann. Undo is available.',
-    );
+    expect(said()).toBe('Completed Call Ann. Undo is available.');
     completion().undo(t.id);
-    expect(w.planner.notices.getSnapshot()?.text).toBe('Call Ann is open again');
+    expect(said()).toBe('Call Ann is open again');
   });
 
   it('notifies subscribers with a new snapshot object on every change', () => {
@@ -130,9 +137,7 @@ describe('the undo window', () => {
     await flushAsync();
     expect(completion().has(t.id)).toBe(false);
     expect(await status(t.id)).toBe('pending');
-    expect(w.planner.notices.getSnapshot()?.text).toBe(
-      "Couldn't complete a. Try again.",
-    );
+    expect(said()).toBe("Couldn't complete a. Try again.");
   });
 });
 

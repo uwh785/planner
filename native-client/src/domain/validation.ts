@@ -11,8 +11,16 @@ import type { TaskList } from './taskList';
  * locally, or its outbox entry would fail on every push. Limits count UTF-8
  * bytes, like the backend's Go `len`.
  */
+/** Which rule a field broke, so a screen can word it in the user's language. */
+export interface ValidationDetail {
+  code: 'required' | 'tooLong';
+  field: string;
+  /** The limit for `tooLong`. */
+  max?: number;
+}
+
 export class ValidationError extends Error {
-  constructor(message: string) {
+  constructor(message: string, readonly detail?: ValidationDetail) {
     super(message);
     this.name = 'ValidationError';
   }
@@ -48,14 +56,21 @@ export function utf8Length(text: string): number {
 function required(value: string, field: string, max: number): string {
   const text = value.trim();
   if (text === '') {
-    throw new ValidationError(`${field} is required`);
+    throw new ValidationError(`${field} is required`, {
+      code: 'required',
+      field,
+    });
   }
   return capped(text, field, max);
 }
 
 function capped(value: string, field: string, max: number): string {
   if (utf8Length(value) > max) {
-    throw new ValidationError(`${field} must be ${max} characters or fewer`);
+    throw new ValidationError(`${field} must be ${max} characters or fewer`, {
+      code: 'tooLong',
+      field,
+      max,
+    });
   }
   return value;
 }
@@ -140,7 +155,7 @@ export function normalizeEvent(e: Event): Event {
 
 /** A referenced entity does not exist (or is deleted) locally. */
 export class NotFoundError extends Error {
-  constructor(message: string) {
+  constructor(message: string, readonly entity?: 'task' | 'list') {
     super(message);
     this.name = 'NotFoundError';
   }

@@ -13,7 +13,7 @@ beforeEach(async () => {
 afterEach(() => w.db.close());
 
 describe('lists overview', () => {
-  it('counts open tasks per list and for all tasks, in list order', async () => {
+  it('counts open tasks per list, in list order', async () => {
     const home = await w.taskLists.create({ name: 'Home' });
     const work = await w.taskLists.create({ name: 'Work' });
     await w.tasks.create({ title: '1', listId: home.id });
@@ -22,7 +22,6 @@ describe('lists overview', () => {
     await w.tasks.create({ title: '4' });
     await w.tasks.complete(done.id, 1);
     const overview = await w.planner.queries.overview();
-    expect(overview.allOpenCount).toBe(3);
     expect(overview.lists.map(l => [l.list.name, l.openCount])).toEqual([
       ['Home', 2],
       ['Work', 0],
@@ -98,13 +97,19 @@ describe('LiveQuery', () => {
     await flushAsync();
     expect(live.getSnapshot()).toMatchObject({
       status: 'ready',
-      data: { allOpenCount: 0 },
+      data: { lists: [] },
     });
     await w.tasks.create({ title: 'x' });
     await flushAsync();
     expect(live.getSnapshot()).toMatchObject({
       status: 'ready',
-      data: { allOpenCount: 1 },
+      data: { lists: [] },
+    });
+    await w.taskLists.create({ name: 'L' });
+    await flushAsync();
+    expect(live.getSnapshot()).toMatchObject({
+      status: 'ready',
+      data: { lists: [{ list: { name: 'L' } }] },
     });
     expect(seen).toHaveBeenCalled();
     off();
@@ -138,9 +143,9 @@ describe('LiveQuery', () => {
     });
     await flushAsync();
     const snap = live.getSnapshot();
-    expect(snap.status === 'ready' && snap.data.open.map(t => t.title)).toEqual([
-      'from server',
-    ]);
+    expect(snap.status === 'ready' && snap.data.open.map(t => t.title)).toEqual(
+      ['from server'],
+    );
   });
 
   it('stops listening when the last subscriber leaves', () => {
@@ -211,5 +216,125 @@ describe('LiveQuery', () => {
     feed.notifyChange();
     await live.idle();
     expect(live.getSnapshot()).toEqual({ status: 'ready', data: 1 });
+  });
+});
+
+describe('tasks by status filter', () => {
+  async function seed() {
+    const list = await w.taskLists.create({ name: 'L' });
+    const pending = await w.tasks.create({ title: 'pending', listId: list.id });
+    await w.tasks.create({ title: 'running', status: 'in_progress' });
+    const done = await w.tasks.create({ title: 'done', listId: list.id });
+    await w.tasks.complete(done.id, 5);
+    await w.tasks.create({
+      title: 'late',
+      dueDate: w.clock.now() - 1000,
+      dueAllDay: false,
+    });
+    return { list, pending };
+  }
+
+  it.each([
+    ['all', ['late', 'pending', 'running'], ['done']],
+    ['pending', ['late', 'pending'], []],
+    ['in_progress', ['running'], []],
+    ['completed', [], ['done']],
+    ['overdue', ['late'], []],
+  ] as const)('%s', async (status, open, completed) => {
+    await seed();
+    const sections = await w.planner.queries.tasks({ status });
+    expect(sections.open.map(t => t.title).sort()).toEqual([...open]);
+    expect(sections.completed.map(t => t.title)).toEqual([...completed]);
+    expect(sections.openTotal).toBe(open.length);
+    expect(sections.completedTotal).toBe(completed.length);
+  });
+
+  it('combines the status with one list', async () => {
+    const { list } = await seed();
+    const sections = await w.planner.queries.tasks({
+      status: 'pending',
+      listId: list.id,
+    });
+    expect(sections.open.map(t => t.title)).toEqual(['pending']);
+  });
+
+  it('treats an omitted status as all', async () => {
+    await seed();
+    const sections = await w.planner.queries.tasks({});
+    expect(sections.openTotal).toBe(3);
+    expect(sections.completedTotal).toBe(1);
+  });
+});
+
+describe('dashboard', () => {
+  it('counts by status and overdue with the web rules, and lists in-progress tasks', async () => {
+    w.clock.current = new Date(2026, 9, 22, 10, 0).getTime();
+    const now = w.clock.now();
+    await w.tasks.create({ title: 'pending' });
+    await w.tasks.create({
+      title: 'running a',
+      status: 'in_progress',
+      dueDate: 5,
+    });
+    await w.tasks.create({ title: 'running b', status: 'in_progress' });
+    const done = await w.tasks.create({ title: 'done', dueDate: 1 });
+    await w.tasks.complete(done.id, 9);
+    // Timed and past: overdue. All-day today: not yet. All-day yesterday: overdue.
+    await w.tasks.create({
+      title: 'timed late',
+      dueDate: now - 1,
+      dueAllDay: false,
+    });
+    await w.tasks.create({
+      title: 'timed soon',
+      dueDate: now + 60_000,
+      dueAllDay: false,
+    });
+    const startOfToday = new Date(new Date(now).setHours(0, 0, 0, 0)).getTime();
+    await w.tasks.create({
+      title: 'all day today',
+      dueDate: startOfToday,
+      dueAllDay: true,
+    });
+    await w.tasks.create({
+      title: 'all day yesterday',
+      dueDate: startOfToday - 86_400_000,
+      dueAllDay: true,
+    });
+    const data = await w.planner.queries.dashboard();
+    expect(data.counts).toEqual({
+      pending: 5,
+      inProgress: 2,
+      completed: 1,
+      overdue: 3,
+    });
+    expect(data.active.map(t => t.title)).toEqual(['running a', 'running b']);
+  });
+
+  it('shows at most ten active tasks but counts them all', async () => {
+    for (let i = 0; i < 12; i += 1) {
+      await w.tasks.create({ title: `r${i}`, status: 'in_progress' });
+    }
+    const data = await w.planner.queries.dashboard();
+    expect(data.counts.inProgress).toBe(12);
+    expect(data.active).toHaveLength(10);
+  });
+
+  it('is empty for a new user and follows data changes', async () => {
+    const live = w.planner.queries.watchDashboard();
+    live.subscribe(() => undefined);
+    await flushAsync();
+    expect(live.getSnapshot()).toMatchObject({
+      status: 'ready',
+      data: {
+        counts: { pending: 0, inProgress: 0, completed: 0, overdue: 0 },
+        active: [],
+      },
+    });
+    await w.tasks.create({ title: 'x' });
+    await flushAsync();
+    expect(live.getSnapshot()).toMatchObject({
+      data: { counts: { pending: 1 } },
+    });
   });
 });

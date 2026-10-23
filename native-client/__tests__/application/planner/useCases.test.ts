@@ -1,3 +1,4 @@
+import { translate } from '@/application/i18n';
 import { NotFoundError, ValidationError } from '@/domain';
 import { LIST_COLORS } from '@/application/planner/listColors';
 import {
@@ -6,6 +7,14 @@ import {
 } from '../../helpers/plannerWorld';
 
 let w: PlannerWorld;
+
+/** What the notice line currently says, in English. */
+const said = (): string | undefined => {
+  const notice = w.planner.notices.getSnapshot();
+  return notice
+    ? translate('en', notice.message.key, notice.message.params)
+    : undefined;
+};
 beforeEach(async () => {
   w = await openPlannerWorld();
 });
@@ -18,7 +27,7 @@ describe('list use cases', () => {
     expect(a.name).toBe('Home');
     expect(a.color).toBe(LIST_COLORS[0]!.value);
     expect(b.color).toBe(LIST_COLORS[1]!.value);
-    expect(w.planner.notices.getSnapshot()?.text).toBe('Added list Work');
+    expect(said()).toBe('Added list Work');
   });
 
   it('keeps a chosen color and rejects a blank or too long name', async () => {
@@ -27,9 +36,9 @@ describe('list use cases', () => {
     await expect(w.planner.lists.create('   ')).rejects.toBeInstanceOf(
       ValidationError,
     );
-    await expect(w.planner.lists.create('x'.repeat(101))).rejects.toBeInstanceOf(
-      ValidationError,
-    );
+    await expect(
+      w.planner.lists.create('x'.repeat(101)),
+    ).rejects.toBeInstanceOf(ValidationError);
     expect(await w.taskLists.list()).toHaveLength(1);
   });
 
@@ -48,9 +57,9 @@ describe('list use cases', () => {
     await expect(w.planner.lists.rename('lst_x', 'a')).rejects.toBeInstanceOf(
       NotFoundError,
     );
-    await expect(w.planner.lists.recolor('lst_x', '#000')).rejects.toBeInstanceOf(
-      NotFoundError,
-    );
+    await expect(
+      w.planner.lists.recolor('lst_x', '#000'),
+    ).rejects.toBeInstanceOf(NotFoundError);
   });
 
   it('deleting a list detaches its tasks and keeps them', async () => {
@@ -59,7 +68,7 @@ describe('list use cases', () => {
     await w.planner.lists.remove(l.id);
     expect(await w.taskLists.get(l.id)).toBeNull();
     expect((await w.tasks.get(t.id))?.listId).toBeNull();
-    expect(w.planner.notices.getSnapshot()?.text).toBe('Deleted list L');
+    expect(said()).toBe('Deleted list L');
   });
 });
 
@@ -67,7 +76,7 @@ describe('task use cases', () => {
   it('quick add takes a title only and trims it', async () => {
     const t = await w.planner.tasks.addQuick('  Buy milk ', null);
     expect(t).toMatchObject({ title: 'Buy milk', listId: null, priority: 0 });
-    expect(w.planner.notices.getSnapshot()?.text).toBe('Added Buy milk');
+    expect(said()).toBe('Added Buy milk');
   });
 
   it('quick add into a list', async () => {
@@ -151,7 +160,7 @@ describe('task use cases', () => {
     const t = await w.planner.tasks.addQuick('gone', null);
     await w.planner.tasks.remove(t.id);
     expect(await w.tasks.get(t.id)).toBeNull();
-    expect(w.planner.notices.getSnapshot()?.text).toBe('Deleted gone');
+    expect(said()).toBe('Deleted gone');
   });
 
   it('deleting a missing task is a quiet no-op', async () => {
@@ -162,9 +171,9 @@ describe('task use cases', () => {
 describe('notices', () => {
   it('replaces the message, numbers each one and clears it after a while', () => {
     const { notices } = w.planner;
-    notices.announce('One');
+    notices.announce({ key: 'noticeAdded', params: { title: 'One' } });
     const first = notices.getSnapshot()!;
-    notices.announce('One');
+    notices.announce({ key: 'noticeAdded', params: { title: 'One' } });
     const second = notices.getSnapshot()!;
     expect(second.id).toBeGreaterThan(first.id);
     w.timer.advance(6_000);
@@ -173,11 +182,11 @@ describe('notices', () => {
 
   it('a newer message is not cleared by the timer of an older one', () => {
     const { notices } = w.planner;
-    notices.announce('A');
+    notices.announce({ key: 'noticeAdded', params: { title: 'A' } });
     w.timer.advance(4_000);
-    notices.announce('B');
+    notices.announce({ key: 'noticeAdded', params: { title: 'B' } });
     w.timer.advance(2_000);
-    expect(notices.getSnapshot()?.text).toBe('B');
+    expect(said()).toBe('Added B');
     w.timer.advance(4_000);
     expect(notices.getSnapshot()).toBeNull();
   });

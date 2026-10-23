@@ -53,6 +53,11 @@ export class LiveQuery<T> {
     };
   };
 
+  /** Reruns now, for results that age without any data change (the clock). */
+  reload(): void {
+    this.refresh();
+  }
+
   /** Resolves when no run is in flight and none is waiting. */
   idle(): Promise<void> {
     return this.running ?? Promise.resolve();
@@ -75,8 +80,13 @@ export class LiveQuery<T> {
       try {
         this.set({ status: 'ready', data: await this.fetch() });
       } catch {
-        const last = this.state.status === 'loading' ? undefined : this.state.data;
-        this.set(last === undefined ? { status: 'error' } : { status: 'error', data: last });
+        const last =
+          this.state.status === 'loading' ? undefined : this.state.data;
+        this.set(
+          last === undefined
+            ? { status: 'error' }
+            : { status: 'error', data: last },
+        );
       }
     } while (this.dirty && this.listeners.size > 0);
     this.running = null;

@@ -22,6 +22,12 @@ const ORDER_BY: Record<TaskOrder, string> = {
   recentlyCompleted: 'completed_at DESC, rowid DESC',
 };
 
+/** The web's overdue rule (backend `overdueCondition`); two `now` parameters. */
+const OVERDUE_SQL =
+  "(due_date IS NOT NULL AND status <> 'completed' AND " +
+  '((due_all_day = 0 AND due_date < ?) OR ' +
+  '(due_all_day = 1 AND due_date + 86400000 <= ?)))';
+
 export class TaskSqlRepository implements TaskRepository {
   private readonly store: EntityStore<Task, TaskRow>;
 
@@ -155,6 +161,10 @@ export class TaskSqlRepository implements TaskRepository {
     if (filter.status !== undefined) {
       where.push('status = ?');
       params.push(filter.status);
+    }
+    if (filter.overdueAt !== undefined) {
+      where.push(OVERDUE_SQL);
+      params.push(filter.overdueAt, filter.overdueAt);
     }
     if (filter.completion === 'open') {
       where.push("status <> 'completed'");

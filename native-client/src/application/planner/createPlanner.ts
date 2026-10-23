@@ -25,6 +25,8 @@ export interface Planner {
   notices: Notices;
   /** The current time, from the same clock the services use. */
   now(): number;
+  /** Runs `fn` once after `delayMs` on the shared timer; returns its cancel. */
+  schedule(fn: () => void, delayMs: number): () => void;
   /** Drops timers and listeners. Flush `completion` first to keep its ticks. */
   dispose(): void;
 }
@@ -39,7 +41,7 @@ export function createPlanner(
   runtime: PlannerRuntime,
 ): Planner {
   const notices = new Notices(runtime.timer);
-  const queries = new PlannerQueries(source);
+  const queries = new PlannerQueries({ ...source, clock: runtime.clock });
   const completion = new CompletionWindow({
     tasks: source.tasks,
     timer: runtime.timer,
@@ -55,6 +57,7 @@ export function createPlanner(
     completion,
     notices,
     now: () => runtime.clock.now(),
+    schedule: (fn, delayMs) => runtime.timer.schedule(fn, delayMs),
     dispose: () => {
       completion.dispose();
       notices.dispose();

@@ -45,3 +45,42 @@ export function isOverdue(
   }
   return task.dueAllDay ? task.dueDate + 86_400_000 <= now : task.dueDate < now;
 }
+
+type TimerFields = Pick<Task, 'status' | 'startedAt' | 'elapsedMs'>;
+
+/**
+ * How much of the countdown has run (web `getElapsedMs`): what earlier
+ * segments accumulated, plus the running segment while the task is in
+ * progress and started. A paused task has no start, so it stays frozen.
+ */
+export function elapsedMs(task: TimerFields, now: number): number {
+  if (task.status === 'in_progress' && task.startedAt !== null) {
+    return task.elapsedMs + Math.max(now - task.startedAt, 0);
+  }
+  return task.elapsedMs;
+}
+
+/** 0 to 1 (web `getProgressPercent`): a completed task is full. */
+export function timerProgress(
+  task: TimerFields & Pick<Task, 'durationMs'>,
+  now: number,
+): number {
+  if (task.status === 'completed') {
+    return 1;
+  }
+  if (!task.durationMs) {
+    return 0;
+  }
+  return Math.min(elapsedMs(task, now) / task.durationMs, 1);
+}
+
+/** Milliseconds left (web `getRemainingMs`); 0 when done or without a duration. */
+export function remainingMs(
+  task: TimerFields & Pick<Task, 'durationMs'>,
+  now: number,
+): number {
+  if (task.status === 'completed' || !task.durationMs) {
+    return 0;
+  }
+  return Math.max(task.durationMs - elapsedMs(task, now), 0);
+}

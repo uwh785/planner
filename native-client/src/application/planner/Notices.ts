@@ -1,3 +1,4 @@
+import type { MessageRef } from '../i18n';
 import type { Timer } from '../ports/Timer';
 
 /** How long a notice stays before it clears itself. */
@@ -6,12 +7,13 @@ export const NOTICE_MS = 5_000;
 export interface Notice {
   /** Grows with every announcement, so the same words can be announced again. */
   id: number;
-  text: string;
+  /** What to say; the screen words it in the current language. */
+  message: MessageRef;
 }
 
 /**
  * The one short line the screens say out loud ("Added Buy milk", "Deleted
- * Buy milk"). Shown as a polite live region, so it is read without
+ * Buy milk"), kept as a message key so it follows the language. Shown as a polite live region, so it is read without
  * interrupting. Shared, so a deletion made on the edit screen is still
  * heard on the list it returns to.
  */
@@ -32,10 +34,10 @@ export class Notices {
     };
   };
 
-  announce(text: string): void {
+  announce(message: MessageRef): void {
     this.cancelClear?.();
     this.seq += 1;
-    this.current = { id: this.seq, text };
+    this.current = { id: this.seq, message };
     this.cancelClear =
       this.timer?.schedule(() => {
         this.current = null;

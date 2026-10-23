@@ -1,5 +1,6 @@
 import type { Task, TaskList } from '@/domain';
 import type { ChangeSource } from '../ports/ChangeNotifier';
+import type { Clock } from '../ports/Clock';
 import type {
   TaskFilter,
   TaskListRepository,
@@ -15,9 +16,24 @@ import { LiveQuery, type Idleable } from './LiveQuery';
 export const OPEN_TASK_LIMIT = 5000;
 export const COMPLETED_TASK_LIMIT = 200;
 
-/** Which tasks a screen shows: one list, or all tasks when `listId` is omitted. */
+/** The most active (in progress) tasks the dashboard shows, like the web's. */
+export const ACTIVE_TASK_LIMIT = 10;
+
+/** The web's task filters. `overdue` is a time rule, the others are statuses. */
+export type StatusFilter =
+  | 'all'
+  | 'pending'
+  | 'in_progress'
+  | 'completed'
+  | 'overdue';
+
+/**
+ * Which tasks a screen shows: one list or every list (`listId` omitted),
+ * narrowed by a status filter (omitted means `all`).
+ */
 export interface TaskScope {
   listId?: string;
+  status?: StatusFilter;
 }
 
 export interface ListSummary {
@@ -26,9 +42,20 @@ export interface ListSummary {
 }
 
 export interface ListsOverview {
-  /** Open tasks everywhere, including those without a list. */
-  allOpenCount: number;
   lists: ListSummary[];
+}
+
+export interface DashboardCounts {
+  pending: number;
+  inProgress: number;
+  completed: number;
+  overdue: number;
+}
+
+export interface DashboardData {
+  counts: DashboardCounts;
+  /** In-progress tasks, at most `ACTIVE_TASK_LIMIT`. */
+  active: Task[];
 }
 
 export interface TaskSections {
@@ -56,6 +83,8 @@ export interface PlannerQuerySource {
   tasks: TaskRepository;
   /** Local writes and applied pulls. */
   dataChanges: ChangeSource;
+  /** "Now" for the overdue rule. */
+  clock: Clock;
 }
 
 /**
@@ -73,37 +102,77 @@ export class PlannerQueries {
       taskLists.list(),
       tasks.countOpenByList(),
     ]);
-    let allOpenCount = 0;
-    counts.forEach(n => {
-      allOpenCount += n;
-    });
     return {
-      allOpenCount,
       lists: lists.map(list => ({ list, openCount: counts.get(list.id) ?? 0 })),
     };
   }
 
-  async tasks(scope: TaskScope, limits: QueryLimits = {}): Promise<TaskSections> {
-    const { tasks } = this.source;
+  /** The four counters and the in-progress tasks, as the web's Panel shows. */
+  async dashboard(): Promise<DashboardData> {
+    const { tasks, clock } = this.source;
+    const now = clock.now();
+    const [pending, inProgress, completed, overdue, active] = await Promise.all(
+      [
+        tasks.count({ status: 'pending' }),
+        tasks.count({ status: 'in_progress' }),
+        tasks.count({ status: 'completed' }),
+        tasks.count({ overdueAt: now }),
+        tasks.list({
+          status: 'in_progress',
+          order: 'plan',
+          limit: ACTIVE_TASK_LIMIT,
+        }),
+      ],
+    );
+    return { counts: { pending, inProgress, completed, overdue }, active };
+  }
+
+  async tasks(
+    scope: TaskScope,
+    limits: QueryLimits = {},
+  ): Promise<TaskSections> {
+    const { tasks, clock } = this.source;
+    const status = scope.status ?? 'all';
     const where: TaskFilter =
       scope.listId === undefined ? {} : { listId: scope.listId };
-    const [open, completed, openTotal, completedTotal] = await Promise.all([
-      tasks.list({
-        ...where,
-        completion: 'open',
-        order: 'plan',
-        limit: limits.openLimit ?? OPEN_TASK_LIMIT,
-      }),
-      tasks.list({
-        ...where,
-        completion: 'completed',
-        order: 'recentlyCompleted',
-        limit: limits.completedLimit ?? COMPLETED_TASK_LIMIT,
-      }),
-      tasks.count({ ...where, completion: 'open' }),
-      tasks.count({ ...where, completion: 'completed' }),
-    ]);
-    return { open, completed, openTotal, completedTotal };
+    const openLimit = limits.openLimit ?? OPEN_TASK_LIMIT;
+    const completedLimit = limits.completedLimit ?? COMPLETED_TASK_LIMIT;
+
+    // What the open and the completed section hold for each filter.
+    const open: TaskFilter | null =
+      status === 'completed'
+        ? null
+        : status === 'all'
+        ? { ...where, completion: 'open' }
+        : status === 'overdue'
+        ? { ...where, overdueAt: clock.now() }
+        : { ...where, status };
+    const completed: TaskFilter | null =
+      status === 'all' || status === 'completed'
+        ? { ...where, completion: 'completed' }
+        : null;
+
+    const none = Promise.resolve<Task[]>([]);
+    const zero = Promise.resolve(0);
+    const [openRows, completedRows, openTotal, completedTotal] =
+      await Promise.all([
+        open ? tasks.list({ ...open, order: 'plan', limit: openLimit }) : none,
+        completed
+          ? tasks.list({
+              ...completed,
+              order: 'recentlyCompleted',
+              limit: completedLimit,
+            })
+          : none,
+        open ? tasks.count(open) : zero,
+        completed ? tasks.count(completed) : zero,
+      ]);
+    return {
+      open: openRows,
+      completed: completedRows,
+      openTotal,
+      completedTotal,
+    };
   }
 
   list(id: string): Promise<TaskList | null> {
@@ -120,6 +189,10 @@ export class PlannerQueries {
 
   watchOverview(): LiveQuery<ListsOverview> {
     return this.watch(() => this.overview());
+  }
+
+  watchDashboard(): LiveQuery<DashboardData> {
+    return this.watch(() => this.dashboard());
   }
 
   watchTasks(scope: TaskScope): LiveQuery<TaskSections> {

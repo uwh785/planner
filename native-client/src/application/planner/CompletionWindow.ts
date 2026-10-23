@@ -90,7 +90,10 @@ export class CompletionWindow {
     }, this.deps.windowMs ?? COMPLETION_WINDOW_MS);
     this.entries.set(task.id, entry);
     this.publish();
-    this.deps.notices?.announce(`Completed ${task.title}. Undo is available.`);
+    this.deps.notices?.announce({
+      key: 'noticeCompleting',
+      params: { title: task.title },
+    });
   }
 
   undo(id: string): void {
@@ -101,7 +104,10 @@ export class CompletionWindow {
     entry.cancelTimer?.();
     this.entries.delete(id);
     this.publish();
-    this.deps.notices?.announce(`${entry.title} is open again`);
+    this.deps.notices?.announce({
+      key: 'noticeReopened',
+      params: { title: entry.title },
+    });
   }
 
   /** Completes every task still in its window, now. Never rejects. */
@@ -135,7 +141,10 @@ export class CompletionWindow {
       await this.deps.tasks.complete(id, entry.at);
       await this.deps.settled?.();
     } catch {
-      this.deps.notices?.announce(`Couldn't complete ${entry.title}. Try again.`);
+      this.deps.notices?.announce({
+        key: 'noticeCompleteFailed',
+        params: { title: entry.title },
+      });
     } finally {
       if (this.entries.get(id) === entry) {
         this.entries.delete(id);

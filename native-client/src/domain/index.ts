@@ -10,8 +10,12 @@ export {
   isTaskStatus,
   isPriority,
   isOverdue,
+  elapsedMs,
+  remainingMs,
+  timerProgress,
 } from './task';
 export type { TaskList } from './taskList';
+export type { ValidationDetail } from './validation';
 export {
   NotFoundError,
   ValidationError,

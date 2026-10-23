@@ -101,3 +101,58 @@ describe('task list ordering and filters', () => {
     );
   });
 });
+
+describe('overdue filter', () => {
+  const at = 1_000_000_000_000;
+  const DAY = 86_400_000;
+
+  it('applies the web rule: timed once past, all-day once the day has ended, never completed', async () => {
+    await w.tasks.create({
+      title: 'timed past',
+      dueDate: at - 1,
+      dueAllDay: false,
+    });
+    await w.tasks.create({ title: 'timed now', dueDate: at, dueAllDay: false });
+    await w.tasks.create({
+      title: 'all day open',
+      dueDate: at - DAY + 1,
+      dueAllDay: true,
+    });
+    await w.tasks.create({
+      title: 'all day ended',
+      dueDate: at - DAY,
+      dueAllDay: true,
+    });
+    await w.tasks.create({ title: 'no date' });
+    const done = await w.tasks.create({
+      title: 'done',
+      dueDate: 1,
+      dueAllDay: false,
+    });
+    await w.tasks.complete(done.id, 2);
+    const overdue = await w.tasks.list({ overdueAt: at, order: 'plan' });
+    expect(titles(overdue)).toEqual(['all day ended', 'timed past']);
+    expect(await w.tasks.count({ overdueAt: at })).toBe(2);
+  });
+
+  it('combines with a list and ignores deleted tasks', async () => {
+    const list = await w.taskLists.create({ name: 'L' });
+    await w.tasks.create({
+      title: 'in list',
+      listId: list.id,
+      dueDate: 1,
+      dueAllDay: false,
+    });
+    const gone = await w.tasks.create({
+      title: 'gone',
+      dueDate: 1,
+      dueAllDay: false,
+    });
+    await w.tasks.create({ title: 'other list', dueDate: 1, dueAllDay: false });
+    await w.tasks.delete(gone.id);
+    expect(
+      titles(await w.tasks.list({ overdueAt: at, listId: list.id })),
+    ).toEqual(['in list']);
+    expect(await w.tasks.count({ overdueAt: at })).toBe(2);
+  });
+});

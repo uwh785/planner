@@ -67,6 +67,12 @@ export interface TaskFilter {
   /** `open`: pending or in progress. `completed`: done. Omit for both. */
   completion?: 'open' | 'completed';
   /**
+   * Only tasks that are overdue at this moment (epoch ms), by the web's
+   * rule: a timed task once its due moment has passed, an all-day task once
+   * its whole day has ended; never a completed task or one without a date.
+   */
+  overdueAt?: number;
+  /**
    * `default`: sort order, then update time. `plan`: sort order, then due
    * date (undated last), then creation order. `recentlyCompleted`: latest
    * completion first.

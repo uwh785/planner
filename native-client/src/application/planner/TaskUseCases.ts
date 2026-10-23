@@ -34,7 +34,10 @@ export class TaskUseCases {
   async addQuick(title: string, listId: string | null): Promise<Task> {
     await this.requireList(listId);
     const task = await this.tasks.create({ title, listId });
-    this.notices.announce(`Added ${task.title}`);
+    this.notices.announce({
+      key: 'noticeAdded',
+      params: { title: task.title },
+    });
     return task;
   }
 
@@ -44,9 +47,12 @@ export class TaskUseCases {
     const patch: TaskPatch = { ...changes };
     const task = await this.tasks.update(id, patch);
     if (task === null) {
-      throw new NotFoundError('Task not found');
+      throw new NotFoundError('Task not found', 'task');
     }
-    this.notices.announce(`Saved ${task.title}`);
+    this.notices.announce({
+      key: 'noticeSaved',
+      params: { title: task.title },
+    });
     return task;
   }
 
@@ -54,7 +60,10 @@ export class TaskUseCases {
   async remove(id: string): Promise<void> {
     const task = await this.tasks.get(id);
     if (task !== null && (await this.tasks.delete(id))) {
-      this.notices.announce(`Deleted ${task.title}`);
+      this.notices.announce({
+        key: 'noticeDeleted',
+        params: { title: task.title },
+      });
     }
   }
 
@@ -76,7 +85,7 @@ export class TaskUseCases {
 
   private async requireList(listId: string | null): Promise<void> {
     if (listId !== null && (await this.lists.get(listId)) === null) {
-      throw new NotFoundError('List not found');
+      throw new NotFoundError('List not found', 'list');
     }
   }
 }

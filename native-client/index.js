@@ -9,13 +9,19 @@
 import 'react-native-get-random-values';
 import React from 'react';
 import { AppRegistry } from 'react-native';
+import { LocaleService } from '@/application/i18n';
 import { bootstrapApp } from '@/infrastructure/composition/bootstrapApp';
 import { runAuthSmoke } from '@/infrastructure/composition/devAuthSmoke';
 import { runRepoSmoke } from '@/infrastructure/composition/devSmoke';
 import { runSyncSmoke } from '@/infrastructure/composition/devSyncSmoke';
+import { AsyncStorageLocaleStore } from '@/infrastructure/storage/AsyncStorageLocaleStore';
 import App from '@/presentation/App';
 import { StartupErrorScreen } from '@/presentation/screens/StartupErrorScreen';
 import { name as appName } from './app.json';
+
+// The device's language choice, read before the first frame is drawn.
+const locale = new LocaleService(new AsyncStorageLocaleStore());
+locale.restore();
 
 // Restores the stored session (no network) and opens that user's database.
 // A misconfigured build does not throw here: it registers and shows why.
@@ -45,8 +51,9 @@ AppRegistry.registerComponent(
         session={boot.services.session}
         containers={boot.services.containers}
         sync={boot.services.sync}
+        locale={locale}
       />
     ) : (
-      <StartupErrorScreen message={boot.message} />
+      <StartupErrorScreen locale={locale} />
     ),
 );

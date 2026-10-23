@@ -13,9 +13,13 @@ export class ListUseCases {
   /** A new list takes the next palette color unless one is given. */
   async create(name: string, color?: string): Promise<TaskList> {
     const chosen =
-      color ?? LIST_COLORS[(await this.lists.list()).length % LIST_COLORS.length]!.value;
+      color ??
+      LIST_COLORS[(await this.lists.list()).length % LIST_COLORS.length]!.value;
     const list = await this.lists.create({ name, color: chosen });
-    this.notices.announce(`Added list ${list.name}`);
+    this.notices.announce({
+      key: 'noticeListAdded',
+      params: { name: list.name },
+    });
     return list;
   }
 
@@ -31,13 +35,16 @@ export class ListUseCases {
   async remove(id: string): Promise<void> {
     const list = await this.lists.get(id);
     if (list !== null && (await this.lists.delete(id))) {
-      this.notices.announce(`Deleted list ${list.name}`);
+      this.notices.announce({
+        key: 'noticeListDeleted',
+        params: { name: list.name },
+      });
     }
   }
 
   private found(list: TaskList | null): TaskList {
     if (list === null) {
-      throw new NotFoundError('List not found');
+      throw new NotFoundError('List not found', 'list');
     }
     return list;
   }
