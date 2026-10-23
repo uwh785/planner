@@ -5,8 +5,9 @@ import (
 	"log"
 	"os"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
+
+	"planner/pkg/db"
 )
 
 func main() {
@@ -17,7 +18,7 @@ func main() {
 		log.Fatal("DATABASE_URL is required")
 	}
 
-	pool, err := pgxpool.New(context.Background(), dbURL)
+	pool, err := db.NewPool(context.Background(), dbURL)
 	if err != nil {
 		log.Fatalf("unable to connect: %v", err)
 	}

@@ -6,11 +6,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
-
 	"planner/pkg/app"
 	"planner/pkg/auth"
 	"planner/pkg/config"
+	"planner/pkg/db"
 	"planner/pkg/store"
 )
 
@@ -20,7 +19,7 @@ func HandlerOrFatal() http.Handler {
 		log.Fatal(err)
 	}
 
-	pool, err := pgxpool.New(context.Background(), cfg.DatabaseURL)
+	pool, err := db.NewPool(context.Background(), cfg.DatabaseURL)
 	if err != nil {
 		log.Fatalf("unable to connect to database: %v", err)
 	}
