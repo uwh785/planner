@@ -17,12 +17,13 @@ On an emulator, if the app cannot reach Metro, run `adb reverse tcp:8081 tcp:808
 
 Auth screens (sign in, create account) gate the app: signed out shows them, a stored session restores offline straight into the Panel. The signed-in app is the web app's mobile version (React Navigation: a native stack over bottom tabs):
 
-- **Panel**: the four counters (pending, in progress, completed, overdue, computed locally with the web's rules) and the active tasks as cards with a countdown ring and the time left.
-- **Tasks**: quick add (into the selected list), the web's status filters (All, Pending, In Progress, Completed, Overdue), a list filter (chips), open task cards and a collapsed Completed section.
+- **Panel**: the four counters (pending, in progress, completed, overdue, computed locally with the web's rules) and the active tasks as cards with a countdown ring, the time left and Pause and Complete.
+- **Tasks**: quick add (into the selected list), the web's status filters (All, Pending, In Progress, Completed, Overdue), a list filter (chips), open task cards (Start or Pause, and Complete) and a collapsed Completed section.
 - **Config**: language, list management (create, rename, recolor, delete), the account and Sign out, the discreet sync status line and, in debug builds, the development items.
-- Above the tabs: the task edit screen and the list screens. Android's back button pops them, returns to Panel from another tab, then leaves the app.
+- **Task detail** (tap any card): the web's detail screen with the ring card that counts down while the task runs, Start / Pause / Complete, priority, due date, status and subtasks (add, check off, delete); the pencil opens the edit screen (which also sets the estimated duration) and the trash deletes after a confirmation.
+- Above the tabs: the task detail, the task edit screen and the list screens. Android's back button pops them, returns to Panel from another tab, then leaves the app.
 
-Every screen reads the local database and never waits for the network. Completing a task has an undo window of about five seconds because the backend cannot reopen a task (see `src/application/README.md`). The look lives in one module, `src/presentation/theme.ts`.
+Every screen reads the local database and never waits for the network. Completing a task has an undo window of about five seconds because the backend cannot reopen a task; Start and Pause write at once, stamped with the moment of the tap and replayed to the backend in order as the timer ops `start`, `pause` and `complete` (see `src/application/README.md`). The look lives in one module, `src/presentation/theme.ts`.
 
 ### Language
 
@@ -51,6 +52,7 @@ The UI only talks to the repositories. A create, update or delete changes the lo
 - `payload` is the snake_case `data` the backend decodes (full current body for upserts; `{task_id}` for a subtask delete; `{task_id, tag_id}` for task/tag links). Server-managed fields are never sent.
 - A task/tag link has no id: its outbox `entity_id` is `<task_id>:<tag_id>`.
 - Coalescing: at most one pending upsert per entity (updated in place, so its `id` ordering key and `change_id` stay). Deleting an entity created offline and never pushed (`origin = 'create'`) drops its entries and hard-deletes the row; deleting a known entity keeps a tombstone and one delete entry.
+- Timer transitions (`start`, `pause`, `complete`; payload `{at}`) are never coalesced: each is its own entry, in id order; deleting the task drops them.
 - Deletes mirror the backend: deleting a task leaves subtasks and links alone, deleting a tag tombstones its links locally (the server cascades). Deleting a list moves its tasks to "no list" (the backend would leave them pointing at a deleted list, which then fails to push).
 - `applyRemoteChanges(pullResponse)` applies a `GET /api/sync` payload in one transaction and skips rows that have an outbox entry (pending or parked).
 
@@ -58,7 +60,7 @@ The UI only talks to the repositories. A create, update or delete changes the lo
 
 `application/sync` is framework-free; platform pieces sit behind ports (`Connectivity`, `AppLifecycle`, `Timer`, `ChangeNotifier`) with adapters in `infrastructure/sync` (NetInfo, AppState, setTimeout).
 
-- `SyncEngine.sync()` is single flight (a call during a run shares it and asks for at most one follow-up). It pushes first, then pulls. Push sends pending outbox entries in id order, at most 200 per request, with their `change_id`; entries are removed only after the response, so a crash re-sends the same ids and the server answers `exists`. Per-item results: `applied`/`exists` clear the entry (so does a delete's `not_found`); an upsert's `not_found` (missing parent) is retried and parked as `blocked` after 5 attempts; `limit` parks as `blocked`; `conflict`/`invalid` park as `rejected` (message kept, local row kept); `error` or an unknown status retries with backoff. A network failure leaves the outbox untouched; a whole-batch 400 parks that batch as `rejected` once; a lost session pauses without backoff.
+- `SyncEngine.sync()` is single flight (a call during a run shares it and asks for at most one follow-up). It pushes first, then pulls. Push sends pending outbox entries in id order, at most 200 per request, with their `change_id`; entries are removed only after the response, so a crash re-sends the same ids and the server answers `exists`. Per-item results: `applied`/`exists` clear the entry (so does a delete's `not_found`, and a timer op's `conflict`, which the next pull reconciles); an upsert's `not_found` (missing parent) is retried and parked as `blocked` after 5 attempts; `limit` parks as `blocked`; `conflict`/`invalid` park as `rejected` (message kept, local row kept); `error` or an unknown status retries with backoff. A network failure leaves the outbox untouched; a whole-batch 400 parks that batch as `rejected` once; a lost session pauses without backoff.
 - Parked entries are never pushed automatically. Editing the entity revives its parked upsert as pending; deleting it drops a parked create or replaces a parked update with one delete; `retryParked()` is for a future attention screen. A pull never overwrites a row that has any outbox entry.
 - Backoff is a pure function (2 s, 5 s, 15 s, 60 s, 5 min, then 15 min, +/-20% jitter). The engine exposes `nextRetryAt`; it owns no timers.
 - `SyncStatus` (`getSnapshot`/`subscribe`): `idle | syncing | offline | error | paused` plus pending/blocked/rejected counts, `lastSyncAt`, `lastError`, `nextRetryAt`.

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Frame } from '../components/atoms/Screen';
 import { ColorDot } from '../components/atoms/ColorDot';
 import { InlineMessage } from '../components/atoms/InlineMessage';
@@ -15,6 +15,7 @@ import {
 } from '../components/organisms/TasksView';
 import { errorSentence } from '../errorMessages';
 import { taskCardModel } from '../format/taskCardModel';
+import { useFlushCompletionOnLeave } from '../hooks/useFlushCompletionOnLeave';
 import { useI18n } from '../i18n/I18nProvider';
 import type { TabScreenProps } from '../navigation/routes';
 import {
@@ -64,13 +65,8 @@ export function TasksScreen({ navigation }: TabScreenProps<'Tasks'>) {
   const data = sections.status === 'loading' ? null : sections.data;
   const { completion } = planner;
 
-  // Leaving the screen completes what is still in its undo window.
-  useEffect(
-    () => () => {
-      completion.flush();
-    },
-    [completion],
-  );
+  // Leaving the screen (or just its tab) completes what is still in its undo window.
+  useFlushCompletionOnLeave();
 
   async function addTask(text: string): Promise<string | null> {
     try {
@@ -146,9 +142,15 @@ export function TasksScreen({ navigation }: TabScreenProps<'Tasks'>) {
         completing={completing}
         completedExpanded={completedExpanded}
         onToggleCompleted={() => setCompletedExpanded(open => !open)}
+        onStartTask={id => {
+          planner.taskTimer.start(id);
+        }}
+        onPauseTask={id => {
+          planner.taskTimer.pause(id);
+        }}
         onCompleteTask={completeTask}
         onUndo={id => completion.undo(id)}
-        onOpenTask={taskId => navigation.navigate('TaskEdit', { taskId })}
+        onOpenTask={taskId => navigation.navigate('TaskDetail', { taskId })}
       />
     </Frame>
   );

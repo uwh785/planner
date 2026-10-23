@@ -202,24 +202,76 @@ describe('active tasks', () => {
     expect(screen.getByLabelText('Time over')).toBeTruthy();
   });
 
-  it('has no timer buttons yet (Pause and Complete come with the task detail)', async () => {
+  it('shows Pause and Complete on an in-progress card, as the web dashboard does, and no Start', async () => {
     const env = await renderSignedIn();
     await seed(env);
     await settle();
     expect(
-      screen.queryByRole('button', { name: /Pause|Complete$|Start/ }),
-    ).toBeNull();
+      screen.getByRole('button', { name: 'Pause Prepare slides' }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: 'Complete Prepare slides' }),
+    ).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /^Start/ })).toBeNull();
   });
 
-  it('opens the existing task edit screen from a card', async () => {
+  it('Pause on the card pauses the task with the time really run, and the card leaves the active list', async () => {
+    const env = await renderSignedIn();
+    const task = await env.world.tasks.create({ title: 'Running' });
+    await env.world.tasks.start(task.id, NOW - 10 * MIN);
+    await settle();
+    fireEvent.press(screen.getByRole('button', { name: 'Pause Running' }));
+    await settle();
+    expect(await env.world.tasks.get(task.id)).toMatchObject({
+      status: 'pending',
+      elapsedMs: 10 * MIN,
+    });
+    expect(screen.getByText('No active tasks')).toBeTruthy();
+    expect(screen.getByText('Paused Running')).toBeTruthy();
+  });
+
+  it('Complete on the card uses the undo window, then completes at the tap time', async () => {
+    const env = await renderSignedIn();
+    const task = await env.world.tasks.create({ title: 'Running' });
+    await env.world.tasks.start(task.id, NOW - 10 * MIN);
+    await settle();
+    const tapped = env.world.clock.now();
+    fireEvent.press(screen.getByRole('button', { name: 'Complete Running' }));
+    await settle();
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeTruthy();
+    expect((await env.world.tasks.get(task.id))?.status).toBe('in_progress');
+    act(() => env.timer.advance(5_000));
+    await settle();
+    expect(await env.world.tasks.get(task.id)).toMatchObject({
+      status: 'completed',
+      completedAt: tapped,
+      elapsedMs: 10 * MIN,
+    });
+    expect(screen.getByText('No active tasks')).toBeTruthy();
+  });
+
+  it('completes a task still in its window when the user leaves for another tab', async () => {
+    const env = await renderSignedIn();
+    const task = await env.world.tasks.create({ title: 'Running' });
+    await env.world.tasks.start(task.id, NOW - MIN);
+    await settle();
+    fireEvent.press(screen.getByRole('button', { name: 'Complete Running' }));
+    await settle();
+    fireEvent.press(screen.getByRole('tab', { name: 'Tasks' }));
+    await screen.findByRole('header', { name: 'Tasks' });
+    await settle();
+    expect((await env.world.tasks.get(task.id))?.status).toBe('completed');
+  });
+
+  it('opens the task detail from a card', async () => {
     const env = await renderSignedIn();
     await seed(env);
     await settle();
     fireEvent.press(screen.getByRole('button', { name: /^Prepare slides/ }));
     expect(
-      await screen.findByRole('header', { name: 'Edit task' }),
+      await screen.findByRole('header', { name: 'Prepare slides' }),
     ).toBeTruthy();
-    expect(screen.getByLabelText('Title').props.value).toBe('Prepare slides');
+    expect(screen.getByRole('button', { name: 'Edit task' })).toBeTruthy();
   });
 
   it('shows an empty state when there are no active tasks', async () => {

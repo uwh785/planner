@@ -37,7 +37,7 @@ export function ListEditScreen({ navigation, route }: ScreenProps<'ListEdit'>) {
     initial.current !== null &&
     (values.name !== initial.current.name ||
       values.color !== initial.current.color);
-  const { allowLeaving } = useDiscardGuard(dirty, 'list');
+  const { leaveWith } = useDiscardGuard(dirty, 'list');
   const goBack = () => navigation.goBack();
 
   if (loaded.status === 'ready' && loaded.data === null && !busy) {
@@ -66,8 +66,7 @@ export function ListEditScreen({ navigation, route }: ScreenProps<'ListEdit'>) {
       if (values!.color !== initial.current!.color) {
         await planner.lists.recolor(listId, values!.color);
       }
-      allowLeaving();
-      goBack();
+      leaveWith(goBack);
     } catch (problem) {
       setError(errorSentence(problem, t));
       setBusy(false);
@@ -84,8 +83,7 @@ export function ListEditScreen({ navigation, route }: ScreenProps<'ListEdit'>) {
           setBusy(true);
           try {
             await planner.lists.remove(listId);
-            allowLeaving();
-            navigation.goBack();
+            leaveWith(() => navigation.goBack());
           } catch (problem) {
             setError(errorSentence(problem, t));
             setBusy(false);

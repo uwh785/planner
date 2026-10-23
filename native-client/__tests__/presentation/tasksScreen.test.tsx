@@ -6,8 +6,10 @@ import {
   waitFor,
   within,
 } from '@testing-library/react-native';
+import { CompletionWindow } from '@/application/planner/CompletionWindow';
 import { flushAsync } from '../helpers/plannerWorld';
 import { renderSignedIn, type Rendered } from '../helpers/renderApp';
+import { openTestWorld } from '../helpers/testRepositories';
 
 beforeEach(() => {
   jest.spyOn(console, 'log').mockImplementation(() => undefined);
@@ -39,6 +41,72 @@ const advance = async (env: Rendered, ms: number) => {
   act(() => env.timer.advance(ms));
   await settle();
 };
+
+describe('leaving the tasks screen with a task in its undo window', () => {
+  const tapComplete = async (title: string) => {
+    fireEvent.press(
+      await screen.findByRole('button', { name: `Complete ${title}` }),
+    );
+    await settle();
+  };
+
+  it('completes it when the user switches to another tab (tabs stay mounted)', async () => {
+    const env = await renderSignedIn();
+    const task = await env.world.tasks.create({ title: 'Buy milk' });
+    await openTasks();
+    await tapComplete('Buy milk');
+    expect((await env.world.tasks.get(task.id))?.status).toBe('pending');
+    fireEvent.press(screen.getByRole('tab', { name: 'Dashboard' }));
+    await screen.findByRole('header', { name: 'Dashboard' });
+    await settle();
+    expect(await env.world.tasks.get(task.id)).toMatchObject({
+      status: 'completed',
+      completedAt: env.world.clock.now(),
+    });
+    expect(await env.world.outbox.peekPending(9)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ op: 'complete' })]),
+    );
+  });
+
+  it('keeps the window open while the user stays on the screen', async () => {
+    const env = await renderSignedIn();
+    const task = await env.world.tasks.create({ title: 'Buy milk' });
+    await openTasks();
+    await tapComplete('Buy milk');
+    await advance(env, 2_000);
+    expect((await env.world.tasks.get(task.id))?.status).toBe('pending');
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeTruthy();
+  });
+
+  it('says so on the screen it lands on when the write on leaving fails', async () => {
+    const env = await renderSignedIn();
+    await env.world.tasks.create({ title: 'Buy milk' });
+    await openTasks();
+    await tapComplete('Buy milk');
+    jest
+      .spyOn(CompletionWindow.prototype, 'flush')
+      .mockRejectedValue(new Error('disk'));
+    fireEvent.press(screen.getByRole('tab', { name: 'Dashboard' }));
+    await screen.findByRole('header', { name: 'Dashboard' });
+    await settle();
+    expect(screen.getByText('Some changes could not be saved.')).toBeTruthy();
+  });
+
+  it('names the task when its own write fails', async () => {
+    const world = await openTestWorld();
+    const env = await renderSignedIn({ world });
+    await env.world.tasks.create({ title: 'Buy milk' });
+    await openTasks();
+    await tapComplete('Buy milk');
+    jest.spyOn(world.tasks, 'complete').mockRejectedValue(new Error('disk'));
+    fireEvent.press(screen.getByRole('tab', { name: 'Dashboard' }));
+    await screen.findByRole('header', { name: 'Dashboard' });
+    await settle();
+    expect(
+      screen.getByText("Couldn't complete Buy milk. Try again."),
+    ).toBeTruthy();
+  });
+});
 
 describe('tasks tab', () => {
   it('starts empty with a plain prompt and a quick add field', async () => {
@@ -159,15 +227,47 @@ describe('tasks tab', () => {
     expect(title.props.numberOfLines).toBeUndefined();
   });
 
-  it('opens the edit screen from a card', async () => {
+  it('opens the task detail from a card, and the pencil there opens the edit screen', async () => {
     const env = await renderSignedIn();
     await env.world.tasks.create({ title: 'Edit me' });
     await openTasks();
     fireEvent.press(await card('Edit me'));
+    expect(await screen.findByRole('header', { name: 'Edit me' })).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: 'Edit task' }));
     expect(
       await screen.findByRole('header', { name: 'Edit task' }),
     ).toBeTruthy();
     expect(screen.getByLabelText('Title').props.value).toBe('Edit me');
+  });
+
+  it('Start and Pause on the cards write the timer transitions', async () => {
+    const env = await renderSignedIn();
+    const task = await env.world.tasks.create({ title: 'Timed' });
+    await env.world.outbox.markSent(
+      (await env.world.outbox.peekPending(9)).map(e => e.id),
+    );
+    await openTasks();
+    const tapped = env.world.clock.now();
+    fireEvent.press(await screen.findByRole('button', { name: 'Start Timed' }));
+    await settle();
+    expect(await env.world.tasks.get(task.id)).toMatchObject({
+      status: 'in_progress',
+      startedAt: tapped,
+    });
+    expect(
+      await screen.findByRole('button', { name: 'Pause Timed' }),
+    ).toBeTruthy();
+    await advance(env, 61_000);
+    fireEvent.press(screen.getByRole('button', { name: 'Pause Timed' }));
+    await settle();
+    expect(await env.world.tasks.get(task.id)).toMatchObject({
+      status: 'pending',
+      elapsedMs: 61_000,
+    });
+    expect((await env.world.outbox.peekPending(9)).map(e => e.op)).toEqual([
+      'start',
+      'pause',
+    ]);
   });
 
   it('follows tasks that arrive from a pull while it is open', async () => {

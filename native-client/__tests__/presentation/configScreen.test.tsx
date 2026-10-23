@@ -1,7 +1,9 @@
 import { act, fireEvent, screen } from '@testing-library/react-native';
+import { CompletionWindow } from '@/application/planner/CompletionWindow';
 import { SyncStatus } from '@/application/sync/SyncStatus';
 import { flushAsync } from '../helpers/plannerWorld';
 import { renderSignedIn } from '../helpers/renderApp';
+import { openTestWorld } from '../helpers/testRepositories';
 
 const settle = () => act(async () => flushAsync());
 beforeEach(() => {
@@ -72,6 +74,61 @@ it('still shows the sign-in form if signing out fails on the server', async () =
   env.gateway.logout.mockRejectedValueOnce(new Error('offline') as never);
   fireEvent.press(screen.getByRole('button', { name: 'Sign Out' }));
   expect(await screen.findByRole('header', { name: 'Sign In' })).toBeTruthy();
+});
+
+describe('signing out with a completion that cannot be saved', () => {
+  it('still signs out and says on the sign-in screen that some tasks were not saved', async () => {
+    const world = await openTestWorld();
+    const env = await renderSignedIn({ world });
+    await env.world.tasks.create({ title: 'Buy milk' });
+    let failSave!: (error: Error) => void;
+    jest.spyOn(world.tasks, 'complete').mockImplementation(
+      () =>
+        new Promise((_, reject) => {
+          failSave = reject;
+        }),
+    );
+    fireEvent.press(await screen.findByRole('tab', { name: 'Tasks' }));
+    fireEvent.press(
+      await screen.findByRole('button', { name: 'Complete Buy milk' }),
+    );
+    await settle();
+    // Leaving the tab starts the write; it hangs until the sign-out waits on it.
+    fireEvent.press(screen.getByRole('tab', { name: 'Settings' }));
+    await screen.findByRole('header', { name: 'Settings' });
+    fireEvent.press(screen.getByRole('button', { name: 'Sign Out' }));
+    await settle();
+    await act(async () => failSave(new Error('disk full')));
+    expect(await screen.findByRole('header', { name: 'Sign In' })).toBeTruthy();
+    expect(
+      screen.getByText(
+        'Some completed tasks could not be saved before you signed out.',
+      ),
+    ).toBeTruthy();
+    expect(env.containers.release).toHaveBeenCalled();
+  });
+
+  it('signs out even if the flush itself rejects', async () => {
+    const env = await openConfig();
+    jest
+      .spyOn(CompletionWindow.prototype, 'flush')
+      .mockRejectedValue(new Error('boom'));
+    fireEvent.press(screen.getByRole('button', { name: 'Sign Out' }));
+    expect(await screen.findByRole('header', { name: 'Sign In' })).toBeTruthy();
+    expect(
+      screen.getByText(
+        'Some completed tasks could not be saved before you signed out.',
+      ),
+    ).toBeTruthy();
+    expect(env.containers.release).toHaveBeenCalled();
+  });
+
+  it('shows no warning when everything was saved', async () => {
+    await openConfig();
+    fireEvent.press(screen.getByRole('button', { name: 'Sign Out' }));
+    await screen.findByRole('header', { name: 'Sign In' });
+    expect(screen.queryByText(/could not be saved/)).toBeNull();
+  });
 });
 
 describe('development items', () => {

@@ -6,6 +6,7 @@ import { useI18n } from '../i18n/I18nProvider';
 import type { TabScreenProps } from '../navigation/routes';
 import { usePlanner } from '../plannerContext';
 import { useSession } from '../sessionContext';
+import { useLeaveSignOutNotice } from '../signOutNotice';
 import { DevTaskButton } from './DevTaskButton';
 import { SyncStatusLine } from './SyncStatusLine';
 
@@ -18,6 +19,7 @@ export function ConfigScreen({ navigation }: TabScreenProps<'Config'>) {
   const { t } = useI18n();
   const { state, logout } = useSession();
   const planner = usePlanner();
+  const leaveNotice = useLeaveSignOutNotice();
   const [leaving, setLeaving] = useState(false);
   const user =
     state.status === 'signedIn' || state.status === 'expired'
@@ -26,8 +28,18 @@ export function ConfigScreen({ navigation }: TabScreenProps<'Config'>) {
 
   async function signOut() {
     setLeaving(true);
+    // Saving the last completions and signing out are separate: a failed
+    // save is told on the sign-in screen, but never stops the sign-out.
+    let unsaved = false;
     try {
-      await planner.completion.flush();
+      unsaved = (await planner.completion.flush()).failed.length > 0;
+    } catch {
+      unsaved = true;
+    }
+    if (unsaved) {
+      leaveNotice('signOutUnsaved');
+    }
+    try {
       await logout();
     } catch {
       // The session is gone locally either way; the gate shows the sign-in form.

@@ -25,6 +25,7 @@ const same = (a: TaskEditValues, b: TaskEditValues) =>
   a.priority === b.priority &&
   a.dueDate === b.dueDate &&
   a.dueAllDay === b.dueAllDay &&
+  a.durationMs === b.durationMs &&
   a.listId === b.listId;
 
 /** The basic edit screen. Explicit Save, confirmed Delete, a guard on Back. */
@@ -49,6 +50,7 @@ export function TaskEditScreen({ navigation, route }: ScreenProps<'TaskEdit'>) {
         priority: task.priority,
         dueDate: task.dueDate,
         dueAllDay: task.dueAllDay,
+        durationMs: task.durationMs,
         listId: task.listId,
       };
       initial.current = seed;
@@ -60,8 +62,10 @@ export function TaskEditScreen({ navigation, route }: ScreenProps<'TaskEdit'>) {
     values !== null &&
     initial.current !== null &&
     !same(values, initial.current);
-  const { allowLeaving } = useDiscardGuard(dirty, 'task');
+  const { leaveWith } = useDiscardGuard(dirty, 'task');
   const goBack = () => navigation.goBack();
+  // A deleted task leaves nothing behind it, the detail included.
+  const leaveAll = () => navigation.popToTop();
 
   if (values === null || loaded.status !== 'ready') {
     if (loaded.status === 'ready' && loaded.data === null) {
@@ -69,7 +73,7 @@ export function TaskEditScreen({ navigation, route }: ScreenProps<'TaskEdit'>) {
         <MessageView
           title={t('taskGoneTitle')}
           body={t('taskGoneBody')}
-          action={{ label: t('back'), onPress: goBack }}
+          action={{ label: t('back'), onPress: leaveAll }}
         />
       );
     }
@@ -80,7 +84,7 @@ export function TaskEditScreen({ navigation, route }: ScreenProps<'TaskEdit'>) {
       <MessageView
         title={t('taskGoneTitle')}
         body={t('taskGoneBody')}
-        action={{ label: t('back'), onPress: goBack }}
+        action={{ label: t('back'), onPress: leaveAll }}
       />
     );
   }
@@ -161,8 +165,7 @@ export function TaskEditScreen({ navigation, route }: ScreenProps<'TaskEdit'>) {
     setBusy(true);
     try {
       await planner.tasks.edit(taskId, { ...values! });
-      allowLeaving();
-      goBack();
+      leaveWith(goBack);
     } catch (problem) {
       setError(errorSentence(problem, t));
       setBusy(false);
@@ -179,8 +182,7 @@ export function TaskEditScreen({ navigation, route }: ScreenProps<'TaskEdit'>) {
           setBusy(true);
           try {
             await planner.tasks.remove(taskId);
-            allowLeaving();
-            goBack();
+            leaveWith(leaveAll);
           } catch (problem) {
             setError(errorSentence(problem, t));
             setBusy(false);
