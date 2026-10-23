@@ -1,3 +1,4 @@
+import { InvalidTransitionError } from '@/domain';
 import {
   openTestWorld,
   outboxRows,
@@ -58,14 +59,16 @@ describe('TaskRepository.complete', () => {
     });
   });
 
-  it('is a no-op the second time: same row, no second entry', async () => {
+  it('refuses a second completion with a typed error: same row, no second entry', async () => {
     const task = await w.tasks.create({ title: 'a' });
     await pushAll();
     const first = await w.tasks.complete(task.id, 5_000);
     w.clock.tick();
-    const second = await w.tasks.complete(task.id, 9_000);
-    expect(second).toEqual(first);
-    expect(second?.completedAt).toBe(5_000);
+    await expect(w.tasks.complete(task.id, 9_000)).rejects.toThrow(
+      InvalidTransitionError,
+    );
+    expect(await w.tasks.get(task.id)).toEqual(first);
+    expect((await w.tasks.get(task.id))?.completedAt).toBe(5_000);
     expect(await w.outbox.pendingCount()).toBe(1);
   });
 
@@ -146,13 +149,15 @@ describe('TaskRepository.complete', () => {
     expect(await outboxSummary(w.db)).toEqual([`task:delete:${task.id}`]);
   });
 
-  it('a parked complete stays parked and is not duplicated by another complete', async () => {
+  it('a parked complete stays parked and a completed task cannot be completed again', async () => {
     const task = await w.tasks.create({ title: 'a' });
     await pushAll();
     await w.tasks.complete(task.id, 7_000);
     const [entry] = await outboxRows(w.db);
     await w.outbox.park(entry!.id, 'blocked', 'missing');
-    await w.tasks.complete(task.id, 8_000);
+    await expect(w.tasks.complete(task.id, 8_000)).rejects.toThrow(
+      InvalidTransitionError,
+    );
     const rows = await outboxRows(w.db);
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ id: entry!.id, status: 'blocked' });

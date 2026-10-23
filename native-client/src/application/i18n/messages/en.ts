@@ -20,7 +20,6 @@ export const en: Record<keyof typeof es, Message> = {
   loginPassword: 'Password',
   loginButton: 'Sign In',
   registerTitle: 'Create Account',
-  registerName: 'Name',
   registerButton: 'Create Account',
   registerLogin: 'Sign In',
   registerNameOptional: 'Name (optional)',
@@ -106,7 +105,6 @@ export const en: Record<keyof typeof es, Message> = {
   taskTimeLeft: 'Time left',
   taskTimeOver: 'Time over',
   taskMarkDone: 'Complete {title}',
-  taskCompletedLabel: '{title}, completed',
   taskOpenHint: 'Opens the task',
   taskStatusPending: 'Pending',
   taskStatusInProgress: 'In progress',
@@ -125,6 +123,22 @@ export const en: Record<keyof typeof es, Message> = {
   durationHoursMinutes: '{hours} h {minutes} min',
   durationHours: '{hours} h',
   durationMinutes: '{minutes} min',
+
+  // Task detail (web wording where it exists)
+  taskStart: 'Start',
+  taskPause: 'Pause',
+  taskStartLabel: 'Start {title}',
+  taskPauseLabel: 'Pause {title}',
+  taskStatus: 'Status',
+  taskSubtasks: 'Subtasks',
+  taskSubtaskNew: 'New subtask',
+  subtaskDelete: 'Delete subtask {title}',
+  timerSpoken: 'Time left: {time}. {percent}% of the time used',
+  durationSeconds: '{seconds} s',
+  taskDetailLoadError: 'The task could not be read.',
+  taskDuration: 'Estimated duration',
+  durationHoursField: 'Hours',
+  durationMinutesField: 'Minutes',
 
   // Task edit (web wording where it exists)
   taskEditTitle: 'Edit task',
@@ -187,7 +201,6 @@ export const en: Record<keyof typeof es, Message> = {
   configTitle: 'Settings',
   configLanguage: 'Language',
   configLogout: 'Sign Out',
-  configUser: 'User',
   configAccount: 'Account',
   configSignedInAs: 'Signed in as',
   configLists: 'Lists',
@@ -208,6 +221,14 @@ export const en: Record<keyof typeof es, Message> = {
   noticeCompleting: 'Completed {title}. Undo is available.',
   noticeReopened: '{title} is open again',
   noticeCompleteFailed: "Couldn't complete {title}. Try again.",
+  noticeStarted: 'Started {title}',
+  noticePaused: 'Paused {title}',
+  noticeTimerFailed: "Couldn't update {title}. Try again.",
+  noticeSubtaskAdded: 'Added subtask {title}',
+  noticeSubtaskDeleted: 'Deleted subtask {title}',
+  noticeFlushFailed: 'Some changes could not be saved.',
+  signOutUnsaved:
+    'Some completed tasks could not be saved before you signed out.',
 
   // Errors
   errorSave: "Couldn't save. Try again.",
@@ -217,6 +238,7 @@ export const en: Record<keyof typeof es, Message> = {
   errorNameTooLong: 'Name must be {max} characters or fewer',
   errorDescriptionTooLong: 'Description must be {max} characters or fewer',
   errorTaskNotFound: 'Task not found',
+  errorSubtaskNotFound: 'Subtask not found',
   errorListNotFound: 'List not found',
 
   // Sync status line

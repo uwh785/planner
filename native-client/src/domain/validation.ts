@@ -155,8 +155,23 @@ export function normalizeEvent(e: Event): Event {
 
 /** A referenced entity does not exist (or is deleted) locally. */
 export class NotFoundError extends Error {
-  constructor(message: string, readonly entity?: 'task' | 'list') {
+  constructor(message: string, readonly entity?: 'task' | 'list' | 'subtask') {
     super(message);
     this.name = 'NotFoundError';
+  }
+}
+
+/**
+ * A timer transition the task's current status does not allow (backend
+ * `ErrInvalidTransition`): start needs pending, pause needs in progress,
+ * complete needs pending or in progress. Nothing is changed when it is thrown.
+ */
+export class InvalidTransitionError extends Error {
+  constructor(
+    readonly op: 'start' | 'pause' | 'complete',
+    readonly from: 'pending' | 'in_progress' | 'completed',
+  ) {
+    super(`Cannot ${op} a task that is ${from}`);
+    this.name = 'InvalidTransitionError';
   }
 }

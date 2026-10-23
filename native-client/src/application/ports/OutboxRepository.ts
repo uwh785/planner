@@ -9,10 +9,17 @@ export type OutboxEntity =
   | 'event';
 
 /**
- * `complete` is a task timer transition (payload `{at}`); the other timer ops
- * (start, pause) arrive with M6.
+ * `start`, `pause` and `complete` are task timer transitions (payload
+ * `{at}`, the moment the user acted). They are not idempotent, so unlike
+ * upserts they are never coalesced: every transition is its own entry and
+ * they keep their id order.
  */
-export type OutboxOp = 'upsert' | 'delete' | 'complete';
+export type TimerOp = 'start' | 'pause' | 'complete';
+export type OutboxOp = 'upsert' | 'delete' | TimerOp;
+
+export const TIMER_OPS: readonly TimerOp[] = ['start', 'pause', 'complete'];
+export const isTimerOp = (op: OutboxOp): op is TimerOp =>
+  (TIMER_OPS as readonly string[]).includes(op);
 
 /**
  * `create`: the entity was made on this device and the server has not seen

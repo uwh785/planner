@@ -85,6 +85,29 @@ describe('task use cases', () => {
     expect(t.listId).toBe(l.id);
   });
 
+  it('edits the estimated duration and clears it with null', async () => {
+    const t = await w.planner.tasks.addQuick('a', null);
+    const timed = await w.planner.tasks.edit(t.id, { durationMs: 5_400_000 });
+    expect(timed.durationMs).toBe(5_400_000);
+    const [row] = (await w.outbox.peekPending(9)).filter(
+      e => e.entity === 'task',
+    );
+    expect(row!.payload).toMatchObject({ duration_ms: 5_400_000 });
+    expect(
+      (await w.planner.tasks.edit(t.id, { durationMs: null })).durationMs,
+    ).toBeNull();
+  });
+
+  it('refuses a duration that is not a positive whole number of milliseconds', async () => {
+    const t = await w.planner.tasks.addQuick('a', null);
+    for (const durationMs of [0, -1, 1.5, Number.NaN]) {
+      await expect(
+        w.planner.tasks.edit(t.id, { durationMs }),
+      ).rejects.toBeInstanceOf(ValidationError);
+    }
+    expect((await w.tasks.get(t.id))?.durationMs).toBeNull();
+  });
+
   it('quick add rejects a blank title and a missing list', async () => {
     await expect(w.planner.tasks.addQuick('  ', null)).rejects.toBeInstanceOf(
       ValidationError,

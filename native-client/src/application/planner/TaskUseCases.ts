@@ -20,10 +20,15 @@ export interface TaskChanges {
   /** Epoch ms; midnight local time when `dueAllDay`. Null clears the date. */
   dueDate?: number | null;
   dueAllDay?: boolean;
+  /** Estimated duration in ms for the countdown; null clears it. */
+  durationMs?: number | null;
   listId?: string | null;
 }
 
-/** Create (title only), edit and delete a task. Completion is CompletionWindow. */
+/**
+ * Create (title only), edit and delete a task. Completion is CompletionWindow;
+ * start and pause are TaskTimerUseCases.
+ */
 export class TaskUseCases {
   constructor(
     private readonly tasks: TaskRepository,
@@ -74,6 +79,10 @@ export class TaskUseCases {
     const due = changes.dueDate;
     if (due != null && (!Number.isInteger(due) || due <= 0)) {
       throw new ValidationError('due date is not valid');
+    }
+    const duration = changes.durationMs;
+    if (duration != null && (!Number.isInteger(duration) || duration <= 0)) {
+      throw new ValidationError('duration must be a positive number of ms');
     }
     if (
       changes.dueAllDay !== undefined &&

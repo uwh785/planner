@@ -1,7 +1,8 @@
-import type { Task, TaskList } from '@/domain';
+import type { Subtask, Task, TaskList } from '@/domain';
 import type { ChangeSource } from '../ports/ChangeNotifier';
 import type { Clock } from '../ports/Clock';
 import type {
+  SubtaskRepository,
   TaskFilter,
   TaskListRepository,
   TaskRepository,
@@ -73,6 +74,15 @@ export interface TaskEditData {
   lists: TaskList[];
 }
 
+/** What the task detail screen shows: the task, its list and its subtasks. */
+export interface TaskDetailData {
+  task: Task;
+  /** Null when the task has no list (or its list was deleted). */
+  list: TaskList | null;
+  /** In the order they were added. */
+  subtasks: Subtask[];
+}
+
 export interface QueryLimits {
   openLimit?: number;
   completedLimit?: number;
@@ -81,6 +91,7 @@ export interface QueryLimits {
 export interface PlannerQuerySource {
   taskLists: TaskListRepository;
   tasks: TaskRepository;
+  subtasks: SubtaskRepository;
   /** Local writes and applied pulls. */
   dataChanges: ChangeSource;
   /** "Now" for the overdue rule. */
@@ -187,6 +198,20 @@ export class PlannerQueries {
     return task === null ? null : { task, lists };
   }
 
+  /** Null when the task does not exist (or was deleted). */
+  async taskDetail(id: string): Promise<TaskDetailData | null> {
+    const { tasks, taskLists, subtasks } = this.source;
+    const task = await tasks.get(id);
+    if (task === null) {
+      return null;
+    }
+    const [list, rows] = await Promise.all([
+      task.listId === null ? Promise.resolve(null) : taskLists.get(task.listId),
+      subtasks.listByTask(id),
+    ]);
+    return { task, list, subtasks: rows };
+  }
+
   watchOverview(): LiveQuery<ListsOverview> {
     return this.watch(() => this.overview());
   }
@@ -201,6 +226,10 @@ export class PlannerQueries {
 
   watchList(id: string): LiveQuery<TaskList | null> {
     return this.watch(() => this.list(id));
+  }
+
+  watchTaskDetail(id: string): LiveQuery<TaskDetailData | null> {
+    return this.watch(() => this.taskDetail(id));
   }
 
   watchTaskEdit(id: string): LiveQuery<TaskEditData | null> {

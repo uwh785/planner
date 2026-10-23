@@ -6,6 +6,8 @@ import { CompletionWindow } from './CompletionWindow';
 import { ListUseCases } from './ListUseCases';
 import { Notices } from './Notices';
 import { PlannerQueries } from './PlannerQueries';
+import { SubtaskUseCases } from './SubtaskUseCases';
+import { TaskTimerUseCases } from './TaskTimerUseCases';
 import { TaskUseCases } from './TaskUseCases';
 
 /** The platform bits the planner needs, injected so tests control them. */
@@ -21,6 +23,9 @@ export interface Planner {
   queries: PlannerQueries;
   lists: ListUseCases;
   tasks: TaskUseCases;
+  /** Start and pause (completion has its own undo window, `completion`). */
+  taskTimer: TaskTimerUseCases;
+  subtasks: SubtaskUseCases;
   completion: CompletionWindow;
   notices: Notices;
   /** The current time, from the same clock the services use. */
@@ -33,7 +38,7 @@ export interface Planner {
 
 export type PlannerSource = Pick<
   AppContainer,
-  'taskLists' | 'tasks' | 'dataChanges'
+  'taskLists' | 'tasks' | 'subtasks' | 'dataChanges'
 >;
 
 export function createPlanner(
@@ -54,6 +59,12 @@ export function createPlanner(
     queries,
     lists: new ListUseCases(source.taskLists, notices),
     tasks: new TaskUseCases(source.tasks, source.taskLists, notices),
+    taskTimer: new TaskTimerUseCases({
+      tasks: source.tasks,
+      clock: runtime.clock,
+      notices,
+    }),
+    subtasks: new SubtaskUseCases(source.subtasks, source.tasks, notices),
     completion,
     notices,
     now: () => runtime.clock.now(),

@@ -3,7 +3,7 @@ export type { ClassSession } from './classSession';
 export type { Event } from './event';
 export type { Subtask } from './subtask';
 export type { Tag, TaskTag } from './tag';
-export type { Task, TaskStatus, Priority } from './task';
+export type { Task, TaskStatus, Priority, TimerState } from './task';
 export {
   TASK_STATUSES,
   PRIORITIES,
@@ -13,10 +13,14 @@ export {
   elapsedMs,
   remainingMs,
   timerProgress,
+  startTimer,
+  pauseTimer,
+  completeTimer,
 } from './task';
 export type { TaskList } from './taskList';
 export type { ValidationDetail } from './validation';
 export {
+  InvalidTransitionError,
   NotFoundError,
   ValidationError,
   DEFAULT_COLORS,

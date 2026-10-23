@@ -1,3 +1,4 @@
+import { InvalidTransitionError } from '@/domain';
 import type { AppLifecycle } from '../ports/AppLifecycle';
 import type { Clock } from '../ports/Clock';
 import type { TaskRepository } from '../ports/repositories';
@@ -12,8 +13,16 @@ interface Entry {
   /** When the user ticked it: the moment the server will be told. */
   at: number;
   cancelTimer: (() => void) | null;
-  /** Set once the write has started; the entry can no longer be undone. */
-  saving: Promise<void> | null;
+  /**
+   * Set once the write has started; the entry can no longer be undone.
+   * Resolves to the title when the write failed, null when it worked.
+   */
+  saving: Promise<string | null> | null;
+}
+
+/** What `flush()` reports: the titles of the tasks that could not be saved. */
+export interface FlushResult {
+  failed: readonly string[];
 }
 
 export interface CompletionDeps {
@@ -42,9 +51,9 @@ export interface CompletionDeps {
  * the moment of the tick.
  *
  * Windows still open are completed (not dropped) by `flush()`, which the
- * app calls when a screen goes away, when the app leaves the foreground and
- * before signing out. A process kill inside the window loses the tick; that
- * is the accepted cost of the window.
+ * app calls when a screen loses focus or goes away, when the app leaves the
+ * foreground and before signing out. A process kill inside the window loses
+ * the tick; that is the accepted cost of the window.
  */
 export class CompletionWindow {
   private readonly entries = new Map<string, Entry>();
@@ -110,9 +119,18 @@ export class CompletionWindow {
     });
   }
 
-  /** Completes every task still in its window, now. Never rejects. */
-  async flush(): Promise<void> {
-    await Promise.all([...this.entries.keys()].map(id => this.commit(id)));
+  /**
+   * Completes every task still in its window, now. Never rejects: a write
+   * that fails is announced by title and reported in `failed`, so a caller
+   * that is about to tear the screens down (sign-out) can still say so.
+   */
+  async flush(): Promise<FlushResult> {
+    const outcomes = await Promise.all(
+      [...this.entries.keys()].map(id => this.commit(id)),
+    );
+    return {
+      failed: outcomes.filter((title): title is string => title !== null),
+    };
   }
 
   /** Forgets the open windows without writing (the database is going away). */
@@ -123,10 +141,10 @@ export class CompletionWindow {
     this.publish();
   }
 
-  private commit(id: string): Promise<void> {
+  private commit(id: string): Promise<string | null> {
     const entry = this.entries.get(id);
     if (entry === undefined) {
-      return Promise.resolve();
+      return Promise.resolve(null);
     }
     if (entry.saving === null) {
       entry.cancelTimer?.();
@@ -136,21 +154,33 @@ export class CompletionWindow {
     return entry.saving;
   }
 
-  private async save(id: string, entry: Entry): Promise<void> {
+  private async save(id: string, entry: Entry): Promise<string | null> {
+    let failed = false;
     try {
       await this.deps.tasks.complete(id, entry.at);
+    } catch (error) {
+      // Already completed meanwhile (say, by a pull from another device): the
+      // outcome the user asked for holds, so it is done, not a failure.
+      failed = !(error instanceof InvalidTransitionError);
+      if (failed) {
+        this.deps.notices?.announce({
+          key: 'noticeCompleteFailed',
+          params: { title: entry.title },
+        });
+      }
+    }
+    try {
       await this.deps.settled?.();
     } catch {
-      this.deps.notices?.announce({
-        key: 'noticeCompleteFailed',
-        params: { title: entry.title },
-      });
+      // The write is done; only the refresh failed, and the screens retry on
+      // the next change.
     } finally {
       if (this.entries.get(id) === entry) {
         this.entries.delete(id);
         this.publish();
       }
     }
+    return failed ? entry.title : null;
   }
 
   private publish(): void {

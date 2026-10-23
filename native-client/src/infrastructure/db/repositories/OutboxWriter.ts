@@ -4,7 +4,9 @@ import type {
   OutboxEntity,
   OutboxOp,
   OutboxOrigin,
+  TimerOp,
 } from '@/application/ports/OutboxRepository';
+import { isTimerOp } from '@/application/ports/OutboxRepository';
 import type { SqlDatabase } from '@/application/ports/SqlDatabase';
 
 interface EntryRow {
@@ -21,12 +23,15 @@ interface EntryRow {
  * - at most one upsert per entity, updated in place so its id (the ordering
  *   key) and change id stay stable; if it was parked (blocked or rejected) the
  *   edit revives it as pending with its attempts reset;
- * - a task's `complete` is queued at most once (a parked one stays as it is);
- *   it never touches the task's upsert, which keeps its place before it;
+ * - a task's timer transitions (`start`, `pause`, `complete`) are NOT
+ *   idempotent, so they are never coalesced with anything: each one is its own
+ *   entry (start, pause, start, complete are four) in id order, with the
+ *   moment the user acted. They never touch the task's upsert, which keeps
+ *   its place before them;
  * - deleting an entity whose upsert has origin `create` (the server never saw
  *   it, parked or not) drops every entry for it and reports `dropped`;
- * - deleting any other entity drops its upserts and completions and queues
- *   one delete.
+ * - deleting any other entity drops its upserts and timer transitions and
+ *   queues one delete.
  *
  * Parked entries are included everywhere below, so an entity never ends up
  * with a parked entry and a second one beside it.
@@ -112,16 +117,20 @@ export class OutboxWriter {
   }
 
   /**
-   * Queues the timer op `complete` of a task, with the moment it happened.
-   * Does nothing when a completion is already queued, parked or not: the
-   * first moment wins, and a parked one waits for the user's retry.
+   * Queues one timer transition of a task with the moment it happened. Always
+   * a new entry: the backend replays them in request order and each one
+   * depends on the state the previous one left. (The domain already refuses a
+   * transition the task's status does not allow, so a parked one is never
+   * followed by an impossible twin; if it is followed by a valid one, the
+   * server decides when they are pushed.)
    */
-  async complete(tx: SqlDatabase, entityId: string, at: number): Promise<void> {
-    const entries = await this.entries(tx, 'task', entityId);
-    if (entries.some(e => e.op === 'complete')) {
-      return;
-    }
-    await this.insert(tx, 'task', 'complete', entityId, { at }, 'update');
+  async transition(
+    tx: SqlDatabase,
+    op: TimerOp,
+    entityId: string,
+    at: number,
+  ): Promise<void> {
+    await this.insert(tx, 'task', op, entityId, { at }, 'update');
   }
 
   /**
@@ -149,7 +158,7 @@ export class OutboxWriter {
     await this.remove(
       tx,
       entries
-        .filter(e => e.op === 'upsert' || e.op === 'complete')
+        .filter(e => e.op === 'upsert' || isTimerOp(e.op as OutboxOp))
         .map(e => e.id),
     );
     if (!entries.some(e => e.op === 'delete' && e.status === 'pending')) {

@@ -26,7 +26,3 @@ export const LIST_COLORS: readonly ListColor[] = [
   { key: 'Teal', value: '#40C8E0' },
   { key: 'Gray', value: '#8E8E93' },
 ];
-
-/** The palette entry for a stored value, or null for a color from elsewhere. */
-export const findListColor = (value: string): ListColor | null =>
-  LIST_COLORS.find(c => c.value.toLowerCase() === value.toLowerCase()) ?? null;

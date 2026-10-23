@@ -51,7 +51,7 @@ export class SubtaskSqlRepository implements SubtaskRepository {
           [input.taskId],
         );
         if (parent.length === 0) {
-          throw new NotFoundError('Task not found');
+          throw new NotFoundError('Task not found', 'task');
         }
       },
     );

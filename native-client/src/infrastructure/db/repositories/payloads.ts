@@ -24,25 +24,25 @@ export const listPayload = (l: TaskList): Body => ({
 });
 
 /**
- * A task completed here travels as the timer op `complete` (see
- * OutboxWriter.complete), never as a status in an upsert: a create that
- * already said `completed` would make the server refuse the later `complete`
- * as a conflict and lose the real moment. So a task with a `completedAt`
- * is described as pending; the server ignores the status of an update anyway.
+ * A task started, paused or completed here travels as the timer ops `start`,
+ * `pause` and `complete` (see OutboxWriter.transition), never as a status or
+ * a start in an upsert. The server's update ignores both, but its create
+ * takes them as given: a create that already said `in_progress` or
+ * `completed` would make the later transitions conflict (or measure from the
+ * wrong start) and lose the real moments. So an upsert always describes the
+ * task as freshly pending with no start; the transitions that follow it, in
+ * order, carry the rest.
  */
-const wireStatus = (t: Task): string =>
-  t.status === 'completed' && t.completedAt !== null ? 'pending' : t.status;
-
 export const taskPayload = (t: Task): Body => ({
   list_id: t.listId,
   title: t.title,
   description: t.description,
   priority: t.priority,
-  status: wireStatus(t),
+  status: 'pending',
   due_date: t.dueDate,
   due_all_day: t.dueAllDay,
   duration_ms: t.durationMs,
-  started_at: t.startedAt,
+  started_at: null,
   sort_order: t.sortOrder,
 });
 

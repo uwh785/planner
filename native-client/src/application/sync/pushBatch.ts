@@ -1,4 +1,8 @@
-import type { OutboxEntry, ParkedStatus } from '../ports/OutboxRepository';
+import {
+  isTimerOp,
+  type OutboxEntry,
+  type ParkedStatus,
+} from '../ports/OutboxRepository';
 
 /** The backend's per-request limit (maxPushChanges in sync_push.go). */
 export const MAX_PUSH_CHANGES = 200;
@@ -31,8 +35,9 @@ export type EntryOutcome =
  * The entry as the server wants it. A task/tag link's entity id is the pair
  * `<task_id>:<tag_id>`; the server ignores the id for links and reads
  * `{task_id, tag_id}` from the data, which the payload already holds.
- * A task `complete` is the backend's timer op: `{entity: 'task', op:
- * 'complete', id, data: {at}, change_id}`; its payload is exactly `{at}`.
+ * A task `start`, `pause` or `complete` is the backend's timer op:
+ * `{entity: 'task', op, id, data: {at}, change_id}`; its payload is exactly
+ * `{at}`, the moment the user acted.
  */
 export const toPushChange = (entry: OutboxEntry): PushChange => ({
   entity: entry.entity,
@@ -83,9 +88,9 @@ function outcomeOf(entry: OutboxEntry, result: Wire | undefined): EntryOutcome {
       return { kind: 'sent' };
     case 'not_found':
       // A delete of something already gone is done. An upsert is missing a
-      // parent (list, tag, task) that may still arrive, and a `complete`
-      // waits for its task (its create may be parked or still behind it):
-      // retry a few times, then park as blocked so it stays visible.
+      // parent (list, tag, task) that may still arrive, and a timer
+      // transition waits for its task (its create may be parked or still
+      // behind it): retry a few times, then park as blocked so it stays visible.
       return entry.op === 'delete'
         ? { kind: 'sent' }
         : {
@@ -103,12 +108,16 @@ function outcomeOf(entry: OutboxEntry, result: Wire | undefined): EntryOutcome {
         error: message(result.error, 'A plan limit was reached'),
       };
     case 'conflict':
-      // For a `complete`, the server answers conflict when the task cannot
-      // leave its current status: it is already completed (the only way a
-      // task we completed locally can be refused). The outcome the user asked
-      // for already holds, so the entry is cleared instead of parked forever.
-      // For an upsert it still means the id belongs to someone else.
-      if (entry.op === 'complete') {
+      // For a timer transition, the server answers conflict when the task
+      // cannot leave its current status: it was already started, paused or
+      // completed from another device (or by an earlier replay whose answer
+      // was lost). Retrying can never succeed and parking would only strand
+      // a stale tap, so the entry is cleared and the pull that follows in the
+      // same run brings the server's version of the task, which wins. A
+      // transition that cannot be replayed is a lost race, not a failure the
+      // user could fix. For an upsert it still means the id belongs to someone
+      // else, so that one is parked.
+      if (isTimerOp(entry.op)) {
         return { kind: 'sent' };
       }
       return {

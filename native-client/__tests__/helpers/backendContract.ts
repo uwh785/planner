@@ -118,15 +118,33 @@ export const DELETE_FIELDS: Record<string, string[]> = {
 };
 
 export const ENTITIES = Object.keys(ACCEPTED_FIELDS);
-export const PUSH_OPS = ['upsert', 'delete', 'complete'];
+export const PUSH_OPS = ['upsert', 'delete', 'start', 'pause', 'complete'];
 
 /**
- * Timer ops (sync_push.go pushTransition): only on `task`, the id travels in
+ * Timer ops (sync_push.go pushTimerOps/pushTransition): `start`, `pause` and
+ * `complete`, only on `task`, the id travels in
  * the change and `data` is `{"at": <positive unix ms>}`. `at` may be at most
  * five minutes ahead of the server clock (store.MaxClockSkewMs), so it is the
  * moment the user acted, never a later one.
  */
-export const TIMER_OPS: Record<string, string[]> = { complete: ['task'] };
+export const TIMER_OPS: Record<string, string[]> = {
+  start: ['task'],
+  pause: ['task'],
+  complete: ['task'],
+};
 export const TIMER_FIELDS: Record<string, Check> = {
   at: v => typeof v === 'number' && Number.isInteger(v) && v > 0,
+};
+
+/**
+ * Mirrors validate.go ValidateSubtask: a trimmed title is required and at most
+ * 200 bytes; the parent task id is required and must be a live task.
+ */
+export const SUBTASK_TITLE_MAX = 200;
+
+/** The task states each timer op accepts (store.go StartTask/PauseTask/CompleteTask). */
+export const TRANSITION_FROM: Record<string, string[]> = {
+  start: ['pending'],
+  pause: ['in_progress'],
+  complete: ['pending', 'in_progress'],
 };

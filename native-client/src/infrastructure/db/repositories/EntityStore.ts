@@ -145,13 +145,13 @@ export class EntityStore<T extends SyncMeta, R extends object> {
 
   /**
    * Changes a live row and queues something other than an upsert for it (a
-   * timer op), in one transaction. `apply` returns the next state, or null
-   * when there is nothing to do (the current row is returned, nothing is
-   * queued). Resolves to null when the row does not exist.
+   * timer op), in one transaction. `apply` returns the next state, or throws
+   * when the change is not allowed (nothing is written then). Resolves to
+   * null when the row does not exist.
    */
   transition(
     id: string,
-    apply: (current: T) => T | null,
+    apply: (current: T) => T,
     queue: (tx: SqlDatabase, next: T) => Promise<void>,
   ): Promise<T | null> {
     return this.db.transaction(async tx => {
@@ -159,12 +159,8 @@ export class EntityStore<T extends SyncMeta, R extends object> {
       if (current === null) {
         return null;
       }
-      const changed = apply(current);
-      if (changed === null) {
-        return current;
-      }
       const next = this.def.normalize({
-        ...changed,
+        ...apply(current),
         updatedAt: this.clock.now(),
         deleted: false,
       });

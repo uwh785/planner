@@ -18,7 +18,6 @@ export const es = {
   loginPassword: 'Contraseña',
   loginButton: 'Entrar',
   registerTitle: 'Crear Cuenta',
-  registerName: 'Nombre',
   registerButton: 'Crear cuenta',
   registerLogin: 'Inicia sesión',
   registerNameOptional: 'Nombre (opcional)',
@@ -103,7 +102,6 @@ export const es = {
   taskTimeLeft: 'Tiempo restante',
   taskTimeOver: 'Tiempo agotado',
   taskMarkDone: 'Completar {title}',
-  taskCompletedLabel: '{title}, completada',
   taskOpenHint: 'Abre la tarea',
   taskStatusPending: 'Pendiente',
   taskStatusInProgress: 'En progreso',
@@ -122,6 +120,22 @@ export const es = {
   durationHoursMinutes: '{hours} h {minutes} min',
   durationHours: '{hours} h',
   durationMinutes: '{minutes} min',
+
+  // Task detail (web wording where it exists)
+  taskStart: 'Iniciar',
+  taskPause: 'Pausar',
+  taskStartLabel: 'Iniciar {title}',
+  taskPauseLabel: 'Pausar {title}',
+  taskStatus: 'Estado',
+  taskSubtasks: 'Subtareas',
+  taskSubtaskNew: 'Nueva subtarea',
+  subtaskDelete: 'Eliminar subtarea {title}',
+  timerSpoken: 'Tiempo restante: {time}. {percent}% del tiempo usado',
+  durationSeconds: '{seconds} s',
+  taskDetailLoadError: 'No se pudo leer la tarea.',
+  taskDuration: 'Duración estimada',
+  durationHoursField: 'Horas',
+  durationMinutesField: 'Minutos',
 
   // Task edit (web wording where it exists)
   taskEditTitle: 'Editar tarea',
@@ -184,7 +198,6 @@ export const es = {
   configTitle: 'Configuración',
   configLanguage: 'Idioma',
   configLogout: 'Cerrar Sesión',
-  configUser: 'Usuario',
   configAccount: 'Cuenta',
   configSignedInAs: 'Sesión iniciada como',
   configLists: 'Listas',
@@ -205,6 +218,14 @@ export const es = {
   noticeCompleting: '{title} completada. Puedes deshacer.',
   noticeReopened: '{title} sigue abierta',
   noticeCompleteFailed: 'No se pudo completar {title}. Inténtalo de nuevo.',
+  noticeStarted: 'Se inició {title}',
+  noticePaused: 'Se pausó {title}',
+  noticeTimerFailed: 'No se pudo actualizar {title}. Inténtalo de nuevo.',
+  noticeSubtaskAdded: 'Se agregó la subtarea {title}',
+  noticeSubtaskDeleted: 'Se eliminó la subtarea {title}',
+  noticeFlushFailed: 'No se pudieron guardar algunos cambios.',
+  signOutUnsaved:
+    'No se pudieron guardar algunas tareas completadas antes de cerrar sesión.',
 
   // Errors
   errorSave: 'No se pudo guardar. Inténtalo de nuevo.',
@@ -214,6 +235,7 @@ export const es = {
   errorNameTooLong: 'El nombre debe tener {max} caracteres o menos',
   errorDescriptionTooLong: 'La descripción debe tener {max} caracteres o menos',
   errorTaskNotFound: 'No se encontró la tarea',
+  errorSubtaskNotFound: 'No se encontró la subtarea',
   errorListNotFound: 'No se encontró la lista',
 
   // Sync status line

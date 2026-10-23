@@ -6,6 +6,7 @@ import {
   PUSH_OPS,
   TIMER_FIELDS,
   TIMER_OPS,
+  TRANSITION_FROM,
 } from '../../helpers/backendContract';
 import {
   openTestWorld,
@@ -40,6 +41,9 @@ async function buildEverything() {
   await w.events.create({ title: 'E', startAt: 5, endAt: 9 });
   await w.taskLists.update(list.id, { name: 'L2' });
   await w.tasks.update(task.id, { title: 'T2', priority: 3 });
+  await w.tasks.start(task.id, 1_699_999_990_000);
+  await w.tasks.pause(task.id, 1_699_999_995_000);
+  await w.tasks.start(task.id, 1_699_999_996_000);
   await w.tasks.complete(task.id, 1_700_000_000_000);
   return { list, task, tag };
 }
@@ -63,24 +67,62 @@ it('every upsert body uses only fields the backend decodes, with the right JSON 
   }
 });
 
-it('a complete is the timer op the backend replays: task only, data {at}', async () => {
+it('every timer transition is the op the backend replays: task only, data {at}, a change id', async () => {
   const { task } = await buildEverything();
   const timers = (await outboxRows(w.db)).filter(r => r.op !== 'upsert');
-  const complete = timers.find(r => r.op === 'complete')!;
-  expect(TIMER_OPS.complete).toContain(complete.entity);
-  expect(complete.entity_id).toBe(task.id);
-  const body = JSON.parse(complete.payload) as Record<string, unknown>;
-  expect(Object.keys(body)).toEqual(Object.keys(TIMER_FIELDS));
-  expect(TIMER_FIELDS.at!(body.at)).toBe(true);
-  expect(complete.change_id).toMatch(/^[\x21-\x7e]{1,64}$/);
+  expect(timers.map(r => r.op)).toEqual([
+    'start',
+    'pause',
+    'start',
+    'complete',
+  ]);
+  for (const timer of timers) {
+    expect(PUSH_OPS).toContain(timer.op);
+    expect(TIMER_OPS[timer.op]).toContain(timer.entity);
+    expect(timer.entity_id).toBe(task.id);
+    const body = JSON.parse(timer.payload) as Record<string, unknown>;
+    expect(Object.keys(body)).toEqual(Object.keys(TIMER_FIELDS));
+    expect(TIMER_FIELDS.at!(body.at)).toBe(true);
+    expect(timer.change_id).toMatch(/^[\x21-\x7e]{1,64}$/);
+  }
 });
 
-it('a task completed here is described as pending in its upsert body', async () => {
+it('the transitions the repository accepts are exactly the ones the backend accepts', async () => {
+  const states = ['pending', 'in_progress', 'completed'] as const;
+  const arrive = async (id: string, status: (typeof states)[number]) => {
+    if (status !== 'pending') {
+      await w.tasks.start(id, 1_000);
+    }
+    if (status === 'completed') {
+      await w.tasks.complete(id, 2_000);
+    }
+  };
+  for (const op of ['start', 'pause', 'complete'] as const) {
+    for (const from of states) {
+      const task = await w.tasks.create({ title: `${op}-${from}` });
+      await arrive(task.id, from);
+      const accepted = await w.tasks[op](task.id, 3_000).then(
+        () => true,
+        () => false,
+      );
+      expect({ op, from, accepted }).toEqual({
+        op,
+        from,
+        accepted: TRANSITION_FROM[op]!.includes(from),
+      });
+    }
+  }
+});
+
+it('a task started or completed here is described as pending with no start in its upsert body', async () => {
   const { task } = await buildEverything();
   const upsert = (await outboxRows(w.db)).find(
     r => r.entity === 'task' && r.op === 'upsert' && r.entity_id === task.id,
   )!;
-  expect(JSON.parse(upsert.payload).status).toBe('pending');
+  expect(JSON.parse(upsert.payload)).toMatchObject({
+    status: 'pending',
+    started_at: null,
+  });
 });
 
 it('every upsert body passes the backend validation', async () => {

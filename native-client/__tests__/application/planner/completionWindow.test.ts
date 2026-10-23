@@ -168,8 +168,44 @@ describe('flushing the window', () => {
     expect((await w.tasks.get(t.id))?.completedAt).toBe(tapped);
   });
 
-  it('flush() with nothing pending is a no-op', async () => {
-    await expect(completion().flush()).resolves.toBeUndefined();
+  it('flush() with nothing pending is a no-op that reports nothing failed', async () => {
+    await expect(completion().flush()).resolves.toEqual({ failed: [] });
+  });
+
+  it('flush() reports the titles it could not save and still resolves', async () => {
+    const a = await w.tasks.create({ title: 'a' });
+    w.clock.tick(10);
+    const b = await w.tasks.create({ title: 'b' });
+    jest.spyOn(w.tasks, 'complete').mockRejectedValueOnce(new Error('disk'));
+    completion().begin(a);
+    completion().begin(b);
+    const result = await completion().flush();
+    expect(result.failed).toEqual(['a']);
+    expect(await status(b.id)).toBe('completed');
+    expect(completion().getSnapshot().size).toBe(0);
+  });
+
+  it('a task completed meanwhile (say, by a pull) is done, not a failure', async () => {
+    const t = await w.tasks.create({ title: 'a' });
+    completion().begin(t);
+    await w.tasks.complete(t.id, w.clock.now() - 1);
+    const result = await completion().flush();
+    expect(result.failed).toEqual([]);
+    expect(said()).not.toMatch(/Couldn't complete/);
+    expect((await w.tasks.get(t.id))?.completedAt).toBe(w.clock.now() - 1);
+  });
+
+  it('flush() never rejects, even when the screens fail to settle', async () => {
+    const t = await w.tasks.create({ title: 'a' });
+    const window = new CompletionWindow({
+      tasks: w.tasks,
+      timer: w.timer,
+      clock: w.clock,
+      settled: () => Promise.reject(new Error('screens')),
+    });
+    window.begin(t);
+    await expect(window.flush()).resolves.toEqual({ failed: [] });
+    expect(await status(t.id)).toBe('completed');
   });
 
   it('flushes when the app goes to the background', async () => {

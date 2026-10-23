@@ -7,7 +7,15 @@ import type {
 } from '@/application/ports/repositories';
 import type { SqlDatabase, SqlValue } from '@/application/ports/SqlDatabase';
 import { taskTagEntityId } from '@/application/sync/entityIds';
-import { normalizeTask, type Task } from '@/domain';
+import {
+  completeTimer,
+  normalizeTask,
+  pauseTimer,
+  startTimer,
+  type Task,
+  type TimerState,
+} from '@/domain';
+import type { TimerOp } from '@/application/ports/OutboxRepository';
 import { taskFromRow, taskToRow } from '../mappers';
 import type { TaskRow } from '../rows';
 import type { RepoDeps } from './deps';
@@ -119,33 +127,35 @@ export class TaskSqlRepository implements TaskRepository {
     return new Map(rows.map(row => [row.list_id, row.n] as const));
   }
 
+  start(id: string, at: number) {
+    return this.timer(id, 'start', startTimer, at);
+  }
+
+  pause(id: string, at: number) {
+    return this.timer(id, 'pause', pauseTimer, at);
+  }
+
   /**
-   * Local state and the queued `complete` change together. A task the server
-   * has never seen keeps its pending create in front of the completion (the
-   * create body says "pending"), so the server creates it and then completes
-   * it at the real moment. An in-progress task folds its running segment into
-   * the elapsed time, as the backend does.
+   * A task the server has never seen keeps its pending create in front of
+   * every transition (the create body says "pending" and carries no start),
+   * so the server creates it and then replays the transitions at the real
+   * moments, in order.
    */
   complete(id: string, at: number) {
+    return this.timer(id, 'complete', completeTimer, at);
+  }
+
+  /** The row and the queued timer op change together, or neither does. */
+  private timer(
+    id: string,
+    op: TimerOp,
+    apply: (task: TimerState, at: number) => TimerState,
+    at: number,
+  ) {
     return this.store.transition(
       id,
-      task => {
-        if (task.status === 'completed') {
-          return null;
-        }
-        const running =
-          task.status === 'in_progress' && task.startedAt !== null
-            ? Math.max(at - task.startedAt, 0)
-            : 0;
-        return {
-          ...task,
-          status: 'completed',
-          completedAt: at,
-          startedAt: null,
-          elapsedMs: task.elapsedMs + running,
-        };
-      },
-      (tx, task) => this.deps.outbox.complete(tx, task.id, at),
+      task => ({ ...task, ...apply(task, at) }),
+      (tx, task) => this.deps.outbox.transition(tx, op, task.id, at),
     );
   }
 

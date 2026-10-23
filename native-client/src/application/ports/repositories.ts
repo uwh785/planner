@@ -12,8 +12,8 @@ import type {
 /**
  * Local-first repositories. Every mutation changes the local row and queues
  * the matching outbox entry in one transaction; reads never return
- * tombstones. Of the timer transitions only `complete` exists so far
- * (start and pause arrive with M6).
+ * tombstones. The task timer transitions (`start`, `pause`, `complete`) apply
+ * the backend's own rules to the local row and queue one timer op each.
  *
  * `update` resolves to the new state, or null when the entity does not exist
  * (or is deleted). `delete` resolves to whether anything was deleted.
@@ -51,7 +51,7 @@ export interface NewTask {
   listId?: string | null;
   description?: string;
   priority?: Priority;
-  /** Only a create carries a status; later changes are timer transitions (M6). */
+  /** Only a create carries a status; later changes are timer transitions. */
   status?: TaskStatus;
   dueDate?: number | null;
   dueAllDay?: boolean;
@@ -92,20 +92,32 @@ export interface TaskRepository extends Repository<Task, NewTask, TaskPatch> {
   /** Open (not completed) live tasks per list id; `null` is "no list". */
   countOpenByList(): Promise<Map<string | null, number>>;
   /**
-   * Completes the task at `at` (epoch ms, the moment the user did it) and
-   * queues the timer op `complete` with `{at}`. There is no way back: the
-   * backend has no reopen transition and ignores status on update.
+   * Timer transitions, mirroring the backend (`StartTask`, `PauseTask`,
+   * `CompleteTask`). `at` is epoch ms, the moment the user acted (never the
+   * time of a later sync), and travels with the queued op as `{at}`.
    *
-   * Resolves to the completed task; to null when it does not exist (or is
-   * deleted). Completing a task that is already completed changes and queues
-   * nothing and resolves to the existing row.
+   * - `start`: a pending task becomes in progress with `startedAt = at`.
+   * - `pause`: an in-progress task goes back to `pending`; the segment just
+   *   run (`at - startedAt`, never negative) joins `elapsedMs` and
+   *   `startedAt` is cleared.
+   * - `complete`: a pending or in-progress task becomes completed with
+   *   `completedAt = at` (a running segment joins `elapsedMs`). There is no
+   *   way back: the backend has no reopen transition.
+   *
+   * Each resolves to the new state, or to null when the task does not exist
+   * (or is deleted). A transition the status does not allow rejects with
+   * `InvalidTransitionError` and changes and queues nothing; so does an `at`
+   * that is not a positive integer (`ValidationError`). Transitions are never
+   * coalesced: every one is its own outbox entry, in order.
    */
+  start(id: string, at: number): Promise<Task | null>;
+  pause(id: string, at: number): Promise<Task | null>;
   complete(id: string, at: number): Promise<Task | null>;
   /**
    * Like the backend, deleting a task does not touch its subtasks or tag
    * links. The exception is a task the server never saw: its pending
    * subtasks and links go with it, since they could never be pushed.
-   * A pending or parked `complete` of the task is dropped with it.
+   * Its pending or parked timer transitions are dropped with it.
    */
   delete(id: string): Promise<boolean>;
 }
