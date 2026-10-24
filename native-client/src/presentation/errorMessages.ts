@@ -5,6 +5,7 @@ import type { Translate } from './i18n/I18nProvider';
 const REQUIRED: Record<string, MessageKey> = {
   title: 'errorTitleRequired',
   name: 'errorNameRequired',
+  subject: 'errorSubjectRequired',
 };
 
 const TOO_LONG: Record<string, MessageKey> = {
@@ -17,6 +18,7 @@ const NOT_FOUND = {
   task: 'errorTaskNotFound',
   list: 'errorListNotFound',
   subtask: 'errorSubtaskNotFound',
+  class: 'errorClassNotFound',
 } as const satisfies Record<string, MessageKey>;
 
 /**

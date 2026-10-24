@@ -17,10 +17,12 @@ import { TabBar } from '../components/organisms/TabBar';
 import { ContainerProvider, useAcquiredContainer } from '../containerContext';
 import { PlannerProvider } from '../plannerContext';
 import { useT } from '../i18n/I18nProvider';
+import { ClassEditScreen } from '../screens/ClassEditScreen';
 import { ConfigScreen } from '../screens/ConfigScreen';
 import { ListEditScreen } from '../screens/ListEditScreen';
 import { ListsScreen } from '../screens/ListsScreen';
 import { PanelScreen } from '../screens/PanelScreen';
+import { ScheduleScreen } from '../screens/ScheduleScreen';
 import { TaskDetailScreen } from '../screens/TaskDetailScreen';
 import { TaskEditScreen } from '../screens/TaskEditScreen';
 import { TasksScreen } from '../screens/TasksScreen';
@@ -33,7 +35,7 @@ const Tabs = createBottomTabNavigator<TabParamList>();
 
 const renderTabBar = (props: BottomTabBarProps) => <TabBar {...props} />;
 
-/** Panel, Tasks and Config behind the web's mobile bottom bar. */
+/** Panel, Tasks, Schedule and Config behind the web's mobile bottom bar. */
 function TabsNavigator() {
   return (
     <Tabs.Navigator
@@ -43,6 +45,7 @@ function TabsNavigator() {
     >
       <Tabs.Screen name="Panel" component={PanelScreen} />
       <Tabs.Screen name="Tasks" component={TasksScreen} />
+      <Tabs.Screen name="Schedule" component={ScheduleScreen} />
       <Tabs.Screen name="Config" component={ConfigScreen} />
     </Tabs.Navigator>
   );
@@ -107,6 +110,7 @@ export function SignedInNavigator({
             <Stack.Screen name="TaskEdit" component={TaskEditScreen} />
             <Stack.Screen name="Lists" component={ListsScreen} />
             <Stack.Screen name="ListEdit" component={ListEditScreen} />
+            <Stack.Screen name="ClassEdit" component={ClassEditScreen} />
           </Stack.Navigator>
         </NavigationContainer>
       </PlannerProvider>

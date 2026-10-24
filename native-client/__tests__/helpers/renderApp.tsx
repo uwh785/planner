@@ -97,6 +97,7 @@ export async function renderSignedIn(
     ...world,
     tasks: inAct(world.tasks),
     taskLists: inAct(world.taskLists),
+    classSessions: inAct(world.classSessions),
     remoteChanges: inAct(world.remoteChanges),
   };
   return {

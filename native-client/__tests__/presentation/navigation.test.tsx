@@ -23,11 +23,11 @@ const pressSystemBack = () => {
 const tab = (name: string) => screen.getByRole('tab', { name });
 
 describe('the bottom tab bar', () => {
-  it('shows Panel, Tasks and Settings with Panel selected first', async () => {
+  it('shows Panel, Tasks, Schedule and Settings with Panel selected first', async () => {
     await renderSignedIn();
     expect(
       screen.getAllByRole('tab').map(t => t.props.accessibilityLabel),
-    ).toEqual(['Dashboard', 'Tasks', 'Settings']);
+    ).toEqual(['Dashboard', 'Tasks', 'Schedule', 'Settings']);
     expect(tab('Dashboard').props.accessibilityState).toMatchObject({
       selected: true,
     });
@@ -40,7 +40,7 @@ describe('the bottom tab bar', () => {
     await renderSignedIn({ locale: 'es' });
     expect(
       screen.getAllByRole('tab').map(t => t.props.accessibilityLabel),
-    ).toEqual(['Panel', 'Tareas', 'Config']);
+    ).toEqual(['Panel', 'Tareas', 'Horario', 'Config']);
   });
 
   it('opens each tab', async () => {
@@ -50,6 +50,10 @@ describe('the bottom tab bar', () => {
     expect(tab('Tasks').props.accessibilityState).toMatchObject({
       selected: true,
     });
+    fireEvent.press(tab('Schedule'));
+    expect(
+      await screen.findByRole('header', { name: 'Schedule' }),
+    ).toBeTruthy();
     fireEvent.press(tab('Settings'));
     expect(
       await screen.findByRole('header', { name: 'Settings' }),
@@ -62,7 +66,7 @@ describe('the bottom tab bar', () => {
 
   it('gives every tab at least 48dp of height', async () => {
     await renderSignedIn();
-    for (const name of ['Dashboard', 'Tasks', 'Settings']) {
+    for (const name of ['Dashboard', 'Tasks', 'Schedule', 'Settings']) {
       const style = tab(name).props.style;
       const flat = Object.assign({}, ...[style].flat(Infinity).filter(Boolean));
       expect(flat.minHeight).toBeGreaterThanOrEqual(48);

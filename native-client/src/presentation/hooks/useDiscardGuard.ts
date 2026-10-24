@@ -3,6 +3,12 @@ import { Alert } from 'react-native';
 import { usePreventRemove, useNavigation } from '@react-navigation/native';
 import { useT } from '../i18n/I18nProvider';
 
+const DISCARD_BODY = {
+  task: 'discardBodyTask',
+  list: 'discardBodyList',
+  class: 'discardBodyClass',
+} as const;
+
 /**
  * Asks before leaving a form with unsaved edits (on-screen Back and the
  * system back button alike). Run a navigation the user already confirmed
@@ -11,7 +17,10 @@ import { useT } from '../i18n/I18nProvider';
  * went through, reached the guard or threw, so a failed or ignored Back can
  * never leave the screen open to a silent discard later.
  */
-export function useDiscardGuard(dirty: boolean, subject: 'task' | 'list') {
+export function useDiscardGuard(
+  dirty: boolean,
+  subject: 'task' | 'list' | 'class',
+) {
   const navigation = useNavigation();
   const t = useT();
   const allowed = useRef(false);
@@ -20,18 +29,14 @@ export function useDiscardGuard(dirty: boolean, subject: 'task' | 'list') {
       navigation.dispatch(data.action);
       return;
     }
-    Alert.alert(
-      t('discardTitle'),
-      t(subject === 'task' ? 'discardBodyTask' : 'discardBodyList'),
-      [
-        { text: t('keepEditing'), style: 'cancel' },
-        {
-          text: t('discard'),
-          style: 'destructive',
-          onPress: () => navigation.dispatch(data.action),
-        },
-      ],
-    );
+    Alert.alert(t('discardTitle'), t(DISCARD_BODY[subject]), [
+      { text: t('keepEditing'), style: 'cancel' },
+      {
+        text: t('discard'),
+        style: 'destructive',
+        onPress: () => navigation.dispatch(data.action),
+      },
+    ]);
   });
   return {
     leaveWith: (navigate: () => void) => {

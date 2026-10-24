@@ -2,7 +2,12 @@ import React from 'react';
 import { Pressable, Text, View } from 'react-native';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LayoutDashboard, ListTodo, Settings } from '../atoms/icons';
+import {
+  CalendarDays,
+  LayoutDashboard,
+  ListTodo,
+  Settings,
+} from '../atoms/icons';
 import { useT } from '../../i18n/I18nProvider';
 import type { TabParamList } from '../../navigation/routes';
 import { useStyles, useTheme } from '../../theme';
@@ -11,12 +16,14 @@ import type { Theme } from '../../theme';
 const ICONS = {
   Panel: LayoutDashboard,
   Tasks: ListTodo,
+  Schedule: CalendarDays,
   Config: Settings,
 } as const;
 
 const LABEL = {
   Panel: 'navDashboard',
   Tasks: 'navTasks',
+  Schedule: 'navSchedule',
   Config: 'navConfig',
 } as const;
 
@@ -48,8 +55,8 @@ const makeStyles = (t: Theme) => ({
 });
 
 /**
- * The web's mobile bottom bar: an icon over a label for Panel, Tasks and
- * Config, the accent on the selected one, clear of the system gesture area.
+ * The web's mobile bottom bar: an icon over a label for Panel, Tasks,
+ * Schedule and Config, the accent on the selected one, clear of the system gesture area.
  * Every tab is at least 56dp tall and grows with the system font.
  */
 export function TabBar({ state, navigation }: BottomTabBarProps) {
