@@ -1,7 +1,8 @@
-import type { Subtask, Task, TaskList } from '@/domain';
+import type { ClassSession, Subtask, Task, TaskList } from '@/domain';
 import type { ChangeSource } from '../ports/ChangeNotifier';
 import type { Clock } from '../ports/Clock';
 import type {
+  ClassSessionRepository,
   SubtaskRepository,
   TaskFilter,
   TaskListRepository,
@@ -83,6 +84,11 @@ export interface TaskDetailData {
   subtasks: Subtask[];
 }
 
+/** Every weekly class, by weekday then start time. */
+export interface ScheduleData {
+  classes: ClassSession[];
+}
+
 export interface QueryLimits {
   openLimit?: number;
   completedLimit?: number;
@@ -92,6 +98,7 @@ export interface PlannerQuerySource {
   taskLists: TaskListRepository;
   tasks: TaskRepository;
   subtasks: SubtaskRepository;
+  classSessions: ClassSessionRepository;
   /** Local writes and applied pulls. */
   dataChanges: ChangeSource;
   /** "Now" for the overdue rule. */
@@ -210,6 +217,14 @@ export class PlannerQueries {
       subtasks.listByTask(id),
     ]);
     return { task, list, subtasks: rows };
+  }
+
+  async schedule(): Promise<ScheduleData> {
+    return { classes: await this.source.classSessions.list() };
+  }
+
+  watchSchedule(): LiveQuery<ScheduleData> {
+    return this.watch(() => this.schedule());
   }
 
   watchOverview(): LiveQuery<ListsOverview> {

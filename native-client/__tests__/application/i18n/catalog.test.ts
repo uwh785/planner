@@ -78,6 +78,10 @@ describe('message catalogs', () => {
     const en = (key: MessageKey) => translate('en', key);
     expect(es('navDashboard')).toBe('Panel');
     expect(es('navTasks')).toBe('Tareas');
+    expect(es('navSchedule')).toBe('Horario');
+    expect(es('scheduleEmptyDay')).toBe('No hay clases este día');
+    expect(es('scheduleTodayTitle')).toBe('Clases de hoy');
+    expect(en('scheduleAddClass')).toBe('Add class');
     expect(es('dashboardPending')).toBe('Pendientes');
     expect(es('dashboardInProgress')).toBe('En progreso');
     expect(es('dashboardCompleted')).toBe('Completadas');
@@ -121,5 +125,23 @@ describe('translate', () => {
 
   it('leaves an unknown placeholder visible instead of printing undefined', () => {
     expect(translate('en', 'noticeAdded', {})).toBe('Added {title}');
+  });
+});
+
+describe('weekday names', () => {
+  it('has a letter and a name for each weekday, Sunday first', () => {
+    const letters = (locale: 'es' | 'en') =>
+      [0, 1, 2, 3, 4, 5, 6].map(d =>
+        translate(locale, `scheduleDayShort${d}` as MessageKey),
+      );
+    const names = (locale: 'es' | 'en') =>
+      [0, 1, 2, 3, 4, 5, 6].map(d =>
+        translate(locale, `scheduleDayName${d}` as MessageKey),
+      );
+    expect(letters('es')).toEqual(['D', 'L', 'M', 'M', 'J', 'V', 'S']);
+    expect(letters('en')).toEqual(['S', 'M', 'T', 'W', 'T', 'F', 'S']);
+    expect(names('es')[0]).toBe('Domingo');
+    expect(names('es')[3]).toBe('Miércoles');
+    expect(names('en')[1]).toBe('Monday');
   });
 });

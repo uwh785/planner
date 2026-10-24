@@ -155,7 +155,10 @@ export function normalizeEvent(e: Event): Event {
 
 /** A referenced entity does not exist (or is deleted) locally. */
 export class NotFoundError extends Error {
-  constructor(message: string, readonly entity?: 'task' | 'list' | 'subtask') {
+  constructor(
+    message: string,
+    readonly entity?: 'task' | 'list' | 'subtask' | 'class',
+  ) {
     super(message);
     this.name = 'NotFoundError';
   }
