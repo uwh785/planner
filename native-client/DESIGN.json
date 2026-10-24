@@ -347,6 +347,22 @@
       "css": ".ds-class{background:#fff;border:1px solid #d1d1d6;border-radius:12px;padding:16px;display:grid;gap:4px}.ds-row{display:flex;align-items:center;gap:8px}.ds-dot{width:16px;height:16px;border-radius:50%;background:#ff453a}.ds-meta{font:500 15px/21px system-ui;color:#636366}"
     },
     {
+      "name": "Day Cell",
+      "kind": "chip",
+      "refersTo": "day-cell",
+      "description": "One day of the month grid: the number, up to three event chips and three task dots, each row ending in +N; today has a bold accent number, the selected day a 2dp accent border and a surface fill.",
+      "html": "<div class=\"ds-cell on\"><b>22</b><span class=\"ds-chips\"><i></i><i></i></span><span class=\"ds-dots\"><i></i></span></div>",
+      "css": ".ds-cell{display:grid;justify-items:center;align-content:start;gap:4px;width:48px;min-height:56px;padding:4px 2px;border:1px solid #d1d1d6;border-radius:10px;background:#f2f2f7;font:500 15px/21px system-ui}.ds-cell.on{border:2px solid #007aff;background:#fff;color:#0062cc}.ds-chips{display:flex;gap:3px}.ds-chips i{width:10px;height:4px;border-radius:2px;background:#bf5af2}.ds-dots i{display:block;width:5px;height:5px;border-radius:50%;background:#007aff}"
+    },
+    {
+      "name": "Event Card",
+      "kind": "card",
+      "refersTo": "event-card",
+      "description": "Color dot and bold title, a calendar icon with the time and a map pin with the location; the color is a dot, never a side stripe.",
+      "html": "<div class=\"ds-event\"><div class=\"ds-row\"><span class=\"ds-dot\"></span><b>Dentist</b></div><div class=\"ds-meta\">14:00 – 15:30</div><div class=\"ds-meta\">Clinic</div></div>",
+      "css": ".ds-event{background:#fff;border:1px solid #d1d1d6;border-radius:12px;padding:16px;display:grid;gap:4px}.ds-row{display:flex;align-items:center;gap:8px}.ds-dot{width:16px;height:16px;border-radius:50%;background:#bf5af2}.ds-meta{font:500 15px/21px system-ui;color:#636366}"
+    },
+    {
       "name": "Today's Class Card",
       "kind": "card",
       "refersTo": "today-class-card",

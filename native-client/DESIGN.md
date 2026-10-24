@@ -184,6 +184,24 @@ components:
     typography: "{typography.callout}"
     rounded: "{rounded.control}"
     height: "48px"
+  day-cell:
+    backgroundColor: "{colors.light-background}"
+    textColor: "{colors.light-text}"
+    typography: "{typography.callout}"
+    rounded: "{rounded.control}"
+    height: "56px"
+  day-cell-selected:
+    backgroundColor: "{colors.light-surface}"
+    textColor: "{colors.light-accent-text}"
+    typography: "{typography.callout}"
+    rounded: "{rounded.control}"
+    height: "56px"
+  event-card:
+    backgroundColor: "{colors.light-surface}"
+    textColor: "{colors.light-text}"
+    typography: "{typography.body}"
+    rounded: "{rounded.card}"
+    padding: "16px"
   today-class-card:
     backgroundColor: "{colors.light-surface}"
     textColor: "{colors.light-text}"
@@ -434,7 +452,7 @@ The web's detail screen on a phone, one column: the **detail header** (Back as a
 One Panel counter: Surface fill, hairline, 12dp radius, 16dp padding, centered. The number is 28dp, weight 700; below it the label in caption muted. Four tiles in a 2 by 2 grid with 12dp gaps. The number's color follows the web (text for pending, accent text for in progress, success for completed, danger for overdue) in AA-safe values, and the tile is read as one "Pending: 3", so color is never the only signal. The Panel stays a glance: the four counters and the active tasks, nothing more.
 
 ### Tab bar
-The web's mobile bottom bar: Surface fill, a 1dp hairline on top, four equal tabs (Panel, Tasks, Schedule, Config) with a 22dp Lucide icon over a caption label (LayoutDashboard, ListTodo, CalendarDays, Settings; Calendar joins later). Each tab is at least 56dp tall and grows with the system font; the bar's bottom padding is the system safe-area inset. The selected tab uses accent text, a heavier label and a heavier icon stroke (so it is not color alone) and is announced as selected. No animation between tabs.
+The web's mobile bottom bar: Surface fill, a 1dp hairline on top, five equal tabs (Panel, Tasks, Schedule, Calendar, Config) with a 22dp Lucide icon over a caption label (LayoutDashboard, ListTodo, CalendarDays, Calendar, Settings). Each tab is at least 56dp tall and grows with the system font; the bar's bottom padding is the system safe-area inset. The selected tab uses accent text, a heavier label and a heavier icon stroke (so it is not color alone) and is announced as selected. No animation between tabs.
 
 ### Filter chip
 The web's filter buttons as a horizontally scrolling row of 48dp-tall chips (10dp radius, 16dp padding, 8dp gaps), one choice at a time, announced as radios in a labelled group ("Filter by status", "Filter by list"). Unselected: 1dp strong border, muted label on the ground. Selected: a 2dp accent border, a Surface fill, an accent-text label in weight 700. The list row has a color dot before each list name and "All" first. The two rows sit under the quick add field.
@@ -446,6 +464,16 @@ The web's Schedule on a phone, one day at a time. **Day tabs** are seven equal 4
 
 ### Today's classes (Panel)
 Shown on the Panel under the counters only when today has a class, with the heading "Today's classes" and a link-style "View schedule" on the right. The class in progress is a card with a 1dp accent edge (the active-card rule): the compact ring (progress of the class so far, decorative) beside the subject with its color dot and "Ends in 30 min" in callout muted. The next class is the same card without the ring and with "Starts in 1 h". The rest are 48dp mini rows: dot, subject, time range. Each card is one spoken unit ("FÍSICA, Ends in 30 min"); the countdown is always written, so the ring and the dot only repeat it. The text refreshes with the Panel's 30-second clock.
+
+### Month grid, day cell and event card
+The web's Calendar on a phone. A header row has the previous and next month as 48dp icon buttons around the month label ("Oct 2026", a heading). The **month grid** is seven equal columns, Sunday first (the weekday row uses the schedule letters and is spoken as the full names), then the weeks with blanks before the 1st and after the last day; no gaps larger than 4dp.
+- **Day cell:** at least 56dp tall (grows with the system font), 1dp hairline, control radius. The day number is callout; today has a bold accent-text number, the selected day a 2dp accent border on a Surface fill (never color alone). Under the number: up to three event chips (10 by 4dp bars in the event's color, or the accent) and up to three task dots (5dp, accent), each row ending in a muted "+N" when there are more. The marks are decorative: the cell is one spoken unit ("Oct 22, 2026, today, 2 events, 1 task"). Tapping selects the day; it does not leave the screen (the web opens the task list instead).
+- **Selected day:** under the grid, the heading "Events" with the day written out in callout muted, then one event card per event (all-day first), or one muted line, "No events this day". New Event is the header's link action and opens on the selected day.
+- **Event card:** Surface, 1dp hairline, 12dp radius, 16dp padding. The event color is a 16dp dot before the bold title (the web's color bar would be a side stripe, see the Don'ts); below, a calendar icon with the time ("All day", "09:00", "09:00 – 10:30", "09:00 – 7 mar 11:00" across days) and, when set, a map-pin icon with the location, both callout muted. One spoken label ("Dentist, 14:00 – 15:30, Clinic") and one 48dp-plus target that opens the event.
+- **Event form:** title, date (a 48dp field with a calendar icon that opens the system date dialog), an All day switch, Start and End (optional) as 48dp time buttons with a clock icon (hidden when all day; End reads "--:--" until set and has a "Clear end" link), location, notes (multiline), and the eight named color swatches (a color outside them shows as "Custom"). An end before the start shows the error under End; Delete appears only when editing, behind a confirmation.
+
+### Today's events (Panel)
+Shown on the Panel above Today's classes only when today has an event, with the heading "Today's events" and one event card each (multi-day events that cover today included, all-day first). Each card opens the event for editing.
 
 ### Priority badge
 A pill on Surface 2 (6dp radius, 8dp by 2dp padding): a 12dp Lucide flag in the priority color (muted, accent, amber, red) and the translated word ("Low", "Medium", "High") in the text color, caption weight 600. None shows nothing. It replaces both the web's red-on-dark label and the earlier priority indicator.

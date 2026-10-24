@@ -8,6 +8,8 @@ import { Announcement } from '../molecules/Announcement';
 import { StatTile } from '../molecules/StatTile';
 import { TaskCard, type TaskCardModel } from '../molecules/TaskCard';
 import { TodayClasses } from './TodayClasses';
+import { TodayEvents } from './TodayEvents';
+import type { EventCardModel } from '../../format/eventCardModel';
 import type { TodayClassesModel } from '../../format/todayClassesModel';
 
 export interface PanelCounts {
@@ -22,6 +24,9 @@ interface PanelViewProps {
   header: React.ReactNode;
   counts: PanelCounts;
   active: readonly TaskCardModel[];
+  /** Today's events, all-day first; empty (or omitted) when the day has none. */
+  todayEvents?: readonly EventCardModel[];
+  onOpenEvent?: (id: string) => void;
   /** Today's classes; null (or omitted) when the day has none. */
   todayClasses?: TodayClassesModel | null;
   onViewSchedule?: () => void;
@@ -79,6 +84,8 @@ export function PanelView({
   header,
   counts,
   active,
+  todayEvents = [],
+  onOpenEvent = noop,
   todayClasses = null,
   onViewSchedule = noop,
   notice = null,
@@ -118,6 +125,9 @@ export function PanelView({
             tone="danger"
           />
         </View>
+        {todayEvents.length > 0 ? (
+          <TodayEvents events={todayEvents} onOpenEvent={onOpenEvent} />
+        ) : null}
         {todayClasses ? (
           <TodayClasses model={todayClasses} onViewSchedule={onViewSchedule} />
         ) : null}
