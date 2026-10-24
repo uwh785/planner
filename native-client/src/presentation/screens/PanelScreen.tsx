@@ -4,6 +4,7 @@ import { InlineMessage } from '../components/atoms/InlineMessage';
 import { ScreenHeader } from '../components/molecules/ScreenHeader';
 import { PanelView } from '../components/organisms/PanelView';
 import { taskCardModel } from '../format/taskCardModel';
+import { todayClassesModel } from '../format/todayClassesModel';
 import { useI18n } from '../i18n/I18nProvider';
 import type { TabScreenProps } from '../navigation/routes';
 import { useFlushCompletionOnLeave } from '../hooks/useFlushCompletionOnLeave';
@@ -26,6 +27,7 @@ export function PanelScreen({ navigation }: TabScreenProps<'Panel'>) {
   const planner = usePlanner();
   const completing = useCompleting();
   const dashboard = useLiveQuery(p => p.queries.watchDashboard(), [], 60_000);
+  const schedule = useLiveQuery(p => p.queries.watchSchedule(), []);
   const now = useNow(REFRESH_MS);
   const notice = useNotice();
   useFlushCompletionOnLeave();
@@ -39,6 +41,12 @@ export function PanelScreen({ navigation }: TabScreenProps<'Panel'>) {
           header={header}
           counts={data.counts}
           active={data.active.map(task => taskCardModel(task, now, i18n))}
+          todayClasses={
+            schedule.status === 'loading' || !schedule.data
+              ? null
+              : todayClassesModel(schedule.data.classes, now, i18n)
+          }
+          onViewSchedule={() => navigation.navigate('Schedule')}
           notice={notice}
           completing={completing}
           onOpenTask={taskId => navigation.navigate('TaskDetail', { taskId })}

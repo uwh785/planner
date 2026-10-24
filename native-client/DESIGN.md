@@ -166,6 +166,30 @@ components:
     rounded: "{rounded.control}"
     height: "48px"
     padding: "0 16px"
+  class-card:
+    backgroundColor: "{colors.light-surface}"
+    textColor: "{colors.light-text}"
+    typography: "{typography.body}"
+    rounded: "{rounded.card}"
+    padding: "16px"
+  day-tab:
+    backgroundColor: "{colors.light-background}"
+    textColor: "{colors.light-text-muted}"
+    typography: "{typography.callout}"
+    rounded: "{rounded.control}"
+    height: "48px"
+  day-tab-selected:
+    backgroundColor: "{colors.light-surface}"
+    textColor: "{colors.light-accent-text}"
+    typography: "{typography.callout}"
+    rounded: "{rounded.control}"
+    height: "48px"
+  today-class-card:
+    backgroundColor: "{colors.light-surface}"
+    textColor: "{colors.light-text}"
+    typography: "{typography.body}"
+    rounded: "{rounded.card}"
+    padding: "16px"
   priority-badge:
     backgroundColor: "{colors.light-surface-2}"
     textColor: "{colors.light-text}"
@@ -410,10 +434,18 @@ The web's detail screen on a phone, one column: the **detail header** (Back as a
 One Panel counter: Surface fill, hairline, 12dp radius, 16dp padding, centered. The number is 28dp, weight 700; below it the label in caption muted. Four tiles in a 2 by 2 grid with 12dp gaps. The number's color follows the web (text for pending, accent text for in progress, success for completed, danger for overdue) in AA-safe values, and the tile is read as one "Pending: 3", so color is never the only signal. The Panel stays a glance: the four counters and the active tasks, nothing more.
 
 ### Tab bar
-The web's mobile bottom bar: Surface fill, a 1dp hairline on top, three equal tabs (Panel, Tasks, Config) with a 22dp Lucide icon over a caption label (LayoutDashboard, ListTodo, Settings; Schedule and Calendar join later). Each tab is at least 56dp tall and grows with the system font; the bar's bottom padding is the system safe-area inset. The selected tab uses accent text, a heavier label and a heavier icon stroke (so it is not color alone) and is announced as selected. No animation between tabs.
+The web's mobile bottom bar: Surface fill, a 1dp hairline on top, four equal tabs (Panel, Tasks, Schedule, Config) with a 22dp Lucide icon over a caption label (LayoutDashboard, ListTodo, CalendarDays, Settings; Calendar joins later). Each tab is at least 56dp tall and grows with the system font; the bar's bottom padding is the system safe-area inset. The selected tab uses accent text, a heavier label and a heavier icon stroke (so it is not color alone) and is announced as selected. No animation between tabs.
 
 ### Filter chip
 The web's filter buttons as a horizontally scrolling row of 48dp-tall chips (10dp radius, 16dp padding, 8dp gaps), one choice at a time, announced as radios in a labelled group ("Filter by status", "Filter by list"). Unselected: 1dp strong border, muted label on the ground. Selected: a 2dp accent border, a Surface fill, an accent-text label in weight 700. The list row has a color dot before each list name and "All" first. The two rows sit under the quick add field.
+
+### Day tabs and class card
+The web's Schedule on a phone, one day at a time. **Day tabs** are seven equal 48dp-tall tabs in one row, Monday first, each a single letter (L M M J V S D / M T W T F S S). They share the filter chip's rules: unselected has a 1dp strong border and a muted letter, selected a 2dp accent border, a Surface fill and an accent-text letter in weight 700; each is announced as a radio named by the full day ("Jueves", "Thursday") in a labelled group, so the letter is never the only name. The screen opens on today. The same row picks the day in the class form.
+- **Class card:** Surface, 1dp hairline, 12dp radius, 16dp padding, 4dp between lines; one 48dp-plus target that opens the class. The class color is a 16dp dot before the subject, not the web's side bar (no colored side stripe, see the Don'ts); a class with no color uses the accent. Subject in body weight 600 (wraps), then the time range ("08:00 – 09:00") and "room, teacher" in callout muted. Spoken as one label: "FÍSICA, 09:00 – 10:30, A1, Ruiz". A free day shows one muted line, "No classes this day"; Add class is the header's link action.
+- **Class form:** a subject field that suggests the subjects already used (accent-folded match, so "fis" finds "FÍSICA") as 48dp rows under the field, with a link that shows every subject; picking or typing a known subject lends its teacher and color while the user has not chosen them, and a caption says so. Start and End are two 48dp time buttons with a clock icon that open the system time dialog; an end that is not after the start shows the error under End. Color is the eight web swatches as named rows with a dot (as the list colors). Delete appears only when editing, behind a confirmation.
+
+### Today's classes (Panel)
+Shown on the Panel under the counters only when today has a class, with the heading "Today's classes" and a link-style "View schedule" on the right. The class in progress is a card with a 1dp accent edge (the active-card rule): the compact ring (progress of the class so far, decorative) beside the subject with its color dot and "Ends in 30 min" in callout muted. The next class is the same card without the ring and with "Starts in 1 h". The rest are 48dp mini rows: dot, subject, time range. Each card is one spoken unit ("FÍSICA, Ends in 30 min"); the countdown is always written, so the ring and the dot only repeat it. The text refreshes with the Panel's 30-second clock.
 
 ### Priority badge
 A pill on Surface 2 (6dp radius, 8dp by 2dp padding): a 12dp Lucide flag in the priority color (muted, accent, amber, red) and the translated word ("Low", "Medium", "High") in the text color, caption weight 600. None shows nothing. It replaces both the web's red-on-dark label and the earlier priority indicator.

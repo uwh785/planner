@@ -331,6 +331,30 @@
       "css": ".ds-chip{display:inline-flex;align-items:center;min-height:48px;padding:0 16px;border:1px solid #85858a;border-radius:10px;font:500 15px/21px system-ui;color:#636366}.ds-chip.on{border:2px solid #007aff;background:#fff;color:#0062cc;font-weight:700}"
     },
     {
+      "name": "Day Tab",
+      "kind": "chip",
+      "refersTo": "day-tab",
+      "description": "One weekday letter in a row of seven, Monday first; selected has a 2dp accent border, a surface fill and a heavier letter, and every tab is named by the full day.",
+      "html": "<span class=\"ds-day on\">J</span><span class=\"ds-day\">V</span>",
+      "css": ".ds-day{display:inline-flex;align-items:center;justify-content:center;min-height:48px;min-width:40px;border:1px solid #85858a;border-radius:10px;font:500 15px/21px system-ui;color:#636366}.ds-day.on{border:2px solid #007aff;background:#fff;color:#0062cc;font-weight:700}"
+    },
+    {
+      "name": "Class Card",
+      "kind": "card",
+      "refersTo": "class-card",
+      "description": "Subject with its color dot, the time range and room, teacher; the color is a dot, never a side stripe.",
+      "html": "<div class=\"ds-class\"><div class=\"ds-row\"><span class=\"ds-dot\"></span><b>FÍSICA</b></div><div class=\"ds-meta\">09:00 – 10:30</div><div class=\"ds-meta\">A1, Ruiz</div></div>",
+      "css": ".ds-class{background:#fff;border:1px solid #d1d1d6;border-radius:12px;padding:16px;display:grid;gap:4px}.ds-row{display:flex;align-items:center;gap:8px}.ds-dot{width:16px;height:16px;border-radius:50%;background:#ff453a}.ds-meta{font:500 15px/21px system-ui;color:#636366}"
+    },
+    {
+      "name": "Today's Class Card",
+      "kind": "card",
+      "refersTo": "today-class-card",
+      "description": "The Panel's class in progress: an accent edge, the ring and the written countdown.",
+      "html": "<div class=\"ds-today\"><span class=\"ds-ring\">50%</span><div><b>FÍSICA</b><div class=\"ds-meta\">Ends in 30 min</div></div></div>",
+      "css": ".ds-today{display:flex;align-items:center;gap:12px;background:#fff;border:1px solid #007aff;border-radius:12px;padding:16px}.ds-ring{width:40px;height:40px;border-radius:50%;border:3px solid #7c7c80;display:grid;place-items:center;font:600 13px system-ui}.ds-meta{font:500 15px/21px system-ui;color:#636366}"
+    },
+    {
       "name": "Priority Badge",
       "kind": "chip",
       "refersTo": "priority-badge",

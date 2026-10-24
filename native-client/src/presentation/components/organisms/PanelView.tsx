@@ -7,6 +7,8 @@ import type { MessageRef } from '@/application/i18n';
 import { Announcement } from '../molecules/Announcement';
 import { StatTile } from '../molecules/StatTile';
 import { TaskCard, type TaskCardModel } from '../molecules/TaskCard';
+import { TodayClasses } from './TodayClasses';
+import type { TodayClassesModel } from '../../format/todayClassesModel';
 
 export interface PanelCounts {
   pending: number;
@@ -20,6 +22,9 @@ interface PanelViewProps {
   header: React.ReactNode;
   counts: PanelCounts;
   active: readonly TaskCardModel[];
+  /** Today's classes; null (or omitted) when the day has none. */
+  todayClasses?: TodayClassesModel | null;
+  onViewSchedule?: () => void;
   /** The latest short message to say out loud (see Announcement). */
   notice?: { id: number; message: MessageRef } | null;
   /** Ids of the tasks in their undo window. */
@@ -34,6 +39,7 @@ interface PanelViewProps {
 }
 
 const NONE: ReadonlySet<string> = new Set();
+const noop = () => undefined;
 
 const makeStyles = (t: Theme) => ({
   content: { paddingBottom: t.spacing.xl },
@@ -73,6 +79,8 @@ export function PanelView({
   header,
   counts,
   active,
+  todayClasses = null,
+  onViewSchedule = noop,
   notice = null,
   completing = NONE,
   onOpenTask,
@@ -110,6 +118,9 @@ export function PanelView({
             tone="danger"
           />
         </View>
+        {todayClasses ? (
+          <TodayClasses model={todayClasses} onViewSchedule={onViewSchedule} />
+        ) : null}
         <Text accessibilityRole="header" style={styles.heading}>
           {t('dashboardActive')}
         </Text>
