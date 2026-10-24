@@ -176,6 +176,14 @@ export class TaskSqlRepository implements TaskRepository {
       where.push(OVERDUE_SQL);
       params.push(filter.overdueAt, filter.overdueAt);
     }
+    if (filter.dueFrom !== undefined) {
+      where.push('due_date >= ?');
+      params.push(filter.dueFrom);
+    }
+    if (filter.dueTo !== undefined) {
+      where.push('due_date < ?');
+      params.push(filter.dueTo);
+    }
     if (filter.completion === 'open') {
       where.push("status <> 'completed'");
     } else if (filter.completion === 'completed') {

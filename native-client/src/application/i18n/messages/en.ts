@@ -13,6 +13,7 @@ export const en: Record<keyof typeof es, Message> = {
   navTasks: 'Tasks',
   navConfig: 'Settings',
   navSchedule: 'Schedule',
+  navCalendar: 'Calendar',
   tabsLabel: 'Main navigation',
 
   // Auth (web wording where it exists)
@@ -163,6 +164,7 @@ export const en: Record<keyof typeof es, Message> = {
   discardBodyTask: 'Your edits to this task are not saved.',
   discardBodyList: 'Your edits to this list are not saved.',
   discardBodyClass: 'Your edits to this class are not saved.',
+  discardBodyEvent: 'Your edits to this event are not saved.',
   keepEditing: 'Keep editing',
   discard: 'Discard',
 
@@ -244,6 +246,56 @@ export const en: Record<keyof typeof es, Message> = {
   scheduleDayName5: 'Friday',
   scheduleDayName6: 'Saturday',
 
+  // Calendar and events (web wording where it exists)
+  calendarPrevMonth: 'Previous month',
+  calendarNextMonth: 'Next month',
+  calendarLoadError: "Couldn't read your calendar.",
+  month0: 'Jan',
+  month1: 'Feb',
+  month2: 'Mar',
+  month3: 'Apr',
+  month4: 'May',
+  month5: 'Jun',
+  month6: 'Jul',
+  month7: 'Aug',
+  month8: 'Sep',
+  month9: 'Oct',
+  month10: 'Nov',
+  month11: 'Dec',
+  calendarDayLabel: '{month} {day}, {year}',
+  calendarDayEvents: {
+    one: '{count} event',
+    other: '{count} events',
+  },
+  calendarDayTasks: {
+    one: '{count} task',
+    other: '{count} tasks',
+  },
+  calendarToday: 'today',
+  eventsEmptyDay: 'No events this day',
+  eventNew: 'New Event',
+  eventEdit: 'Edit event',
+  eventTitle: 'Title',
+  eventDate: 'Date',
+  eventStart: 'Start',
+  eventEnd: 'End (optional)',
+  eventLocation: 'Location',
+  eventNotes: 'Notes',
+  eventColor: 'Color',
+  eventEndAfterStart: 'End time cannot be before start time',
+  eventStartRequired: 'Pick a date and a start time',
+  eventDeleteConfirm: 'Delete this event?',
+  eventDelete: 'Delete event',
+  eventNotFound: 'We could not find this event. It may have been deleted.',
+  eventStorageLimit:
+    'You reached the maximum number of events that can be stored. Delete one to create another.',
+  eventInvalid: 'Check the event details: a field is empty or too long.',
+  eventTooLarge: 'The event is too large. Shorten the notes.',
+  eventSaveError: 'Could not save the event. Please try again.',
+  eventsDayTitle: 'Events',
+  eventsUpcomingTitle: 'Upcoming events',
+  dashboardTodayEvents: "Today's events",
+
   // Config (web wording where it exists)
   configTitle: 'Settings',
   configLanguage: 'Language',
@@ -276,6 +328,9 @@ export const en: Record<keyof typeof es, Message> = {
   noticeClassAdded: 'Added class {subject}',
   noticeClassSaved: 'Saved class {subject}',
   noticeClassDeleted: 'Deleted class {subject}',
+  noticeEventAdded: 'Added event {title}',
+  noticeEventSaved: 'Saved event {title}',
+  noticeEventDeleted: 'Deleted event {title}',
   noticeFlushFailed: 'Some changes could not be saved.',
   signOutUnsaved:
     'Some completed tasks could not be saved before you signed out.',
@@ -292,6 +347,7 @@ export const en: Record<keyof typeof es, Message> = {
   errorSubtaskNotFound: 'Subtask not found',
   errorListNotFound: 'List not found',
   errorClassNotFound: 'Class not found',
+  errorLocationTooLong: 'Location must be {max} characters or fewer',
 
   // Sync status line
   syncJustNow: 'Synced just now',

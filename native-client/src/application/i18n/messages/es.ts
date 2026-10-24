@@ -11,6 +11,7 @@ export const es = {
   navTasks: 'Tareas',
   navConfig: 'Config',
   navSchedule: 'Horario',
+  navCalendar: 'Calendario',
   tabsLabel: 'Navegación principal',
 
   // Auth (web wording where it exists)
@@ -160,6 +161,7 @@ export const es = {
   discardBodyTask: 'Tus cambios en esta tarea no se han guardado.',
   discardBodyList: 'Tus cambios en esta lista no se han guardado.',
   discardBodyClass: 'Tus cambios en esta clase no se han guardado.',
+  discardBodyEvent: 'Tus cambios en este evento no se han guardado.',
   keepEditing: 'Seguir editando',
   discard: 'Descartar',
 
@@ -241,6 +243,57 @@ export const es = {
   scheduleDayName5: 'Viernes',
   scheduleDayName6: 'Sábado',
 
+  // Calendar and events (web wording where it exists)
+  calendarPrevMonth: 'Mes anterior',
+  calendarNextMonth: 'Mes siguiente',
+  calendarLoadError: 'No se pudo leer tu calendario.',
+  month0: 'Ene',
+  month1: 'Feb',
+  month2: 'Mar',
+  month3: 'Abr',
+  month4: 'May',
+  month5: 'Jun',
+  month6: 'Jul',
+  month7: 'Ago',
+  month8: 'Sep',
+  month9: 'Oct',
+  month10: 'Nov',
+  month11: 'Dic',
+  calendarDayLabel: '{day} de {month} de {year}',
+  calendarDayEvents: {
+    one: '{count} evento',
+    other: '{count} eventos',
+  },
+  calendarDayTasks: {
+    one: '{count} tarea',
+    other: '{count} tareas',
+  },
+  calendarToday: 'hoy',
+  eventsEmptyDay: 'No hay eventos este día',
+  eventNew: 'Nuevo Evento',
+  eventEdit: 'Editar evento',
+  eventTitle: 'Título',
+  eventDate: 'Fecha',
+  eventStart: 'Inicio',
+  eventEnd: 'Fin (opcional)',
+  eventLocation: 'Lugar',
+  eventNotes: 'Notas',
+  eventColor: 'Color',
+  eventEndAfterStart: 'La hora de fin no puede ser anterior a la de inicio',
+  eventStartRequired: 'Elegí una fecha y una hora de inicio',
+  eventDeleteConfirm: '¿Eliminar este evento?',
+  eventDelete: 'Eliminar evento',
+  eventNotFound: 'No encontramos este evento. Puede que se haya eliminado.',
+  eventStorageLimit:
+    'Llegaste al máximo de eventos que se pueden guardar. Borrá alguno para crear otro.',
+  eventInvalid:
+    'Revisá los datos del evento: hay un campo vacío o demasiado largo.',
+  eventTooLarge: 'El evento es demasiado grande. Acortá las notas.',
+  eventSaveError: 'No se pudo guardar el evento. Intentá de nuevo.',
+  eventsDayTitle: 'Eventos',
+  eventsUpcomingTitle: 'Próximos eventos',
+  dashboardTodayEvents: 'Eventos de hoy',
+
   // Config (web wording where it exists)
   configTitle: 'Configuración',
   configLanguage: 'Idioma',
@@ -273,6 +326,9 @@ export const es = {
   noticeClassAdded: 'Se agregó la clase {subject}',
   noticeClassSaved: 'Se guardó la clase {subject}',
   noticeClassDeleted: 'Se eliminó la clase {subject}',
+  noticeEventAdded: 'Se agregó el evento {title}',
+  noticeEventSaved: 'Se guardó el evento {title}',
+  noticeEventDeleted: 'Se eliminó el evento {title}',
   noticeFlushFailed: 'No se pudieron guardar algunos cambios.',
   signOutUnsaved:
     'No se pudieron guardar algunas tareas completadas antes de cerrar sesión.',
@@ -289,6 +345,7 @@ export const es = {
   errorSubtaskNotFound: 'No se encontró la subtarea',
   errorListNotFound: 'No se encontró la lista',
   errorClassNotFound: 'No se encontró la clase',
+  errorLocationTooLong: 'El lugar debe tener {max} caracteres o menos',
 
   // Sync status line
   syncJustNow: 'Sincronizado hace un momento',

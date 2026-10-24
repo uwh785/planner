@@ -145,3 +145,28 @@ describe('weekday names', () => {
     expect(names('en')[1]).toBe('Monday');
   });
 });
+
+describe('month names', () => {
+  it('has a short name for each month, January first, as the web writes them', () => {
+    const months = (locale: 'es' | 'en') =>
+      Array.from({ length: 12 }, (_, i) =>
+        translate(locale, `month${i}` as MessageKey),
+      );
+    expect(months('es')).toEqual([
+      'Ene',
+      'Feb',
+      'Mar',
+      'Abr',
+      'May',
+      'Jun',
+      'Jul',
+      'Ago',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dic',
+    ]);
+    expect(months('en')[0]).toBe('Jan');
+    expect(months('en')[11]).toBe('Dec');
+  });
+});

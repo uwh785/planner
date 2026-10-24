@@ -73,6 +73,12 @@ export interface TaskFilter {
    */
   overdueAt?: number;
   /**
+   * Only tasks due in [dueFrom, dueTo) (epoch ms), either bound optional;
+   * open and completed alike. Tasks without a due date never match.
+   */
+  dueFrom?: number;
+  dueTo?: number;
+  /**
    * `default`: sort order, then update time. `plan`: sort order, then due
    * date (undated last), then creation order. `recentlyCompleted`: latest
    * completion first.

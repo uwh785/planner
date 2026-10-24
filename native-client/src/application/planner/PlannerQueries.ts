@@ -1,8 +1,12 @@
-import type { ClassSession, Subtask, Task, TaskList } from '@/domain';
+import type { ClassSession, Event, Subtask, Task, TaskList } from '@/domain';
+import { eventLastDayStart } from '../calendar/eventDays';
+import { monthBounds } from '../calendar/monthGrid';
+import { startOfLocalDay } from '../calendar/localDate';
 import type { ChangeSource } from '../ports/ChangeNotifier';
 import type { Clock } from '../ports/Clock';
 import type {
   ClassSessionRepository,
+  EventRepository,
   SubtaskRepository,
   TaskFilter,
   TaskListRepository,
@@ -89,6 +93,19 @@ export interface ScheduleData {
   classes: ClassSession[];
 }
 
+/** Every event, by start time. */
+export interface EventsData {
+  events: Event[];
+}
+
+/** What one month of the calendar shows. */
+export interface CalendarMonthData {
+  /** Events occupying at least one day of the month, by start time. */
+  events: Event[];
+  /** Tasks due in the month, open and completed. */
+  tasks: Task[];
+}
+
 export interface QueryLimits {
   openLimit?: number;
   completedLimit?: number;
@@ -99,6 +116,7 @@ export interface PlannerQuerySource {
   tasks: TaskRepository;
   subtasks: SubtaskRepository;
   classSessions: ClassSessionRepository;
+  events: EventRepository;
   /** Local writes and applied pulls. */
   dataChanges: ChangeSource;
   /** "Now" for the overdue rule. */
@@ -221,6 +239,38 @@ export class PlannerQueries {
 
   async schedule(): Promise<ScheduleData> {
     return { classes: await this.source.classSessions.list() };
+  }
+
+  async events(): Promise<EventsData> {
+    return { events: await this.source.events.list() };
+  }
+
+  /** `month` is 0 (January) to 11. */
+  async calendarMonth(year: number, month: number): Promise<CalendarMonthData> {
+    const { events, tasks } = this.source;
+    const { from, to } = monthBounds(year, month);
+    const [all, due] = await Promise.all([
+      events.list(),
+      tasks.list({ dueFrom: from, dueTo: to, limit: OPEN_TASK_LIMIT }),
+    ]);
+    return {
+      // The end is exclusive: see eventLastDayStart.
+      events: all.filter(
+        e => startOfLocalDay(e.startAt) < to && eventLastDayStart(e) >= from,
+      ),
+      tasks: due,
+    };
+  }
+
+  watchEvents(): LiveQuery<EventsData> {
+    return this.watch(() => this.events());
+  }
+
+  watchCalendarMonth(
+    year: number,
+    month: number,
+  ): LiveQuery<CalendarMonthData> {
+    return this.watch(() => this.calendarMonth(year, month));
   }
 
   watchSchedule(): LiveQuery<ScheduleData> {

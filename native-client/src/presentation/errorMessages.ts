@@ -12,6 +12,7 @@ const TOO_LONG: Record<string, MessageKey> = {
   title: 'errorTitleTooLong',
   name: 'errorNameTooLong',
   description: 'errorDescriptionTooLong',
+  location: 'errorLocationTooLong',
 };
 
 const NOT_FOUND = {
@@ -19,6 +20,7 @@ const NOT_FOUND = {
   list: 'errorListNotFound',
   subtask: 'errorSubtaskNotFound',
   class: 'errorClassNotFound',
+  event: 'eventNotFound',
 } as const satisfies Record<string, MessageKey>;
 
 /**

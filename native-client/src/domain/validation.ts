@@ -157,7 +157,7 @@ export function normalizeEvent(e: Event): Event {
 export class NotFoundError extends Error {
   constructor(
     message: string,
-    readonly entity?: 'task' | 'list' | 'subtask' | 'class',
+    readonly entity?: 'task' | 'list' | 'subtask' | 'class' | 'event',
   ) {
     super(message);
     this.name = 'NotFoundError';

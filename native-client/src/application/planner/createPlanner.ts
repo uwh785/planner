@@ -3,6 +3,7 @@ import type { AppLifecycle } from '../ports/AppLifecycle';
 import type { Clock } from '../ports/Clock';
 import type { Timer } from '../ports/Timer';
 import { CompletionWindow } from './CompletionWindow';
+import { EventUseCases } from '../calendar/EventUseCases';
 import { ClassUseCases } from '../schedule/ClassUseCases';
 import { ListUseCases } from './ListUseCases';
 import { Notices } from './Notices';
@@ -29,6 +30,8 @@ export interface Planner {
   subtasks: SubtaskUseCases;
   /** Create, edit and delete weekly classes. */
   classes: ClassUseCases;
+  /** Create, edit and delete events. */
+  events: EventUseCases;
   completion: CompletionWindow;
   notices: Notices;
   /** The current time, from the same clock the services use. */
@@ -41,7 +44,12 @@ export interface Planner {
 
 export type PlannerSource = Pick<
   AppContainer,
-  'taskLists' | 'tasks' | 'subtasks' | 'classSessions' | 'dataChanges'
+  | 'taskLists'
+  | 'tasks'
+  | 'subtasks'
+  | 'classSessions'
+  | 'events'
+  | 'dataChanges'
 >;
 
 export function createPlanner(
@@ -69,6 +77,7 @@ export function createPlanner(
     }),
     subtasks: new SubtaskUseCases(source.subtasks, source.tasks, notices),
     classes: new ClassUseCases(source.classSessions, notices),
+    events: new EventUseCases(source.events, notices),
     completion,
     notices,
     now: () => runtime.clock.now(),
