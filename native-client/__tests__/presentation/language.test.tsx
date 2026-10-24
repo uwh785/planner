@@ -36,7 +36,7 @@ describe('switching the language', () => {
     expect(screen.getByRole('button', { name: 'Sign Out' })).toBeTruthy();
     expect(
       screen.getAllByRole('tab').map(t => t.props.accessibilityLabel),
-    ).toEqual(['Dashboard', 'Tasks', 'Schedule', 'Settings']);
+    ).toEqual(['Dashboard', 'Tasks', 'Schedule', 'Calendar', 'Settings']);
     expect(env.locale.getSnapshot().locale).toBe('en');
   });
 

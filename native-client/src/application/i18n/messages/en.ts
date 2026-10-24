@@ -279,6 +279,7 @@ export const en: Record<keyof typeof es, Message> = {
   eventDate: 'Date',
   eventStart: 'Start',
   eventEnd: 'End (optional)',
+  eventEndClear: 'Clear end',
   eventLocation: 'Location',
   eventNotes: 'Notes',
   eventColor: 'Color',

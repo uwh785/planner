@@ -5,11 +5,12 @@ import type {
 } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-/** The bottom tabs, as on the web app's mobile bar (Calendar comes later). */
+/** The bottom tabs, as on the web app's mobile bar . */
 export type TabParamList = {
   Panel: undefined;
   Tasks: undefined;
   Schedule: undefined;
+  Calendar: undefined;
   Config: undefined;
 };
 
@@ -28,6 +29,8 @@ export type RootStackParamList = {
   ListEdit: { listId: string };
   /** A weekly class: edit `classId`, or add one on `day` (0 = Sunday). */
   ClassEdit: { classId?: string; day?: number };
+  /** An event: edit `eventId`, or add one on `date` (local midnight, ms). */
+  EventEdit: { eventId?: string; date?: number };
 };
 
 export type ScreenProps<Name extends keyof RootStackParamList> =

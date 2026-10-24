@@ -3,13 +3,16 @@
  * so the bundle never carries the whole library.
  */
 export { default as ArrowLeft } from 'lucide-react-native/icons/arrow-left';
+export { default as Calendar } from 'lucide-react-native/icons/calendar';
 export { default as CalendarDays } from 'lucide-react-native/icons/calendar-days';
 export { default as Check } from 'lucide-react-native/icons/check';
+export { default as ChevronLeft } from 'lucide-react-native/icons/chevron-left';
 export { default as ChevronRight } from 'lucide-react-native/icons/chevron-right';
 export { default as Clock } from 'lucide-react-native/icons/clock';
 export { default as Flag } from 'lucide-react-native/icons/flag';
 export { default as LayoutDashboard } from 'lucide-react-native/icons/layout-dashboard';
 export { default as ListTodo } from 'lucide-react-native/icons/list-todo';
+export { default as MapPin } from 'lucide-react-native/icons/map-pin';
 export { default as Pencil } from 'lucide-react-native/icons/pencil';
 export { default as Plus } from 'lucide-react-native/icons/plus';
 export { default as Settings } from 'lucide-react-native/icons/settings';

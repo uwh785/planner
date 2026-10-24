@@ -7,6 +7,7 @@ const DISCARD_BODY = {
   task: 'discardBodyTask',
   list: 'discardBodyList',
   class: 'discardBodyClass',
+  event: 'discardBodyEvent',
 } as const;
 
 /**
@@ -19,7 +20,7 @@ const DISCARD_BODY = {
  */
 export function useDiscardGuard(
   dirty: boolean,
-  subject: 'task' | 'list' | 'class',
+  subject: 'task' | 'list' | 'class' | 'event',
 ) {
   const navigation = useNavigation();
   const t = useT();

@@ -3,6 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
+  Calendar,
   CalendarDays,
   LayoutDashboard,
   ListTodo,
@@ -17,6 +18,7 @@ const ICONS = {
   Panel: LayoutDashboard,
   Tasks: ListTodo,
   Schedule: CalendarDays,
+  Calendar,
   Config: Settings,
 } as const;
 
@@ -24,6 +26,7 @@ const LABEL = {
   Panel: 'navDashboard',
   Tasks: 'navTasks',
   Schedule: 'navSchedule',
+  Calendar: 'navCalendar',
   Config: 'navConfig',
 } as const;
 
@@ -56,7 +59,7 @@ const makeStyles = (t: Theme) => ({
 
 /**
  * The web's mobile bottom bar: an icon over a label for Panel, Tasks,
- * Schedule and Config, the accent on the selected one, clear of the system gesture area.
+ * Schedule, Calendar and Config, the accent on the selected one, clear of the system gesture area.
  * Every tab is at least 56dp tall and grows with the system font.
  */
 export function TabBar({ state, navigation }: BottomTabBarProps) {

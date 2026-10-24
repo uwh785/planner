@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Clock } from '../atoms/icons';
+import type { ComponentType } from 'react';
 import { useStyles, useTheme } from '../../theme';
 import type { Theme } from '../../theme';
 
@@ -9,6 +10,8 @@ interface TimeFieldProps {
   /** "08:00". */
   time: string;
   error?: string | null;
+  /** The leading icon; a clock unless the field holds a date. */
+  icon?: ComponentType<{ size?: number; color?: string }>;
   onPress: () => void;
 }
 
@@ -40,8 +43,17 @@ const makeStyles = (t: Theme) => ({
   },
 });
 
-/** A time of day that opens the system time dialog; the value is the button. */
-export function TimeField({ label, time, error, onPress }: TimeFieldProps) {
+/**
+ * A time of day (or a date, with another icon) that opens the system dialog;
+ * the value is the button.
+ */
+export function TimeField({
+  label,
+  time,
+  error,
+  icon: Icon = Clock,
+  onPress,
+}: TimeFieldProps) {
   const styles = useStyles(makeStyles);
   const { colors } = useTheme();
   return (
@@ -59,7 +71,7 @@ export function TimeField({ label, time, error, onPress }: TimeFieldProps) {
           pressed && styles.pressed,
         ]}
       >
-        <Clock size={18} color={colors.textMuted} />
+        <Icon size={18} color={colors.textMuted} />
         <Text style={styles.time}>{time}</Text>
       </Pressable>
       <View accessibilityLiveRegion="polite">

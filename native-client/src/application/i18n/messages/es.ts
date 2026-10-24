@@ -276,6 +276,7 @@ export const es = {
   eventDate: 'Fecha',
   eventStart: 'Inicio',
   eventEnd: 'Fin (opcional)',
+  eventEndClear: 'Quitar fin',
   eventLocation: 'Lugar',
   eventNotes: 'Notas',
   eventColor: 'Color',
