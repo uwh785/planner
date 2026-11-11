@@ -29,7 +29,7 @@ The user (2026-11-11) wants to record things like "I recharged today, remind me 
 ## Tasks
 - [x] T1 Backend: `remind` column (idempotent `ALTER TABLE`), model field, store column lists (eventColumns, scanEvent, INSERT, UPDATE with keep-when-absent), sync pull scan, tests - route: delegated writer (4+ non-trivial files)
 - [x] T2 Native client: migration 003, domain/row/mappers/payload/pull parsing, `daysUntil` helper and reminders model, form switch and shortcuts, Panel "Reminders" block, i18n, tests - route: delegated writer
-- [ ] T3 Web: form checkbox and shortcuts, dashboard "Reminders" block, i18n with a count, `daysUntil` helper - route: delegated writer
+- [x] T3 Web: form checkbox and shortcuts, dashboard "Reminders" block, i18n with a count, `daysUntil` helper - route: delegated writer
 
 ## Acceptance criteria
 - POST/PUT `/api/events` round-trips `remind`; a PUT or sync push without `remind` leaves the stored value unchanged; pull returns it.
@@ -57,4 +57,9 @@ The user (2026-11-11) wants to record things like "I recharged today, remind me 
   - Decisions: shortcuts reuse `FilterChips` under the date field and count from today; a shortcut sets the date and turns the reminder on; the Panel block is one grouped surface of `ReminderRow`s above "Today's events"; "Today"/"Tomorrow" reuse `dateToday`/`dateTomorrow`; new keys `eventRemind`, `eventInDays`, `eventShortcuts`, `dashboardReminders`, `reminderDaysLeft`.
   - Known limit: a shortcut on a multi-day event trips the existing end-before-start validation, as picking a date by hand does.
   - Pending: emulator check of the form and the Panel.
-- Next: T3.
+- T3 done (delegated writer), commit 5544422 (5 files, +250/-6).
+  - Test-first exception: `web/` has no test runner; logic kept in pure helpers in `utils.js`.
+  - Checks: `npm run build` ok (only the existing `ClassForm.svelte:155` a11y warning); throwaway node script confirmed 2026-11-11 + 60 days = 2027-01-10, today 0, yesterday excluded, ordering. No browser check; `t()` with params was not exercised outside the build.
+  - Decisions: `t(key, params)` with `{count}` and `{ one, other }`; future events fetched with `from` only; shortcut chips copy the `.filter-btn` rules.
+- Review: range from `0a8dcc7` assessed medium, `under_budget` after T2. Whole-branch review against `main` consented twice (2026-11-11); the first stopped with `lens_context_budget_exceeded`, the second was not started because T3 landed after its target was frozen and the session ran out of usage.
+- Pending: parent spot check of T3, emulator and browser checks, native review of the reminders range, the hanging `syncStatus.test.tsx`.
