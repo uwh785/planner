@@ -199,7 +199,12 @@ const translations = {
     eventSaveError: 'No se pudo guardar el evento. Intentá de nuevo.',
     eventsDayTitle: 'Eventos',
     eventsUpcomingTitle: 'Próximos eventos',
-    dashboardTodayEvents: 'Eventos de hoy'
+    dashboardTodayEvents: 'Eventos de hoy',
+    eventRemind: 'Recordar en inicio',
+    eventShortcuts: 'Atajos de fecha',
+    eventInDays: 'En {count} días',
+    dashboardReminders: 'Recordatorios',
+    reminderDaysLeft: { one: 'Falta {count} día', other: 'Faltan {count} días' }
   },
   en: {
     appName: 'Planner',
@@ -399,10 +404,24 @@ const translations = {
     eventSaveError: 'Could not save the event. Please try again.',
     eventsDayTitle: 'Events',
     eventsUpcomingTitle: 'Upcoming events',
-    dashboardTodayEvents: "Today's events"
+    dashboardTodayEvents: "Today's events",
+    eventRemind: 'Remind me on the home panel',
+    eventShortcuts: 'Date shortcuts',
+    eventInDays: 'In {count} days',
+    dashboardReminders: 'Reminders',
+    reminderDaysLeft: { one: '{count} day left', other: '{count} days left' }
   }
 };
 
-export function t(key) {
-  return translations[locale.value]?.[key] ?? translations.es?.[key] ?? key;
+// `params` is optional. Each `{name}` in the message is replaced by
+// `params.name`, and a message written as { one, other } picks its form from
+// `params.count` (1 is `one`, anything else `other`, which is all Spanish and
+// English need). Calls without params return the stored value untouched.
+export function t(key, params) {
+  let message = translations[locale.value]?.[key] ?? translations.es?.[key] ?? key;
+  if (message && typeof message === 'object' && !Array.isArray(message) && 'other' in message) {
+    message = params?.count === 1 && message.one ? message.one : message.other;
+  }
+  if (!params || typeof message !== 'string') return message;
+  return message.replace(/\{(\w+)\}/g, (match, name) => (name in params ? String(params[name]) : match));
 }

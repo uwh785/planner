@@ -6,7 +6,8 @@
     toDateInputValue,
     toTimeInputValue,
     eventTimesFromInputs,
-    isEventEndValid
+    isEventEndValid,
+    dateInDays
   } from '$lib/utils.js';
 
   let {
@@ -26,6 +27,9 @@
   const LOCATION_MAX = 200;
   const DESCRIPTION_MAX = 5000;
 
+  // "In N days" shortcuts, counted from today.
+  const SHORTCUT_DAYS = [30, 60, 90];
+
   let title = $state(untrack(() => event?.title || ''));
   let date = $state(untrack(() => event ? toDateInputValue(event.start_at) : (defaultDate || toDateInputValue(Date.now()))));
   let allDay = $state(untrack(() => !!event?.all_day));
@@ -34,7 +38,16 @@
   let location = $state(untrack(() => event?.location || ''));
   let description = $state(untrack(() => event?.description || ''));
   let color = $state(untrack(() => event?.color || SWATCHES[0]));
+  let remind = $state(untrack(() => !!event?.remind));
   let clientError = $state('');
+
+  const shortcuts = SHORTCUT_DAYS.map((days) => ({ days, date: dateInDays(Date.now(), days) }));
+
+  // A shortcut picks the date and flags the event as a reminder in one tap.
+  function applyShortcut(shortcut) {
+    date = shortcut.date;
+    remind = true;
+  }
 
   function handleSubmit() {
     clientError = '';
@@ -55,6 +68,7 @@
       start_at: times.start_at,
       end_at: times.end_at,
       all_day: allDay,
+      remind,
       color
     });
   }
@@ -80,11 +94,29 @@
   <div class="form-group">
     <label for="event-date">{t('eventDate')}</label>
     <input id="event-date" type="date" bind:value={date} required />
+    <div class="shortcuts" role="group" aria-label={t('eventShortcuts')}>
+      {#each shortcuts as shortcut (shortcut.days)}
+        <button
+          type="button"
+          class="filter-btn"
+          class:active={date === shortcut.date}
+          aria-pressed={date === shortcut.date}
+          onclick={() => applyShortcut(shortcut)}
+        >
+          {t('eventInDays', { count: shortcut.days })}
+        </button>
+      {/each}
+    </div>
   </div>
 
   <label class="toggle">
     <input type="checkbox" bind:checked={allDay} />
     <span>{t('eventAllDay')}</span>
+  </label>
+
+  <label class="toggle">
+    <input type="checkbox" bind:checked={remind} />
+    <span>{t('eventRemind')}</span>
   </label>
 
   {#if !allDay}
@@ -220,6 +252,41 @@
     height: 20px;
     accent-color: var(--accent);
     cursor: pointer;
+  }
+
+  .shortcuts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  /* Same chip as TaskFilters' .filter-btn (component styles are scoped). */
+  .filter-btn {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: inherit;
+    color: var(--text2);
+    background: transparent;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+
+  .filter-btn:hover {
+    color: var(--text);
+    border-color: var(--text2);
+  }
+
+  .filter-btn.active {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: rgba(10, 132, 255, 0.1);
   }
 
   .form-row {

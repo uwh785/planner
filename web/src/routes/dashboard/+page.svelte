@@ -5,8 +5,9 @@
   import { t } from '$lib/i18n.svelte.js';
   import TaskCard from '$lib/components/TaskCard.svelte';
   import EventCard from '$lib/components/EventCard.svelte';
+  import ReminderList from '$lib/components/ReminderList.svelte';
   import CountdownRing from '$lib/components/CountdownRing.svelte';
-  import { splitTodayClasses, formatMinuteDuration, formatTimeRange, startOfLocalDay, addDays, sortEvents } from '$lib/utils.js';
+  import { splitTodayClasses, formatMinuteDuration, formatTimeRange, startOfLocalDay, addDays, sortEvents, upcomingReminders } from '$lib/utils.js';
 
   let loading = $state(true);
   let error = $state('');
@@ -14,6 +15,7 @@
   let todayTasks = $state([]);
   let todayTasksLoading = $state(true);
   let todayEvents = $state([]);
+  let reminders = $state([]);
 
   function currentMinuteOfDay() {
     const d = new Date();
@@ -28,6 +30,7 @@
       loadDashboard();
       loadTodayTasks();
       loadTodayEvents();
+      loadReminders();
     }
   });
 
@@ -39,6 +42,18 @@
       todayEvents = sortEvents(await api(`/api/events?from=${from}&to=${to}`));
     } catch {
       todayEvents = [];
+    }
+  }
+
+  // Every event from today on (the API takes `from` without `to`), narrowed to
+  // the ones flagged as reminders. Independent too: on failure the block
+  // stays hidden.
+  async function loadReminders() {
+    try {
+      const now = Date.now();
+      reminders = upcomingReminders(await api(`/api/events?from=${startOfLocalDay(now)}`), now);
+    } catch {
+      reminders = [];
     }
   }
 
@@ -124,6 +139,13 @@
 
 <div class="dashboard">
   <h1>{t('dashboardTitle')}</h1>
+
+  {#if reminders.length > 0}
+    <section class="reminders">
+      <h2>{t('dashboardReminders')}</h2>
+      <ReminderList {reminders} />
+    </section>
+  {/if}
 
   {#if todayEvents.length > 0}
     <section class="today-events">

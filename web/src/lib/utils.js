@@ -356,3 +356,31 @@ export function formatEventTime(event, allDayLabel, monthNames) {
   if (isSameLocalDay(event.start_at, end)) return `${start} – ${endTime}`;
   return `${start} – ${formatShortDate(end, monthNames)} ${endTime}`;
 }
+
+// --- Event reminders (mirror native-client application/calendar/reminders) ---
+
+const DAY_MS = 86400000;
+
+// Whole local days from the day holding `nowMs` to the day holding
+// `targetMs`; negative for the past. Counted between local midnights and
+// rounded, so the 23 and 25 hour days of a DST change do not shift it.
+export function daysUntil(targetMs, nowMs) {
+  return Math.round((startOfLocalDay(targetMs) - startOfLocalDay(nowMs)) / DAY_MS);
+}
+
+// The events flagged as reminders that start today or later, soonest first
+// (the given order for equal starts), each as { event, daysLeft } where
+// daysLeft is 0 today and 1 tomorrow.
+export function upcomingReminders(events, nowMs) {
+  return (Array.isArray(events) ? events : [])
+    .filter((event) => event?.remind && event.start_at > 0)
+    .map((event) => ({ event, daysLeft: daysUntil(event.start_at, nowMs) }))
+    .filter((reminder) => reminder.daysLeft >= 0)
+    .sort((a, b) => a.event.start_at - b.event.start_at);
+}
+
+// 'YYYY-MM-DD' of the local date `n` days after the day holding `nowMs`, in
+// the form <input type="date"> uses.
+export function dateInDays(nowMs, n) {
+  return toDateInputValue(addDays(startOfLocalDay(nowMs), n));
+}
