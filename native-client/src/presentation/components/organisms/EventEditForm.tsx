@@ -6,6 +6,7 @@ import { ColorDot } from '../atoms/ColorDot';
 import { CalendarDays } from '../atoms/icons';
 import { InlineMessage } from '../atoms/InlineMessage';
 import { TextField } from '../atoms/TextField';
+import { FilterChips } from '../molecules/FilterChips';
 import { FormSection } from '../molecules/FormSection';
 import { RadioGroup } from '../molecules/RadioGroup';
 import { TimeField } from '../molecules/TimeField';
@@ -18,6 +19,8 @@ export interface EventFormValues {
   /** Local midnight of the event's day. */
   date: number;
   allDay: boolean;
+  /** Show on the home panel with a days-left countdown. */
+  remind: boolean;
   /** "09:00". */
   startTime: string;
   /** "10:30", or empty for no end. */
@@ -26,6 +29,10 @@ export interface EventFormValues {
   description: string;
   color: string;
 }
+
+/** The "in N days" date shortcuts, in days from today. */
+export const SHORTCUT_DAYS = [30, 60, 90] as const;
+export type ShortcutDays = (typeof SHORTCUT_DAYS)[number];
 
 /** The web's limits (backend model/event.go). */
 export const EVENT_LIMITS = {
@@ -38,6 +45,8 @@ interface EventEditFormProps {
   values: EventFormValues;
   /** "Oct 22, 2026". */
   dateText: string;
+  /** The shortcut the form date matches today, if any. */
+  shortcut: ShortcutDays | null;
   titleError: string | null;
   /** The start-time or end-before-start sentence, under the times. */
   startError: string | null;
@@ -48,6 +57,8 @@ interface EventEditFormProps {
   editing: boolean;
   onChange: (patch: Partial<EventFormValues>) => void;
   onPickDate: () => void;
+  /** Sets the date to today plus the days and turns the reminder on. */
+  onShortcut: (days: ShortcutDays) => void;
   onPickStart: () => void;
   onPickEnd: () => void;
   onSave: () => void;
@@ -70,16 +81,21 @@ const makeStyles = (t: Theme) => ({
   notes: { minHeight: 96, textAlignVertical: 'top' as const },
   actions: { gap: t.spacing.sm, marginTop: t.spacing.xs },
   clear: { alignItems: 'flex-start' as const, marginBottom: t.spacing.md },
+  // The chips bring the screen's side padding themselves, so the row scrolls
+  // edge to edge and still starts on the form's margin.
+  shortcuts: { marginHorizontal: -t.spacing.lg, marginBottom: t.spacing.xs },
 });
 
 /**
- * The web's event form: title, date, an all-day switch, start and optional
- * end (hidden for an all-day event), location, notes and the eight color
- * swatches (each with its name); Delete when editing.
+ * The web's event form: title, date with its "in N days" shortcuts, an
+ * all-day switch, start and optional end (hidden for an all-day event), the
+ * reminder switch, location, notes and the eight color swatches (each with
+ * its name); Delete when editing.
  */
 export function EventEditForm({
   values,
   dateText,
+  shortcut,
   titleError,
   startError,
   endError,
@@ -88,6 +104,7 @@ export function EventEditForm({
   editing,
   onChange,
   onPickDate,
+  onShortcut,
   onPickStart,
   onPickEnd,
   onSave,
@@ -103,6 +120,10 @@ export function EventEditForm({
     value: c.value.toLowerCase(),
     label: t(`color${c.key}`),
     leading: <ColorDot color={c.value} />,
+  }));
+  const shortcutOptions = SHORTCUT_DAYS.map(days => ({
+    value: String(days),
+    label: t('eventInDays', { count: days }),
   }));
   return (
     <ScrollView
@@ -124,6 +145,19 @@ export function EventEditForm({
           time={dateText}
           icon={CalendarDays}
           onPress={onPickDate}
+        />
+      </View>
+      <View style={styles.shortcuts}>
+        <FilterChips
+          label={t('eventShortcuts')}
+          options={shortcutOptions}
+          value={shortcut === null ? '' : String(shortcut)}
+          onChange={picked => {
+            const days = SHORTCUT_DAYS.find(d => String(d) === picked);
+            if (days !== undefined) {
+              onShortcut(days);
+            }
+          }}
         />
       </View>
       <View style={styles.row}>
@@ -164,6 +198,17 @@ export function EventEditForm({
           ) : null}
         </View>
       )}
+      <View style={styles.row}>
+        <Text style={styles.rowLabel}>{t('eventRemind')}</Text>
+        <Switch
+          accessibilityRole="switch"
+          accessibilityLabel={t('eventRemind')}
+          value={values.remind}
+          onValueChange={remind => onChange({ remind })}
+          trackColor={{ false: colors.borderStrong, true: colors.primary }}
+          thumbColor={colors.surface}
+        />
+      </View>
       <TextField
         label={t('eventLocation')}
         value={values.location}

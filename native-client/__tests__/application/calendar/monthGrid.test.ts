@@ -20,6 +20,7 @@ const ev = (
   startAt,
   endAt,
   allDay: false,
+  remind: false,
   color: '',
   updatedAt: 1,
   deleted: false,

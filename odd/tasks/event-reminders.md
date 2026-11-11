@@ -28,7 +28,7 @@ The user (2026-11-11) wants to record things like "I recharged today, remind me 
 
 ## Tasks
 - [x] T1 Backend: `remind` column (idempotent `ALTER TABLE`), model field, store column lists (eventColumns, scanEvent, INSERT, UPDATE with keep-when-absent), sync pull scan, tests - route: delegated writer (4+ non-trivial files)
-- [ ] T2 Native client: migration 003, domain/row/mappers/payload/pull parsing, `daysUntil` helper and reminders model, form switch and shortcuts, Panel "Reminders" block, i18n, tests - route: delegated writer
+- [x] T2 Native client: migration 003, domain/row/mappers/payload/pull parsing, `daysUntil` helper and reminders model, form switch and shortcuts, Panel "Reminders" block, i18n, tests - route: delegated writer
 - [ ] T3 Web: form checkbox and shortcuts, dashboard "Reminders" block, i18n with a count, `daysUntil` helper - route: delegated writer
 
 ## Acceptance criteria
@@ -40,8 +40,9 @@ The user (2026-11-11) wants to record things like "I recharged today, remind me 
 
 ## Delivery
 - Strategy: ask-on-risk. Forecast ~700 authored lines (T1 ~130, T2 ~420, T3 ~150), over ~400.
-- Chain strategy: pending the user's answer (the events feature used `stacked-to-main`).
-- Slices: one per task.
+- Chain strategy (user, 2026-11-11): `stacked-to-main`.
+- Slices: PR1 = T1 backend (`75ef964` + docs `47aa276`), PR2 = T2 native client, PR3 = T3 web. Each PR targets `main` and is based on the previous slice. The branch sits on `feat/native-calendar` (not merged into `main` yet), which has to land first. Push and PR creation remain the user's decision.
+- Review: T1 range from `0a8dcc7` assessed medium, `under_budget` (247 lines), pending in the slice. A whole-branch review against `main` (58 files, 3050 lines, consent granted) stopped with `lens_context_budget_exceeded`; no authority was created.
 
 ## Progress
 - 2026-11-11: mapped the events vertical (read-only explorer); feature document created; branch created.
@@ -50,4 +51,10 @@ The user (2026-11-11) wants to record things like "I recharged today, remind me 
   - GREEN: `gofmt -l .` empty, `go vet ./...` clean, `go test ./...` ok; with the local compose Postgres (port 5434, migrated) `go test -count=1 ./...` 304 passed, `TestEventRemindIntegration`, `TestSyncChangesIntegration` and `TestSyncPushIntegration` ran, not skipped. Parent spot check: gofmt, vet and `go test ./...` ok.
   - Decisions: `Remind *bool`; `UpdateEvent` uses `COALESCE($10, remind)` and covers PUT and sync push; `CreateEvent` defaults nil to false in Go because the POST handler returns the struct without re-reading the row.
   - Not covered: no HTTP-level test of the POST/PUT JSON response (covered at model, store and sync-push level).
-- Next: T2.
+- T2 done (delegated writer; parent added two names to the components README).
+  - RED: first jest run over the touched suites, 10 suites and 19 tests failed (missing modules, missing `remind`, missing Panel block and form controls).
+  - GREEN: `npm run typecheck` clean, `npm run lint` clean. `npm test` does not finish: `__tests__/presentation/syncStatus.test.tsx` hangs, also with the changes stashed (pre-existing). Without that suite: 93 of 94 suites, 1060 of 1061 tests passed; the one failure, `taskDetailComponents > SubtaskAddField > has a visible label`, is a 5000 ms timeout that passed alone (36/36) and in the first full run, no clean-checkout evidence. Parent spot check: typecheck clean, the four new suites pass (18 tests).
+  - Decisions: shortcuts reuse `FilterChips` under the date field and count from today; a shortcut sets the date and turns the reminder on; the Panel block is one grouped surface of `ReminderRow`s above "Today's events"; "Today"/"Tomorrow" reuse `dateToday`/`dateTomorrow`; new keys `eventRemind`, `eventInDays`, `eventShortcuts`, `dashboardReminders`, `reminderDaysLeft`.
+  - Known limit: a shortcut on a multi-day event trips the existing end-before-start validation, as picking a date by hand does.
+  - Pending: emulator check of the form and the Panel.
+- Next: T3.

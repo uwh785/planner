@@ -8,5 +8,7 @@ export interface Event extends SyncMeta {
   startAt: number;
   endAt: number | null;
   allDay: boolean;
+  /** Show on the home panel with a days-left countdown. */
+  remind: boolean;
   color: string;
 }

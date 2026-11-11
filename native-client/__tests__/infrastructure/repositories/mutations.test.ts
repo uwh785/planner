@@ -360,6 +360,7 @@ describe('events', () => {
     expect(e).toMatchObject({
       endAt: null,
       allDay: false,
+      remind: false,
       location: '',
       description: '',
     });
@@ -370,6 +371,7 @@ describe('events', () => {
       start_at: 5000,
       end_at: null,
       all_day: false,
+      remind: false,
       color: '#0A84FF',
     });
     await expect(w.events.create({ title: 'x', startAt: 0 })).rejects.toThrow(
@@ -378,6 +380,24 @@ describe('events', () => {
     await expect(
       w.events.create({ title: 'x', startAt: 10, endAt: 5 }),
     ).rejects.toThrow(/end_at/);
+  });
+
+  it('stores the reminder flag and keeps it when a patch omits it', async () => {
+    const e = await w.events.create({
+      title: 'Recharge',
+      startAt: 5000,
+      remind: true,
+    });
+    expect(e.remind).toBe(true);
+    expect(await payloadOf()).toMatchObject({ remind: true });
+    await w.events.update(e.id, { title: 'Recharge phone' });
+    expect(await w.events.get(e.id)).toMatchObject({
+      title: 'Recharge phone',
+      remind: true,
+    });
+    await w.events.update(e.id, { remind: false });
+    expect((await w.events.get(e.id))!.remind).toBe(false);
+    expect(await payloadOf()).toMatchObject({ remind: false });
   });
 
   it('lists by start time', async () => {

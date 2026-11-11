@@ -26,6 +26,7 @@ function event(patch: Partial<Event> & { startAt: number }): Event {
     location: '',
     endAt: null,
     allDay: false,
+    remind: false,
     color: '',
     updatedAt: 1,
     deleted: false,

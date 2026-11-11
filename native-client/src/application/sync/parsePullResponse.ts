@@ -195,6 +195,7 @@ export function parsePullResponse(body: unknown): ParsedPull {
         startAt,
         endAt,
         allDay: flag(r.all_day),
+        remind: flag(r.remind),
         color: text(r.color),
         ...meta(r),
       };

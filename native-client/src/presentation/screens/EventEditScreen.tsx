@@ -5,7 +5,9 @@ import {
   isEventEndValid,
 } from '@/application/calendar/eventDays';
 import { DEFAULT_EVENT_COLOR } from '@/application/calendar/eventColors';
+import { dateInDays } from '@/application/calendar/reminders';
 import {
+  fromDateInputValue,
   startOfLocalDay,
   toDateInputValue,
   toTimeInputValue,
@@ -15,7 +17,9 @@ import { MessageView } from '../components/molecules/MessageView';
 import { ScreenHeader } from '../components/molecules/ScreenHeader';
 import {
   EventEditForm,
+  SHORTCUT_DAYS,
   type EventFormValues,
+  type ShortcutDays,
 } from '../components/organisms/EventEditForm';
 import { errorSentence } from '../errorMessages';
 import { useDiscardGuard } from '../hooks/useDiscardGuard';
@@ -31,6 +35,7 @@ const sameValues = (a: EventFormValues, b: EventFormValues): boolean =>
   a.title === b.title &&
   a.date === b.date &&
   a.allDay === b.allDay &&
+  a.remind === b.remind &&
   a.startTime === b.startTime &&
   a.endTime === b.endTime &&
   a.location === b.location &&
@@ -84,6 +89,7 @@ export function EventEditScreen({
           title: existing.title,
           date: startOfLocalDay(existing.startAt),
           allDay: existing.allDay,
+          remind: existing.remind,
           startTime: existing.allDay
             ? DEFAULT_START
             : toTimeInputValue(existing.startAt),
@@ -99,6 +105,7 @@ export function EventEditScreen({
           title: '',
           date: startOfLocalDay(date ?? planner.now()),
           allDay: false,
+          remind: false,
           startTime: DEFAULT_START,
           endTime: '',
           location: '',
@@ -171,6 +178,16 @@ export function EventEditScreen({
     }
   }
 
+  // A shortcut counts from today, whatever day the form is on. The new date
+  // differs from the seed, so it also makes the form dirty and the times
+  // touched.
+  function applyShortcut(days: ShortcutDays) {
+    const picked = fromDateInputValue(dateInDays(planner.now(), days));
+    if (picked !== null) {
+      change({ date: picked, remind: true });
+    }
+  }
+
   async function pickClock(which: 'startTime' | 'endTime') {
     const picked = await pickTime(
       dateAtTime(values![which] || values!.startTime),
@@ -200,6 +217,7 @@ export function EventEditScreen({
       description: values!.description,
       location: values!.location,
       allDay: values!.allDay,
+      remind: values!.remind,
       color: values!.color,
     };
     setBusy(true);
@@ -242,6 +260,11 @@ export function EventEditScreen({
     ]);
   }
 
+  const today = planner.now();
+  const formDate = toDateInputValue(values.date);
+  const shortcut =
+    SHORTCUT_DAYS.find(days => dateInDays(today, days) === formDate) ?? null;
+
   return (
     <Frame>
       <ScreenHeader
@@ -250,7 +273,8 @@ export function EventEditScreen({
       />
       <EventEditForm
         values={values}
-        dateText={dateText(values.date, planner.now(), i18n.locale)}
+        dateText={dateText(values.date, today, i18n.locale)}
+        shortcut={shortcut}
         titleError={titleError}
         startError={startError}
         endError={endError}
@@ -259,6 +283,7 @@ export function EventEditScreen({
         editing={editing}
         onChange={change}
         onPickDate={pickDay}
+        onShortcut={applyShortcut}
         onPickStart={() => pickClock('startTime')}
         onPickEnd={() => pickClock('endTime')}
         onSave={save}

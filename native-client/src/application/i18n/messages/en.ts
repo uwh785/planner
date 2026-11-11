@@ -296,6 +296,14 @@ export const en: Record<keyof typeof es, Message> = {
   eventsDayTitle: 'Events',
   eventsUpcomingTitle: 'Upcoming events',
   dashboardTodayEvents: "Today's events",
+  eventRemind: 'Remind me on the home panel',
+  eventShortcuts: 'Date shortcuts',
+  eventInDays: 'In {count} days',
+  dashboardReminders: 'Reminders',
+  reminderDaysLeft: {
+    one: '{count} day left',
+    other: '{count} days left',
+  },
 
   // Config (web wording where it exists)
   configTitle: 'Settings',

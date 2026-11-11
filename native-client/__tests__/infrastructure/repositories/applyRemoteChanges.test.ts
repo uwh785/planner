@@ -114,6 +114,7 @@ describe('applying a pull response', () => {
           start_at: 1000,
           end_at: null,
           all_day: true,
+          remind: true,
           color: '#abc',
           updated_at: 15,
           deleted: false,
@@ -151,6 +152,7 @@ describe('applying a pull response', () => {
     expect((await w.events.list())[0]).toMatchObject({
       id: 'evt_a',
       allDay: true,
+      remind: true,
       endAt: null,
     });
     expect(await outboxRows(w.db)).toEqual([]);

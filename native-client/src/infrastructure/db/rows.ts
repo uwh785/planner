@@ -66,5 +66,6 @@ export interface EventRow extends SyncColumns {
   start_at: number;
   end_at: number | null;
   all_day: number;
+  remind: number;
   color: string;
 }

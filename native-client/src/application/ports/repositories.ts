@@ -186,6 +186,8 @@ export interface NewEvent {
   description?: string;
   location?: string;
   allDay?: boolean;
+  /** Show on the home panel with a countdown; off when omitted. */
+  remind?: boolean;
   color?: string;
 }
 export type EventPatch = Partial<NewEvent>;

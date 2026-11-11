@@ -47,6 +47,7 @@ export const ACCEPTED_FIELDS: Record<string, Record<string, Check>> = {
     start_at: int,
     end_at: nullable(int),
     all_day: bool,
+    remind: bool,
     color: str,
   },
 };

@@ -7,9 +7,11 @@ import type { MessageRef } from '@/application/i18n';
 import { Announcement } from '../molecules/Announcement';
 import { StatTile } from '../molecules/StatTile';
 import { TaskCard, type TaskCardModel } from '../molecules/TaskCard';
+import { Reminders } from './Reminders';
 import { TodayClasses } from './TodayClasses';
 import { TodayEvents } from './TodayEvents';
 import type { EventCardModel } from '../../format/eventCardModel';
+import type { ReminderModel } from '../../format/remindersModel';
 import type { TodayClassesModel } from '../../format/todayClassesModel';
 
 export interface PanelCounts {
@@ -24,6 +26,8 @@ interface PanelViewProps {
   header: React.ReactNode;
   counts: PanelCounts;
   active: readonly TaskCardModel[];
+  /** Flagged events from today on, soonest first; empty when there are none. */
+  reminders?: readonly ReminderModel[];
   /** Today's events, all-day first; empty (or omitted) when the day has none. */
   todayEvents?: readonly EventCardModel[];
   onOpenEvent?: (id: string) => void;
@@ -84,6 +88,7 @@ export function PanelView({
   header,
   counts,
   active,
+  reminders = [],
   todayEvents = [],
   onOpenEvent = noop,
   todayClasses = null,
@@ -125,6 +130,9 @@ export function PanelView({
             tone="danger"
           />
         </View>
+        {reminders.length > 0 ? (
+          <Reminders reminders={reminders} onOpenEvent={onOpenEvent} />
+        ) : null}
         {todayEvents.length > 0 ? (
           <TodayEvents events={todayEvents} onOpenEvent={onOpenEvent} />
         ) : null}

@@ -264,6 +264,64 @@ describe('add an event', () => {
     });
   });
 
+  it('leaves the reminder off unless the user turns it on', async () => {
+    await openAdd();
+    const remind = screen.getByRole('switch', {
+      name: 'Remind me on the home panel',
+    });
+    expect(remind.props.value).toBe(false);
+    fireEvent.changeText(screen.getByLabelText('Title'), 'Exam');
+    fireEvent(remind, 'valueChange', true);
+    fireEvent.press(screen.getByRole('button', { name: 'Save' }));
+    await screen.findByRole('header', { name: 'Calendar' });
+    expect((await env.world.events.list())[0]).toMatchObject({
+      remind: true,
+      startAt: at(9, 25, 9),
+    });
+  });
+
+  it('sets the date N days from today and turns the reminder on with a shortcut', async () => {
+    await openAdd();
+    fireEvent.changeText(screen.getByLabelText('Title'), 'Recharge');
+    const shortcuts = ['In 30 days', 'In 60 days', 'In 90 days'].map(name =>
+      screen.getByRole('radio', { name }),
+    );
+    expect(shortcuts.map(s => s.props.accessibilityState.selected)).toEqual([
+      false,
+      false,
+      false,
+    ]);
+    fireEvent.press(shortcuts[1]!);
+    // 60 days after Oct 22 (today), not after the day the form opened on.
+    await screen.findByRole('button', { name: 'Date, Dec 21' });
+    expect(
+      screen.getByRole('switch', { name: 'Remind me on the home panel' }).props
+        .value,
+    ).toBe(true);
+    expect(
+      screen.getByRole('radio', { name: 'In 60 days' }).props
+        .accessibilityState,
+    ).toMatchObject({ selected: true });
+    fireEvent.press(screen.getByRole('button', { name: 'Save' }));
+    await screen.findByRole('header', { name: 'Calendar' });
+    expect((await env.world.events.list())[0]).toMatchObject({
+      remind: true,
+      startAt: at(9, 22 + 60, 9),
+      endAt: null,
+    });
+  });
+
+  it('asks before discarding a date picked with a shortcut', async () => {
+    await openAdd();
+    fireEvent.press(screen.getByRole('radio', { name: 'In 90 days' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Back' }));
+    expect(alert).toHaveBeenCalledWith(
+      'Discard changes?',
+      'Your edits to this event are not saved.',
+      expect.any(Array),
+    );
+  });
+
   it('asks before discarding an unsaved event', async () => {
     await openAdd();
     fireEvent.changeText(screen.getByLabelText('Title'), 'Exam');
@@ -320,6 +378,47 @@ describe('edit and delete an event', () => {
       startAt: at(9, 22, 14),
       endAt: at(9, 24, 11),
     });
+  });
+
+  it('moves an existing event with a shortcut, keeping its time', async () => {
+    const created = await openEdit();
+    fireEvent.press(screen.getByRole('radio', { name: 'In 30 days' }));
+    await screen.findByRole('button', { name: 'Date, Nov 21' });
+    fireEvent.press(screen.getByRole('button', { name: 'Save' }));
+    await screen.findByRole('header', { name: 'Calendar' });
+    expect(await env.world.events.get(created.id)).toMatchObject({
+      remind: true,
+      startAt: at(10, 21, 14),
+      endAt: null,
+    });
+  });
+
+  it('saves only the reminder of a multi-day event, keeping its dates', async () => {
+    const created = await openEdit({ endAt: at(9, 24, 11) });
+    fireEvent(
+      screen.getByRole('switch', { name: 'Remind me on the home panel' }),
+      'valueChange',
+      true,
+    );
+    fireEvent.press(screen.getByRole('button', { name: 'Save' }));
+    await screen.findByRole('header', { name: 'Calendar' });
+    expect(await env.world.events.get(created.id)).toMatchObject({
+      remind: true,
+      startAt: at(9, 22, 14),
+      endAt: at(9, 24, 11),
+    });
+  });
+
+  it('shows the stored reminder and can turn it off', async () => {
+    const created = await openEdit({ remind: true });
+    const remind = screen.getByRole('switch', {
+      name: 'Remind me on the home panel',
+    });
+    expect(remind.props.value).toBe(true);
+    fireEvent(remind, 'valueChange', false);
+    fireEvent.press(screen.getByRole('button', { name: 'Save' }));
+    await screen.findByRole('header', { name: 'Calendar' });
+    expect((await env.world.events.get(created.id))!.remind).toBe(false);
   });
 
   it('shows a custom color as its own row', async () => {

@@ -30,6 +30,24 @@ describe('parsePullResponse', () => {
     });
   });
 
+  it('reads the event reminder flag, off when the server omits it', () => {
+    const row = { event_id: 'evt_a', title: 'e', start_at: 1000 };
+    const parsed = parsePullResponse({
+      events: [
+        { ...row, remind: true },
+        { ...row, event_id: 'evt_b', remind: 1 },
+        { ...row, event_id: 'evt_c' },
+        { ...row, event_id: 'evt_d', remind: false },
+      ],
+    });
+    expect(parsed.events.rows.map(e => e.remind)).toEqual([
+      true,
+      true,
+      false,
+      false,
+    ]);
+  });
+
   it('treats absent or wrongly typed collections as empty', () => {
     const parsed = parsePullResponse({ tasks: 'x', lists: {}, events: null });
     expect(parsed.cursor).toBeNull();

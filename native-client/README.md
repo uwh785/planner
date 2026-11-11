@@ -17,7 +17,7 @@ On an emulator, if the app cannot reach Metro, run `adb reverse tcp:8081 tcp:808
 
 Auth screens (sign in, create account) gate the app: signed out shows them, a stored session restores offline straight into the Panel. The signed-in app is the web app's mobile version (React Navigation: a native stack over bottom tabs):
 
-- **Panel**: the four counters (pending, in progress, completed, overdue, computed locally with the web's rules) and the active tasks as cards with a countdown ring, the time left and Pause and Complete.
+- **Panel**: the four counters (pending, in progress, completed, overdue, computed locally with the web's rules) and the active tasks as cards with a countdown ring, the time left and Pause and Complete. Above today's events, a **Reminders** block lists the events flagged "Remind me on the home panel" from today on, soonest first, with the days left (the event form also sets the date with "In 30 / 60 / 90 days").
 - **Tasks**: quick add (into the selected list), the web's status filters (All, Pending, In Progress, Completed, Overdue), a list filter (chips), open task cards (Start or Pause, and Complete) and a collapsed Completed section.
 - **Config**: language, list management (create, rename, recolor, delete), the account and Sign out, the discreet sync status line and, in debug builds, the development items.
 - **Task detail** (tap any card): the web's detail screen with the ring card that counts down while the task runs, Start / Pause / Complete, priority, due date, status and subtasks (add, check off, delete); the pencil opens the edit screen (which also sets the estimated duration) and the trash deletes after a confirmation.

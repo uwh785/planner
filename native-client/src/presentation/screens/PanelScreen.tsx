@@ -3,6 +3,7 @@ import { Frame } from '../components/atoms/Screen';
 import { InlineMessage } from '../components/atoms/InlineMessage';
 import { ScreenHeader } from '../components/molecules/ScreenHeader';
 import { PanelView } from '../components/organisms/PanelView';
+import { remindersModel } from '../format/remindersModel';
 import { taskCardModel } from '../format/taskCardModel';
 import { todayEventsModel } from '../format/todayEventsModel';
 import { todayClassesModel } from '../format/todayClassesModel';
@@ -34,6 +35,8 @@ export function PanelScreen({ navigation }: TabScreenProps<'Panel'>) {
   const notice = useNotice();
   useFlushCompletionOnLeave();
   const data = dashboard.status === 'loading' ? null : dashboard.data;
+  const events =
+    stored.status === 'loading' || !stored.data ? null : stored.data.events;
   const header = <ScreenHeader title={t('dashboardTitle')} />;
 
   return (
@@ -43,11 +46,8 @@ export function PanelScreen({ navigation }: TabScreenProps<'Panel'>) {
           header={header}
           counts={data.counts}
           active={data.active.map(task => taskCardModel(task, now, i18n))}
-          todayEvents={
-            stored.status === 'loading' || !stored.data
-              ? []
-              : todayEventsModel(stored.data.events, now, t)
-          }
+          reminders={events ? remindersModel(events, now, t) : []}
+          todayEvents={events ? todayEventsModel(events, now, t) : []}
           onOpenEvent={eventId => navigation.navigate('EventEdit', { eventId })}
           todayClasses={
             schedule.status === 'loading' || !schedule.data

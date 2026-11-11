@@ -294,6 +294,14 @@ export const es = {
   eventsDayTitle: 'Eventos',
   eventsUpcomingTitle: 'Próximos eventos',
   dashboardTodayEvents: 'Eventos de hoy',
+  eventRemind: 'Recordar en inicio',
+  eventShortcuts: 'Atajos de fecha',
+  eventInDays: 'En {count} días',
+  dashboardReminders: 'Recordatorios',
+  reminderDaysLeft: {
+    one: 'Falta {count} día',
+    other: 'Faltan {count} días',
+  },
 
   // Config (web wording where it exists)
   configTitle: 'Configuración',

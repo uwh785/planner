@@ -80,5 +80,6 @@ export const eventPayload = (e: Event): Body => ({
   start_at: e.startAt,
   end_at: e.endAt,
   all_day: e.allDay,
+  remind: e.remind,
   color: e.color,
 });

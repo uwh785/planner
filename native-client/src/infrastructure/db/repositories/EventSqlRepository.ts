@@ -42,6 +42,7 @@ export class EventSqlRepository implements EventRepository {
       startAt: input.startAt,
       endAt: input.endAt ?? null,
       allDay: input.allDay ?? false,
+      remind: input.remind ?? false,
       color: input.color ?? '',
       updatedAt: now,
       deleted: false,
