@@ -26,7 +26,12 @@ type Event struct {
 	EndAt       *int64 `json:"end_at"`
 	AllDay      bool   `json:"all_day"`
 	Color       string `json:"color"`
-	UpdatedAt   int64  `json:"updated_at"`
+	// Remind flags the event for the home panel countdown. It is a pointer so
+	// a request that omits it (a client that predates the field) is told apart
+	// from an explicit false: an update keeps the stored value when it is nil.
+	// Events read from the store always carry a non-nil value.
+	Remind    *bool `json:"remind"`
+	UpdatedAt int64 `json:"updated_at"`
 }
 
 // ValidateEvent trims and validates e in place, returning an error describing

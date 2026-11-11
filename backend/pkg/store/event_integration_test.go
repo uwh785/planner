@@ -139,3 +139,79 @@ func TestEventsIntegration(t *testing.T) {
 		t.Errorf("ListEvents after delete: got %+v, want only the point event", remaining)
 	}
 }
+
+// TestEventRemindIntegration checks that remind always reads back as a
+// concrete boolean and that an update which omits it keeps the stored value.
+func TestEventRemindIntegration(t *testing.T) {
+	s, pool, user := newTestStore(t)
+	t.Cleanup(func() {
+		if _, err := pool.Exec(context.Background(), `DELETE FROM events WHERE user_id = $1`, user.UserID); err != nil {
+			t.Errorf("cleanup: delete events: %v", err)
+		}
+	})
+
+	boolPtr := func(v bool) *bool { return &v }
+	remindOf := func(eventID string) bool {
+		t.Helper()
+		got, err := s.GetEvent(user.UserID, eventID)
+		if err != nil {
+			t.Fatalf("GetEvent: %v", err)
+		}
+		if got.Remind == nil {
+			t.Fatal("GetEvent: remind is nil, want a concrete boolean")
+		}
+		return *got.Remind
+	}
+
+	plain, err := s.CreateEvent(user.UserID, model.Event{Title: "Plain", StartAt: 1000})
+	if err != nil {
+		t.Fatalf("CreateEvent (plain): %v", err)
+	}
+	if plain.Remind == nil || *plain.Remind {
+		t.Errorf("CreateEvent without remind: returned remind = %v, want false", plain.Remind)
+	}
+	if remindOf(plain.EventID) {
+		t.Error("CreateEvent without remind: stored remind = true, want false")
+	}
+
+	flagged, err := s.CreateEvent(user.UserID, model.Event{Title: "Recharge", StartAt: 2000, Remind: boolPtr(true)})
+	if err != nil {
+		t.Fatalf("CreateEvent (flagged): %v", err)
+	}
+	if flagged.Remind == nil || !*flagged.Remind {
+		t.Errorf("CreateEvent with remind: returned remind = %v, want true", flagged.Remind)
+	}
+	if !remindOf(flagged.EventID) {
+		t.Error("CreateEvent with remind: stored remind = false, want true")
+	}
+
+	updates := []struct {
+		name   string
+		remind *bool
+		want   bool
+	}{
+		{name: "absent keeps true", remind: nil, want: true},
+		{name: "false clears it", remind: boolPtr(false), want: false},
+		{name: "absent keeps false", remind: nil, want: false},
+		{name: "true sets it", remind: boolPtr(true), want: true},
+	}
+	for _, tt := range updates {
+		t.Run(tt.name, func(t *testing.T) {
+			err := s.UpdateEvent(user.UserID, model.Event{EventID: flagged.EventID, Title: "Recharge", StartAt: 2000, Remind: tt.remind})
+			if err != nil {
+				t.Fatalf("UpdateEvent: %v", err)
+			}
+			if got := remindOf(flagged.EventID); got != tt.want {
+				t.Errorf("remind after update = %v, want %v", got, tt.want)
+			}
+		})
+	}
+
+	all, err := s.ListEvents(user.UserID, nil, nil)
+	if err != nil {
+		t.Fatalf("ListEvents: %v", err)
+	}
+	if len(all) != 2 || all[0].Remind == nil || *all[0].Remind || all[1].Remind == nil || !*all[1].Remind {
+		t.Errorf("ListEvents: got %+v, want remind [false, true]", all)
+	}
+}

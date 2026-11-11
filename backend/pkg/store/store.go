@@ -1077,12 +1077,12 @@ func (s *Store) DeleteClass(userID, classID string) error {
 // ──────────────────────────── Events ─────────────────────────
 
 const eventColumns = `user_id, event_id, title, description, location, start_at, end_at,
-	all_day, color, updated_at`
+	all_day, color, remind, updated_at`
 
 func scanEvent(row pgx.Row) (model.Event, error) {
 	var e model.Event
 	err := row.Scan(&e.UserID, &e.EventID, &e.Title, &e.Description, &e.Location,
-		&e.StartAt, &e.EndAt, &e.AllDay, &e.Color, &e.UpdatedAt)
+		&e.StartAt, &e.EndAt, &e.AllDay, &e.Color, &e.Remind, &e.UpdatedAt)
 	return e, err
 }
 
@@ -1134,14 +1134,20 @@ func (s *Store) CreateEvent(userID string, e model.Event) (model.Event, error) {
 	if e.Color == "" {
 		e.Color = "#0A84FF"
 	}
+	if e.Remind == nil {
+		// Set here, not by the column default, so the returned event carries
+		// a concrete boolean like every other read.
+		remind := false
+		e.Remind = &remind
+	}
 	e.UpdatedAt = time.Now().UnixMilli()
 	tag, err := s.pool.Exec(context.Background(),
 		`INSERT INTO events (user_id, event_id, title, description, location, start_at, end_at,
-		        all_day, color, updated_at, deleted)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 0)
+		        all_day, color, remind, updated_at, deleted)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 0)
 		 ON CONFLICT (event_id) DO NOTHING`,
 		e.UserID, e.EventID, e.Title, e.Description, e.Location, e.StartAt, e.EndAt,
-		e.AllDay, e.Color, e.UpdatedAt,
+		e.AllDay, e.Color, e.Remind, e.UpdatedAt,
 	)
 	return e, createResult(tag, err)
 }
@@ -1155,14 +1161,18 @@ func (s *Store) ReplayEvent(userID, eventID string) (model.Event, error) {
 	return s.GetEvent(userID, eventID)
 }
 
+// UpdateEvent replaces every column of the event except remind, which keeps
+// its stored value when e.Remind is nil: a client that predates the field
+// omits it and must not reset it.
 func (s *Store) UpdateEvent(userID string, e model.Event) error {
 	e.UpdatedAt = time.Now().UnixMilli()
 	tag, err := s.pool.Exec(context.Background(),
 		`UPDATE events SET title = $3, description = $4, location = $5, start_at = $6,
-		        end_at = $7, all_day = $8, color = $9, updated_at = $10
+		        end_at = $7, all_day = $8, color = $9, remind = COALESCE($10, remind),
+		        updated_at = $11
 		 WHERE user_id = $1 AND event_id = $2 AND deleted = 0`,
 		userID, e.EventID, e.Title, e.Description, e.Location, e.StartAt, e.EndAt,
-		e.AllDay, e.Color, e.UpdatedAt,
+		e.AllDay, e.Color, e.Remind, e.UpdatedAt,
 	)
 	if err != nil {
 		return err

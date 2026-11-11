@@ -184,7 +184,7 @@ func (s *Store) SyncChanges(userID string, since int64) (SyncChanges, error) {
 		userID, since,
 		func(r pgx.Rows, e *model.Event, deleted *int) error {
 			return r.Scan(&e.UserID, &e.EventID, &e.Title, &e.Description, &e.Location, &e.StartAt, &e.EndAt,
-				&e.AllDay, &e.Color, &e.UpdatedAt, deleted)
+				&e.AllDay, &e.Color, &e.Remind, &e.UpdatedAt, deleted)
 		}); err != nil {
 		return SyncChanges{}, err
 	}

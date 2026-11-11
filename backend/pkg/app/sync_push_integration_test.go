@@ -194,6 +194,27 @@ func TestSyncPushIntegration(t *testing.T) {
 	}
 	if ev, err := s.GetEvent(owner.UserID, evt); err != nil || ev.Title != "Exam2" {
 		t.Errorf("event after replay = %+v, err %v, want title Exam2", ev, err)
+	} else if ev.Remind == nil || *ev.Remind {
+		t.Errorf("event pushed without remind = %v, want false", ev.Remind)
+	}
+
+	// remind is optional on an upsert of an existing event: a client that
+	// predates the field omits it and must not reset the stored value.
+	remindPushes := []struct {
+		name   string
+		remind string
+		want   bool
+	}{
+		{name: "true sets it", remind: `,"remind":true`, want: true},
+		{name: "absent keeps true", remind: "", want: true},
+		{name: "false clears it", remind: `,"remind":false`, want: false},
+	}
+	for _, tt := range remindPushes {
+		results = push(owner.UserID, fmt.Sprintf(`{"entity":"event","op":"upsert","id":%q,"data":{"title":"Exam2","start_at":1000%s}}`, evt, tt.remind), 1)
+		expect(results[0], "event", "applied", http.StatusOK)
+		if ev, err := s.GetEvent(owner.UserID, evt); err != nil || ev.Remind == nil || *ev.Remind != tt.want {
+			t.Errorf("%s: event = %+v, err %v, want remind %v", tt.name, ev, err, tt.want)
+		}
 	}
 	if tags, err := s.ListTags(owner.UserID); err != nil || len(tags) != 1 || tags[0].Name != "Tag2" {
 		t.Errorf("tags after replay = %+v, err %v, want one renamed tag", tags, err)

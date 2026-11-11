@@ -173,6 +173,7 @@ func main() {
 			CHECK (end_at IS NULL OR end_at >= start_at)
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_events_user_start ON events(user_id, start_at)`,
+		`ALTER TABLE events ADD COLUMN IF NOT EXISTS remind BOOLEAN NOT NULL DEFAULT false`,
 		// Offline sync: tags and task_tags gain the change-tracking columns the
 		// other synced tables already have, so deletes can be reported as tombstones.
 		`ALTER TABLE tags ADD COLUMN IF NOT EXISTS updated_at BIGINT DEFAULT 0`,

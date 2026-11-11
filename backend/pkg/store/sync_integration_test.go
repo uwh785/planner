@@ -108,7 +108,8 @@ func TestSyncChangesIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateClass: %v", err)
 	}
-	event, err := s.CreateEvent(owner.UserID, model.Event{Title: "event", StartAt: 1000})
+	remind := true
+	event, err := s.CreateEvent(owner.UserID, model.Event{Title: "event", StartAt: 1000, Remind: &remind})
 	if err != nil {
 		t.Fatalf("CreateEvent: %v", err)
 	}
@@ -174,6 +175,8 @@ func TestSyncChangesIntegration(t *testing.T) {
 	}
 	if len(got.Events) != 1 || got.Events[0].Row.EventID != event.EventID {
 		t.Errorf("events = %+v, want the owner's event", got.Events)
+	} else if r := got.Events[0].Row.Remind; r == nil || !*r {
+		t.Errorf("events[0].remind = %v, want true", r)
 	}
 	for _, id := range []string{otherList.ListID, otherTask.TaskID, otherTag.TagID} {
 		for _, r := range got.Lists {
