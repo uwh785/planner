@@ -12,7 +12,7 @@ The user (2026-11-11) wants to record things like "I recharged today, remind me 
 ## Scope
 - New boolean `remind` on events (JSON `remind`, default false): "show on the home panel with a countdown".
 - Event form: a "Remind me on the home panel" switch and three shortcuts, "In 30 days", "In 60 days", "In 90 days". A shortcut sets the date to today plus N local days and turns the switch on.
-- Home panel: a "Reminders" block listing flagged events whose start day is today or later, soonest first, each with "N days left" ("Tomorrow", "Today" for 1 and 0). The block is absent when there are none. Past reminders drop off.
+- Home panel: a "Reminders" block listing flagged events whose start day is tomorrow or later, soonest first, each with "N days left" ("Tomorrow" for 1). On its own day the event is only under "Today's events" (user, 2026-11-13, after review). The block is absent when there are none. Past reminders drop off.
 - Backend, native client and web.
 
 ## Out of scope
@@ -35,7 +35,7 @@ The user (2026-11-11) wants to record things like "I recharged today, remind me 
 - POST/PUT `/api/events` round-trips `remind`; a PUT or sync push without `remind` leaves the stored value unchanged; pull returns it.
 - Natively, an event created offline with the switch on appears under "Reminders" on the Panel with the right day count, survives restart, and syncs.
 - "In 60 days" on 2026-11-11 sets the date to 2027-01-10 and the Panel reads "60 days left".
-- A flagged event for today reads "Today"; one from yesterday is not listed.
+- A flagged event for tomorrow reads "Tomorrow"; one for today shows only under "Today's events"; one from yesterday is not listed.
 - `go test ./...`, native `typecheck`, `lint`, `test`, and web `npm run build` pass.
 
 ## Delivery
@@ -65,4 +65,11 @@ The user (2026-11-11) wants to record things like "I recharged today, remind me 
 - 2026-11-13: parent spot check of T3: `npm run build` ok; `remind` reaches POST/PUT bodies unchanged; `ListEvents` with `from` only returns events with `COALESCE(end_at, start_at) >= from`, and `upcomingReminders` drops the ones that started before today, as scoped.
 - 2026-11-13: fixed the hanging `syncStatus.test.tsx`. Cause: "keeps its relative time fresh" faked every timer, `setImmediate` included, which React's scheduler uses in Node, so `act()` never settled (a Node report showed an idle event loop, not a busy one). Toggling `doNotFake` one at a time isolated `setImmediate`; the test now keeps it real. Limit: the test also passes with `SyncStatusLine`'s own interval broken, because the Panel re-renders on `useNow`; it covers the visible behavior, not that interval.
   - Checks: native `typecheck` clean, `lint` clean, `npm test` 95 of 95 suites, 1092 of 1092 tests passed (the `SubtaskAddField` timeout did not recur).
-- Pending: emulator and browser checks, native review of the reminders range.
+- 2026-11-13: review of `0a8dcc7..HEAD` (medium, 9 findings, unverified by the recipe; parent confirmed the pull and shortcut ones in code). User chose to fix 1, 4, 5, 6 and 9:
+  - Pull keeps the stored `remind` when the server omits it (`PulledEvent`, `pulledEventToRow` drops the column; a new row takes the column default 0), matching the backend rule.
+  - Reminders start tomorrow (native and web), so a reminder on its day is not shown twice.
+  - Web shortcuts read today at the tap; the dashboard derives reminders from a ticking `nowMs` and reloads today's events and reminders when the day changes.
+  - `dueText` reuses `daysUntil`.
+  - Left as is: server-side `remind` filter and the two overlapping web requests (2, 3), shortcut keeping the end time on multi-day events (7, known limit), chip staying active with the switch off (8).
+  - Checks: native typecheck and lint clean, `npm test` 95 of 95 suites, 1093 tests; RED first for the pull and tomorrow-on tests (2 and 3 failures). Web `npm run build` ok; throwaway node script: today excluded, tomorrow 1, 2026-11-11 + 60 = 2027-01-10.
+- Pending: emulator and browser checks.
