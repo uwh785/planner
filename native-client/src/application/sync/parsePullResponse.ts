@@ -25,8 +25,17 @@ export interface ParsedPull {
   tags: Parsed<Tag>;
   taskTags: Parsed<TaskTag>;
   classes: Parsed<ClassSession>;
-  events: Parsed<Event>;
+  events: Parsed<PulledEvent>;
 }
+
+/**
+ * An event as pulled: `remind` is undefined when the server left it out (one
+ * that predates the field), so applying the row keeps the stored flag, as
+ * the backend does for a client that omits it.
+ */
+export type PulledEvent = Omit<Event, 'remind'> & {
+  remind: boolean | undefined;
+};
 
 type Wire = Record<string, unknown>;
 
@@ -195,7 +204,10 @@ export function parsePullResponse(body: unknown): ParsedPull {
         startAt,
         endAt,
         allDay: flag(r.all_day),
-        remind: flag(r.remind),
+        remind:
+          r.remind === undefined || r.remind === null
+            ? undefined
+            : flag(r.remind),
         color: text(r.color),
         ...meta(r),
       };

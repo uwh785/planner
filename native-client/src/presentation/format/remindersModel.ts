@@ -10,7 +10,7 @@ export interface ReminderModel {
   title: string;
   /** "10 jan": the day the event starts. */
   date: string;
-  /** "29 days left", "Tomorrow" or "Today". */
+  /** "29 days left" or "Tomorrow". */
   countdown: string;
   daysLeft: number;
   /** The event's own color, or empty to take the accent. */
@@ -20,9 +20,6 @@ export interface ReminderModel {
 }
 
 function countdownText(daysLeft: number, t: Translate): string {
-  if (daysLeft === 0) {
-    return t('dateToday');
-  }
   if (daysLeft === 1) {
     return t('dateTomorrow');
   }
@@ -30,7 +27,7 @@ function countdownText(daysLeft: number, t: Translate): string {
 }
 
 /**
- * The Panel's reminders: flagged events from today on, soonest first. Empty
+ * The Panel's reminders: flagged events from tomorrow on, soonest first. Empty
  * when there are none (the Panel then shows no block at all).
  */
 export function remindersModel(

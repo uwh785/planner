@@ -9,6 +9,7 @@ import {
   type TaskList,
   type TaskTag,
 } from '@/domain';
+import type { PulledEvent } from '@/application/sync/parsePullResponse';
 import type {
   ClassSessionRow,
   EventRow,
@@ -176,6 +177,18 @@ export const eventToRow = (e: Event): EventRow => ({
   updated_at: e.updatedAt,
   deleted: bit(e.deleted),
 });
+
+/** A pulled event's row; without `remind` when the server omitted it. */
+export const pulledEventToRow = ({
+  remind,
+  ...event
+}: PulledEvent): Omit<EventRow, 'remind'> & { remind?: number } => {
+  const { remind: stored, ...row } = eventToRow({
+    ...event,
+    remind: remind ?? false,
+  });
+  return remind === undefined ? row : { ...row, remind: stored };
+};
 
 export const eventFromRow = (r: EventRow): Event => ({
   id: r.event_id,

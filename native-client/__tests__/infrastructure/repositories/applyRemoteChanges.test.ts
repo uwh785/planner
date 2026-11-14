@@ -158,6 +158,32 @@ describe('applying a pull response', () => {
     expect(await outboxRows(w.db)).toEqual([]);
   });
 
+  it('keeps the stored reminder flag when the server omits it', async () => {
+    const event = {
+      event_id: 'evt_r',
+      title: 'Recharge',
+      start_at: 1000,
+      updated_at: 1,
+    };
+    await w.remoteChanges.applyRemoteChanges({
+      cursor: 1,
+      events: [{ ...event, remind: true }],
+    });
+    await w.remoteChanges.applyRemoteChanges({
+      cursor: 2,
+      events: [{ ...event, title: 'Renamed', updated_at: 2 }],
+    });
+    expect(await w.events.get('evt_r')).toMatchObject({
+      title: 'Renamed',
+      remind: true,
+    });
+    await w.remoteChanges.applyRemoteChanges({
+      cursor: 3,
+      events: [{ ...event, event_id: 'evt_new', updated_at: 3 }],
+    });
+    expect(await w.events.get('evt_new')).toMatchObject({ remind: false });
+  });
+
   it('overwrites an existing synced row with the remote version', async () => {
     await w.remoteChanges.applyRemoteChanges({
       cursor: 1,

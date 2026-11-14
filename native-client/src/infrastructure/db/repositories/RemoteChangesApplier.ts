@@ -11,7 +11,7 @@ import {
 } from '@/application/sync/parsePullResponse';
 import {
   classSessionToRow,
-  eventToRow,
+  pulledEventToRow,
   subtaskToRow,
   tagToRow,
   taskListToRow,
@@ -108,7 +108,7 @@ export class RemoteChangesApplier implements ApplyRemoteChanges {
         'events',
         ['event_id'],
         r => r.id,
-        eventToRow,
+        pulledEventToRow,
       );
       await apply(
         pull.taskTags,

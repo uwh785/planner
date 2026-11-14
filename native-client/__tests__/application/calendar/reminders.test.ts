@@ -49,21 +49,21 @@ describe('daysUntil', () => {
 describe('upcomingReminders', () => {
   const now = at(2026, 10, 11, 15);
 
-  it('keeps flagged events from today on, soonest first, with the days left', () => {
+  it('keeps flagged events from tomorrow on, soonest first, with the days left', () => {
     const far = event({ startAt: at(2027, 0, 10, 9) });
-    const today = event({ startAt: at(2026, 10, 11, 8) });
     const tomorrow = event({ startAt: at(2026, 10, 12, 9) });
-    expect(upcomingReminders([far, today, tomorrow], now)).toEqual([
-      { event: today, daysLeft: 0 },
+    expect(upcomingReminders([far, tomorrow], now)).toEqual([
       { event: tomorrow, daysLeft: 1 },
       { event: far, daysLeft: 60 },
     ]);
   });
 
-  it('drops past reminders and events that are not flagged', () => {
+  it("drops today's and past reminders and events that are not flagged", () => {
     const yesterday = event({ startAt: at(2026, 10, 10, 23) });
+    // On its day the event is already among today's events.
+    const today = event({ startAt: at(2026, 10, 11, 23) });
     const plain = event({ startAt: at(2026, 10, 20), remind: false });
-    expect(upcomingReminders([yesterday, plain], now)).toEqual([]);
+    expect(upcomingReminders([yesterday, today, plain], now)).toEqual([]);
   });
 
   it('keeps the given order for events starting at the same moment', () => {

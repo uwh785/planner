@@ -30,7 +30,7 @@ describe('Panel: reminders', () => {
     expect(screen.queryByText('Reminders')).toBeNull();
   });
 
-  it('lists flagged events soonest first with their countdown, above the events of today', async () => {
+  it('lists flagged events soonest first with their countdown, above the events of today, which hold the one due today', async () => {
     const env = await renderSignedIn();
     await env.world.events.create({
       title: 'Recharge',
@@ -49,11 +49,11 @@ describe('Panel: reminders', () => {
     });
     await settle();
     expect(reminderLabels()).toEqual([
-      'Pay, 22 oct, Today',
       'Renew, 23 oct, Tomorrow',
       'Recharge, 20 nov, 29 days left',
     ]);
     expect(screen.getByText('29 days left')).toBeTruthy();
+    expect(screen.getByText('Pay')).toBeTruthy();
     const headers = screen
       .getAllByRole('header')
       .map(h => h.props.children as string);

@@ -1,11 +1,7 @@
+import { daysUntil } from '@/application/calendar/reminders';
 import { isOverdue, type Task } from '@/domain';
 import type { I18n } from '../i18n/I18nProvider';
 import { dateText, timeText } from './dates';
-
-const startOfDay = (ms: number): number => {
-  const d = new Date(ms);
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-};
 
 /** The date, and the time for a timed due moment: "Dec 3" or "Dec 3, 14:30". */
 export function dueDateTimeText(
@@ -51,9 +47,7 @@ export function dueText(
   if (isOverdue(task, now)) {
     return { text: t('dueOverdue', { date: absolute }), overdue: true };
   }
-  const days = Math.round(
-    (startOfDay(task.dueDate) - startOfDay(now)) / 86_400_000,
-  );
+  const days = daysUntil(task.dueDate, now);
   const dayKey = days === 0 ? 'dateToday' : days === 1 ? 'dateTomorrow' : null;
   if (dayKey === null) {
     return { text: absolute, overdue: false };

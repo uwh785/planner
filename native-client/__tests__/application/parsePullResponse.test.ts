@@ -30,7 +30,7 @@ describe('parsePullResponse', () => {
     });
   });
 
-  it('reads the event reminder flag, off when the server omits it', () => {
+  it('reads the event reminder flag, absent when the server omits it', () => {
     const row = { event_id: 'evt_a', title: 'e', start_at: 1000 };
     const parsed = parsePullResponse({
       events: [
@@ -43,7 +43,7 @@ describe('parsePullResponse', () => {
     expect(parsed.events.rows.map(e => e.remind)).toEqual([
       true,
       true,
-      false,
+      undefined,
       false,
     ]);
   });

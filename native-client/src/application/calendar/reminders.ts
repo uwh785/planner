@@ -16,13 +16,14 @@ export function daysUntil(targetMs: number, nowMs: number): number {
 
 export interface UpcomingReminder<T> {
   event: T;
-  /** 0 today, 1 tomorrow. */
+  /** 1 tomorrow; never 0, see upcomingReminders. */
   daysLeft: number;
 }
 
 /**
- * The events flagged as reminders that start today or later, soonest first
- * (the given order for equal starts), each with the days left.
+ * The events flagged as reminders that start tomorrow or later, soonest first
+ * (the given order for equal starts), each with the days left. On its own day
+ * an event is already among today's events, so it is not repeated here.
  */
 export function upcomingReminders<T extends Pick<Event, 'startAt' | 'remind'>>(
   events: readonly T[],
@@ -31,7 +32,7 @@ export function upcomingReminders<T extends Pick<Event, 'startAt' | 'remind'>>(
   return events
     .filter(event => event.remind && event.startAt > 0)
     .map(event => ({ event, daysLeft: daysUntil(event.startAt, nowMs) }))
-    .filter(reminder => reminder.daysLeft >= 0)
+    .filter(reminder => reminder.daysLeft > 0)
     .sort((a, b) => a.event.startAt - b.event.startAt);
 }
 
