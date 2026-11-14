@@ -250,6 +250,25 @@ export function splitTodayClasses(classes, nowMinute) {
   return { current, next, upcoming };
 }
 
+// Every class of the day by start time, each with its state against
+// `nowMinute`: 'done' once it ended, 'current' for the one in progress,
+// 'next' for the first still to start, else 'later' (a class overlapping the
+// current one included). Mirrors the native Panel's todayClassesModel.
+export function todayClassRows(classes, nowMinute) {
+  const sorted = (Array.isArray(classes) ? classes : []).slice().sort((a, b) => a.start_minute - b.start_minute);
+  const { current, next } = splitTodayClasses(sorted, nowMinute);
+  return sorted.map((c) => ({
+    cls: c,
+    state: c === current ? 'current' : c === next ? 'next' : c.end_minute <= nowMinute ? 'done' : 'later'
+  }));
+}
+
+// "08:00 – 09:00 · A1, Ruiz": the class's range, then room and teacher when set.
+export function classDetail(c) {
+  const place = [c.room, c.teacher].filter(Boolean).join(', ');
+  return [formatTimeRange(c.start_minute, c.end_minute), place].filter(Boolean).join(' · ');
+}
+
 // Builds an event's start_at/end_at (epoch ms) from the form inputs. An
 // all-day event starts at local midnight of its date and has no end; a timed
 // event without an end time also has no end. Returns null when the date or

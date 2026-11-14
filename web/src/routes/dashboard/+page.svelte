@@ -7,7 +7,7 @@
   import EventCard from '$lib/components/EventCard.svelte';
   import ReminderList from '$lib/components/ReminderList.svelte';
   import CountdownRing from '$lib/components/CountdownRing.svelte';
-  import { splitTodayClasses, formatMinuteDuration, formatTimeRange, startOfLocalDay, addDays, sortEvents, upcomingReminders } from '$lib/utils.js';
+  import { todayClassRows, classDetail, formatMinuteDuration, startOfLocalDay, addDays, sortEvents, upcomingReminders } from '$lib/utils.js';
 
   let loading = $state(true);
   let error = $state('');
@@ -88,7 +88,7 @@
     } catch {}
   }
 
-  const todaySplit = $derived(splitTodayClasses(todayClasses, nowMinute));
+  const todayRows = $derived(todayClassRows(todayClasses, nowMinute));
 
   async function loadDashboard() {
     loading = true;
@@ -175,42 +175,38 @@
         <a href="/schedule" class="today-classes-link">{t('scheduleViewLink')}</a>
       </div>
 
-      {#if todaySplit.current}
-        {@const c = todaySplit.current}
-        <div class="today-class-card current" style="--card-color: {c.color || 'var(--accent)'}">
-          <CountdownRing
-            progress={Math.min(Math.max((nowMinute - c.start_minute) / (c.end_minute - c.start_minute), 0), 1)}
-            size={44}
-            strokeWidth={4}
-            status="in_progress"
-          />
-          <div class="today-class-info">
-            <span class="today-class-subject">{c.subject}</span>
-            <span class="today-class-sub">{t('scheduleEndsIn')} {formatMinuteDuration(c.end_minute - nowMinute)}</span>
-          </div>
-        </div>
-      {/if}
-
-      {#if todaySplit.next}
-        {@const n = todaySplit.next}
-        <div class="today-class-card next" style="--card-color: {n.color || 'var(--accent)'}">
-          <div class="today-class-info">
-            <span class="today-class-subject">{n.subject}</span>
-            <span class="today-class-sub">{t('scheduleStartsIn')} {formatMinuteDuration(n.start_minute - nowMinute)}</span>
-          </div>
-        </div>
-      {/if}
-
-      {#if todaySplit.upcoming.length > 0}
-        <div class="today-class-rest">
-          {#each todaySplit.upcoming as u (u.class_id)}
-            <div class="today-class-mini" style="--card-color: {u.color || 'var(--accent)'}">
-              <span class="mini-subject">{u.subject}</span>
-              <span class="mini-time">{formatTimeRange(u.start_minute, u.end_minute)}</span>
+      {#each todayRows as { cls: c, state } (c.class_id)}
+        {#if state === 'current'}
+          <div class="today-class-card current" style="--card-color: {c.color || 'var(--accent)'}">
+            <CountdownRing
+              progress={Math.min(Math.max((nowMinute - c.start_minute) / (c.end_minute - c.start_minute), 0), 1)}
+              size={44}
+              strokeWidth={4}
+              status="in_progress"
+            />
+            <div class="today-class-info">
+              <span class="today-class-subject">{c.subject}</span>
+              <span class="today-class-sub">{t('scheduleEndsIn')} {formatMinuteDuration(c.end_minute - nowMinute)}</span>
+              <span class="today-class-sub">{classDetail(c)}</span>
             </div>
-          {/each}
-        </div>
-      {/if}
+          </div>
+        {:else if state === 'next'}
+          <div class="today-class-card next" style="--card-color: {c.color || 'var(--accent)'}">
+            <div class="today-class-info">
+              <span class="today-class-subject">{c.subject}</span>
+              <span class="today-class-sub">{t('scheduleStartsIn')} {formatMinuteDuration(c.start_minute - nowMinute)}</span>
+              <span class="today-class-sub">{classDetail(c)}</span>
+            </div>
+          </div>
+        {:else}
+          <div class="today-class-mini" class:done={state === 'done'} style="--card-color: {c.color || 'var(--accent)'}">
+            <span class="mini-subject">{c.subject}</span>
+            <span class="mini-time">
+              {#if state === 'done'}<span class="visually-hidden">{t('scheduleClassDone')}, </span>{/if}{classDetail(c)}
+            </span>
+          </div>
+        {/if}
+      {/each}
     </section>
   {/if}
 
@@ -406,22 +402,31 @@
     color: var(--text2);
   }
 
-  .today-class-rest {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-
   .today-class-mini {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
+    gap: 4px 8px;
     padding: 8px 10px;
     border-radius: 8px;
     background: var(--surface2);
     border-left: 3px solid var(--card-color);
     font-size: 13px;
+  }
+
+  /* An ended class stays listed, dimmed. */
+  .today-class-mini.done {
+    opacity: 0.55;
+  }
+
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
   }
 
   .mini-subject {

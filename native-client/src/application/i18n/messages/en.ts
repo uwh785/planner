@@ -228,6 +228,7 @@ export const en: Record<keyof typeof es, Message> = {
   scheduleTodayTitle: "Today's classes",
   scheduleEndsIn: 'Ends in',
   scheduleStartsIn: 'Starts in',
+  scheduleClassDone: 'Finished',
   scheduleLoadError: "Couldn't read your schedule.",
   scheduleGoneTitle: 'This class no longer exists',
   scheduleGoneBody: 'It was deleted. Nothing is left to edit.',

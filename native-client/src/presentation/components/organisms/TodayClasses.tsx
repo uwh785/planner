@@ -50,14 +50,16 @@ const makeStyles = (t: Theme) => ({
     flex: 1,
   },
   sub: { ...t.typography.callout, color: t.colors.textMuted },
-  rest: { gap: t.spacing.xxs },
   mini: {
     minHeight: t.minTouch,
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
-    gap: t.spacing.xs,
+    gap: t.spacing.sm,
     paddingHorizontal: t.spacing.md,
+    paddingVertical: t.spacing.xs,
   },
+  // An ended class stays listed, dimmed.
+  done: { opacity: 0.55 },
   miniSubject: { ...t.typography.body, color: t.colors.text, flex: 1 },
 });
 
@@ -75,28 +77,53 @@ function Subject({ model }: { model: TodayClassModel }) {
 function MiniRow({ model }: { model: TodayClassModel }) {
   const styles = useStyles(makeStyles);
   const { colors } = useTheme();
+  const done = model.state === 'done';
   return (
     <View
       accessible
-      accessibilityLabel={`${model.subject}, ${model.time}`}
-      style={styles.mini}
+      accessibilityLabel={model.spoken}
+      style={[styles.mini, done && styles.done]}
     >
       <ColorDot color={model.color || colors.accent} size={12} />
-      <Text style={styles.miniSubject}>{model.subject}</Text>
-      <Text style={styles.sub}>{model.time}</Text>
+      <View style={styles.info}>
+        <Text style={styles.miniSubject}>{model.subject}</Text>
+        <Text style={styles.sub}>{model.detail}</Text>
+      </View>
+    </View>
+  );
+}
+
+function CardRow({ model }: { model: TodayClassModel }) {
+  const styles = useStyles(makeStyles);
+  const current = model.state === 'current';
+  return (
+    <View
+      accessible
+      accessibilityLabel={model.spoken}
+      style={[styles.card, current && styles.current]}
+    >
+      {current ? (
+        <CountdownRing progress={model.progress} status="in_progress" />
+      ) : null}
+      <View style={styles.info}>
+        <Subject model={model} />
+        <Text style={styles.sub}>{model.countdown}</Text>
+        <Text style={styles.sub}>{model.detail}</Text>
+      </View>
     </View>
   );
 }
 
 /**
- * The Panel's "Today's classes" block, as on the web: the class in progress
- * with its ring and "Ends in …", the next one with "Starts in …", then the
- * rest as small rows. The countdown is always written; the ring only repeats it.
+ * The Panel's "Today's classes" block: the whole day by start time. The class
+ * in progress is a card with its ring and "Ends in …", the next one a card
+ * with "Starts in …", the rest small rows, the ended ones dimmed. Every row
+ * shows its time, room and teacher. The countdown is always written; the ring
+ * only repeats it.
  */
 export function TodayClasses({ model, onViewSchedule }: TodayClassesProps) {
   const t = useT();
   const styles = useStyles(makeStyles);
-  const { current, next, upcoming } = model;
   return (
     <View style={styles.section}>
       <View style={styles.header}>
@@ -109,38 +136,13 @@ export function TodayClasses({ model, onViewSchedule }: TodayClassesProps) {
           onPress={onViewSchedule}
         />
       </View>
-      {current ? (
-        <View
-          accessible
-          accessibilityLabel={`${current.subject}, ${current.countdown}`}
-          style={[styles.card, styles.current]}
-        >
-          <CountdownRing progress={current.progress} status="in_progress" />
-          <View style={styles.info}>
-            <Subject model={current} />
-            <Text style={styles.sub}>{current.countdown}</Text>
-          </View>
-        </View>
-      ) : null}
-      {next ? (
-        <View
-          accessible
-          accessibilityLabel={`${next.subject}, ${next.countdown}`}
-          style={styles.card}
-        >
-          <View style={styles.info}>
-            <Subject model={next} />
-            <Text style={styles.sub}>{next.countdown}</Text>
-          </View>
-        </View>
-      ) : null}
-      {upcoming.length > 0 ? (
-        <View style={styles.rest}>
-          {upcoming.map(item => (
-            <MiniRow key={item.id} model={item} />
-          ))}
-        </View>
-      ) : null}
+      {model.items.map(item =>
+        item.state === 'current' || item.state === 'next' ? (
+          <CardRow key={item.id} model={item} />
+        ) : (
+          <MiniRow key={item.id} model={item} />
+        ),
+      )}
     </View>
   );
 }

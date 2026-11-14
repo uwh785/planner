@@ -11,6 +11,12 @@ const settle = () => act(async () => flushAsync());
 // The test clock reads Thursday 22 Oct 2026, 10:00.
 const THURSDAY = 4;
 
+// Every class row's spoken label, top to bottom.
+const classLabels = () =>
+  screen
+    .getAllByLabelText(/\d\d:\d\d – \d\d:\d\d/)
+    .map(node => node.props.accessibilityLabel as string);
+
 describe("Panel: today's classes", () => {
   it('shows no block when today has no class', async () => {
     const env = await renderSignedIn();
@@ -25,31 +31,42 @@ describe("Panel: today's classes", () => {
     expect(screen.queryByRole('button', { name: 'View schedule' })).toBeNull();
   });
 
-  it('shows the class in progress, the next one and the rest', async () => {
+  it('lists the whole day in order, with time, room and teacher', async () => {
     const env = await renderSignedIn();
-    const make = (subject: string, startMinute: number, endMinute: number) =>
+    const make = (
+      subject: string,
+      startMinute: number,
+      endMinute: number,
+      extra: { room?: string; teacher?: string } = {},
+    ) =>
       env.world.classSessions.create({
         subject,
         dayOfWeek: THURSDAY,
         startMinute,
         endMinute,
+        ...extra,
       });
-    await make('Física', 570, 630);
-    await make('Química', 660, 720);
-    await make('Arte', 780, 840);
     await make('Música', 900, 960);
+    await make('Física', 570, 630, { room: 'B204' });
+    await make('Inglés', 480, 540, { room: 'A1', teacher: 'Ruiz' });
+    await make('Química', 660, 720, { teacher: 'Díaz' });
+    await make('Arte', 780, 840);
     await settle();
     expect(
       screen.getByRole('header', { name: "Today's classes" }),
     ).toBeTruthy();
-    expect(screen.getByLabelText('FÍSICA, Ends in 30 min')).toBeTruthy();
-    expect(screen.getByLabelText('QUÍMICA, Starts in 1 h')).toBeTruthy();
+    expect(classLabels()).toEqual([
+      'INGLÉS, Finished, 08:00 – 09:00, A1, Ruiz',
+      'FÍSICA, Ends in 30 min, 09:30 – 10:30, B204',
+      'QUÍMICA, Starts in 1 h, 11:00 – 12:00, Díaz',
+      'ARTE, 13:00 – 14:00',
+      'MÚSICA, 15:00 – 16:00',
+    ]);
     expect(screen.getByText('Ends in 30 min')).toBeTruthy();
-    expect(screen.getByLabelText('ARTE, 13:00 – 14:00')).toBeTruthy();
-    expect(screen.getByLabelText('MÚSICA, 15:00 – 16:00')).toBeTruthy();
+    expect(screen.getByText('08:00 – 09:00 · A1, Ruiz')).toBeTruthy();
   });
 
-  it("keeps the heading but shows no card once the day's classes are over", async () => {
+  it("still lists the day's classes once they are over", async () => {
     const env = await renderSignedIn();
     await env.world.classSessions.create({
       subject: 'Física',
@@ -58,10 +75,10 @@ describe("Panel: today's classes", () => {
       endMinute: 360,
     });
     await settle();
-    // Over already: the block is there (today has a class) but has no cards.
     expect(
       screen.getByRole('header', { name: "Today's classes" }),
     ).toBeTruthy();
+    expect(classLabels()).toEqual(['FÍSICA, Finished, 05:00 – 06:00']);
     expect(screen.queryByText(/Ends in|Starts in/)).toBeNull();
   });
 
@@ -94,6 +111,7 @@ describe("Panel: today's classes", () => {
     await settle();
     expect(screen.getByRole('header', { name: 'Clases de hoy' })).toBeTruthy();
     expect(screen.getByText('Termina en 30 min')).toBeTruthy();
+    expect(screen.getByLabelText(/^FÍSICA, Termina en 30 min/)).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Ver horario' })).toBeTruthy();
   });
 });

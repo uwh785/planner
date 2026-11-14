@@ -41,28 +41,54 @@ describe('todayClassesModel', () => {
     ).toBeNull();
   });
 
-  it('words the current, the next and the rest', () => {
+  it('lists every class of the day in order, the ended ones included', () => {
     const model = todayClassesModel(
       [
-        cls({ id: 'a', startMinute: 570, endMinute: 630 }),
-        cls({ id: 'b', subject: 'QUÍMICA', startMinute: 660, endMinute: 720 }),
         cls({ id: 'c', subject: 'ARTE', startMinute: 780, endMinute: 840 }),
+        cls({ id: 'a', startMinute: 570, endMinute: 630 }),
+        cls({
+          id: 'e',
+          subject: 'INGLÉS',
+          startMinute: 480,
+          endMinute: 540,
+          room: 'A1',
+          teacher: 'Ruiz',
+        }),
+        cls({ id: 'b', subject: 'QUÍMICA', startMinute: 660, endMinute: 720 }),
         cls({ id: 'x', dayOfWeek: 1 }),
       ],
       THURSDAY_10,
       en,
     );
-    expect(model?.current).toMatchObject({
-      id: 'a',
-      countdown: 'Ends in 30 min',
-      progress: 0.5,
-    });
-    expect(model?.next).toMatchObject({
-      id: 'b',
-      countdown: 'Starts in 1 h',
-    });
-    expect(model?.upcoming).toEqual([
-      expect.objectContaining({ id: 'c', time: '13:00 – 14:00' }),
+    expect(
+      model?.items.map(i => [i.id, i.state, i.countdown, i.detail]),
+    ).toEqual([
+      ['e', 'done', '', '08:00 – 09:00 · A1, Ruiz'],
+      ['a', 'current', 'Ends in 30 min', '09:30 – 10:30'],
+      ['b', 'next', 'Starts in 1 h', '11:00 – 12:00'],
+      ['c', 'later', '', '13:00 – 14:00'],
+    ]);
+    expect(model?.items[1]?.progress).toBe(0.5);
+    expect(model?.items.map(i => i.spoken)).toEqual([
+      'INGLÉS, Finished, 08:00 – 09:00, A1, Ruiz',
+      'FÍSICA, Ends in 30 min, 09:30 – 10:30',
+      'QUÍMICA, Starts in 1 h, 11:00 – 12:00',
+      'ARTE, 13:00 – 14:00',
+    ]);
+  });
+
+  it('keeps a class that overlaps the one in progress', () => {
+    const model = todayClassesModel(
+      [
+        cls({ id: 'a', startMinute: 570, endMinute: 630 }),
+        cls({ id: 'b', startMinute: 590, endMinute: 650 }),
+      ],
+      THURSDAY_10,
+      en,
+    );
+    expect(model?.items.map(i => [i.id, i.state])).toEqual([
+      ['a', 'current'],
+      ['b', 'later'],
     ]);
   });
 
@@ -72,6 +98,6 @@ describe('todayClassesModel', () => {
       THURSDAY_10,
       words('es'),
     );
-    expect(model?.current?.countdown).toBe('Termina en 30 min');
+    expect(model?.items[0]?.countdown).toBe('Termina en 30 min');
   });
 });

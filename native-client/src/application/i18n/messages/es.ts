@@ -225,6 +225,7 @@ export const es = {
   scheduleTodayTitle: 'Clases de hoy',
   scheduleEndsIn: 'Termina en',
   scheduleStartsIn: 'Empieza en',
+  scheduleClassDone: 'Terminada',
   scheduleLoadError: 'No se pudo leer tu horario.',
   scheduleGoneTitle: 'Esta clase ya no existe',
   scheduleGoneBody: 'Se eliminó. No queda nada que editar.',
