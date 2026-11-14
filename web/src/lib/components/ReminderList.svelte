@@ -7,7 +7,6 @@
   let { reminders = [] } = $props();
 
   function countdown(daysLeft) {
-    if (daysLeft === 0) return t('dateToday');
     if (daysLeft === 1) return t('dateTomorrow');
     return t('reminderDaysLeft', { count: daysLeft });
   }

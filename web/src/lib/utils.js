@@ -368,14 +368,15 @@ export function daysUntil(targetMs, nowMs) {
   return Math.round((startOfLocalDay(targetMs) - startOfLocalDay(nowMs)) / DAY_MS);
 }
 
-// The events flagged as reminders that start today or later, soonest first
+// The events flagged as reminders that start tomorrow or later, soonest first
 // (the given order for equal starts), each as { event, daysLeft } where
-// daysLeft is 0 today and 1 tomorrow.
+// daysLeft is 1 tomorrow. On its own day an event is already among today's
+// events, so it is not repeated here.
 export function upcomingReminders(events, nowMs) {
   return (Array.isArray(events) ? events : [])
     .filter((event) => event?.remind && event.start_at > 0)
     .map((event) => ({ event, daysLeft: daysUntil(event.start_at, nowMs) }))
-    .filter((reminder) => reminder.daysLeft >= 0)
+    .filter((reminder) => reminder.daysLeft > 0)
     .sort((a, b) => a.event.start_at - b.event.start_at);
 }
 

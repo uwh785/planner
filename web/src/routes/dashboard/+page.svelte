@@ -15,7 +15,11 @@
   let todayTasks = $state([]);
   let todayTasksLoading = $state(true);
   let todayEvents = $state([]);
-  let reminders = $state([]);
+  let futureEvents = $state([]);
+  let nowMs = $state(Date.now());
+  // Recomputed as the clock ticks, so the countdown stays right on a page
+  // left open overnight.
+  const reminders = $derived(upcomingReminders(futureEvents, nowMs));
 
   function currentMinuteOfDay() {
     const d = new Date();
@@ -45,15 +49,14 @@
     }
   }
 
-  // Every event from today on (the API takes `from` without `to`), narrowed to
-  // the ones flagged as reminders. Independent too: on failure the block
+  // Every event from today on (the API takes `from` without `to`); the
+  // reminders are derived from it. Independent too: on failure the block
   // stays hidden.
   async function loadReminders() {
     try {
-      const now = Date.now();
-      reminders = upcomingReminders(await api(`/api/events?from=${startOfLocalDay(now)}`), now);
+      futureEvents = await api(`/api/events?from=${startOfLocalDay(Date.now())}`);
     } catch {
-      reminders = [];
+      futureEvents = [];
     }
   }
 
@@ -65,6 +68,13 @@
     if (!A.token) return;
     loadTodayClasses();
     const interval = setInterval(() => {
+      const now = Date.now();
+      // A new day: a reminder due today moves to today's events.
+      if (startOfLocalDay(now) !== startOfLocalDay(nowMs)) {
+        loadTodayEvents();
+        loadReminders();
+      }
+      nowMs = now;
       nowMinute = currentMinuteOfDay();
       loadTodayClasses();
     }, 30000);

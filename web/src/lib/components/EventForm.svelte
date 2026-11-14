@@ -41,11 +41,11 @@
   let remind = $state(untrack(() => !!event?.remind));
   let clientError = $state('');
 
-  const shortcuts = SHORTCUT_DAYS.map((days) => ({ days, date: dateInDays(Date.now(), days) }));
-
   // A shortcut picks the date and flags the event as a reminder in one tap.
-  function applyShortcut(shortcut) {
-    date = shortcut.date;
+  // "Today" is read at the tap, not when the form opened, so a form left open
+  // past midnight still counts from the right day.
+  function applyShortcut(days) {
+    date = dateInDays(Date.now(), days);
     remind = true;
   }
 
@@ -95,15 +95,16 @@
     <label for="event-date">{t('eventDate')}</label>
     <input id="event-date" type="date" bind:value={date} required />
     <div class="shortcuts" role="group" aria-label={t('eventShortcuts')}>
-      {#each shortcuts as shortcut (shortcut.days)}
+      {#each SHORTCUT_DAYS as days (days)}
+        {@const active = date === dateInDays(Date.now(), days)}
         <button
           type="button"
           class="filter-btn"
-          class:active={date === shortcut.date}
-          aria-pressed={date === shortcut.date}
-          onclick={() => applyShortcut(shortcut)}
+          class:active
+          aria-pressed={active}
+          onclick={() => applyShortcut(days)}
         >
-          {t('eventInDays', { count: shortcut.days })}
+          {t('eventInDays', { count: days })}
         </button>
       {/each}
     </div>
