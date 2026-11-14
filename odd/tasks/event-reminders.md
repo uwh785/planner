@@ -19,7 +19,7 @@ The user (2026-11-11) wants to record things like "I recharged today, remind me 
 - Push or local notifications, recurring reminders ("every 60 days"), a separate reminders screen.
 
 ## Constraints
-- Branch `feat/event-reminders`, based on `feat/native-calendar` (0a8dcc7).
+- Branch `feat/event-reminders`, based on `feat/native-calendar` (0a8dcc7); both are now in `main` and deleted (see Delivery).
 - An older client that omits `remind` on update must not reset it: the backend takes `remind` as optional (`*bool`) and keeps the stored value when it is absent.
 - Day counts use whole local days (`startOfLocalDay` difference, rounded), never elapsed milliseconds, so DST days do not shift the number.
 - Native local schema changes go in a new append-only migration `003`.
@@ -40,8 +40,8 @@ The user (2026-11-11) wants to record things like "I recharged today, remind me 
 
 ## Delivery
 - Strategy: ask-on-risk. Forecast ~700 authored lines (T1 ~130, T2 ~420, T3 ~150), over ~400.
-- Chain strategy (user, 2026-11-11): `stacked-to-main`.
-- Slices: PR1 = T1 backend (`75ef964` + docs `47aa276`), PR2 = T2 native client, PR3 = T3 web. Each PR targets `main` and is based on the previous slice. The branch sits on `feat/native-calendar` (not merged into `main` yet), which has to land first. Push and PR creation remain the user's decision.
+- Planned (2026-11-11): `stacked-to-main`, three PRs (backend, native client, web) on top of `feat/native-calendar`. Superseded.
+- Delivered (user, 2026-11-13): no PRs. `main` fast-forwarded to `1b94cb6` (`feat/native-calendar` and `feat/event-reminders`, no merge commit) and pushed to `origin`. Every other branch, local and remote, was checked to be contained in that commit and then deleted; `main` is the only branch left. Nothing went through GitHub review; the review on record is the medium local review of `0a8dcc7..HEAD` (see Progress).
 - Review: T1 range from `0a8dcc7` assessed medium, `under_budget` (247 lines), pending in the slice. A whole-branch review against `main` (58 files, 3050 lines, consent granted) stopped with `lens_context_budget_exceeded`; no authority was created.
 
 ## Progress
@@ -73,4 +73,5 @@ The user (2026-11-11) wants to record things like "I recharged today, remind me 
   - Left as is: server-side `remind` filter and the two overlapping web requests (2, 3), shortcut keeping the end time on multi-day events (7, known limit), chip staying active with the switch off (8).
   - Checks: native typecheck and lint clean, `npm test` 95 of 95 suites, 1093 tests; RED first for the pull and tomorrow-on tests (2 and 3 failures). Web `npm run build` ok; throwaway node script: today excluded, tomorrow 1, 2026-11-11 + 60 = 2027-01-10.
 - 2026-11-13: browser check (headless Chromium via Playwright against `npm run dev` + local backend and compose Postgres, seeded through the API). Dashboard: "Renovar seguro, Mañana", "Recarga, Faltan 29 días"; the flagged event due today shows only under "Eventos de hoy"; a non-flagged event is not listed. Form: "En 60 días" on 2026-11-13 set 2027-01-12, ticked "Recordar en inicio" and marked the chip pressed; after saving, the dashboard read "Recarga celular, 12 ene, Faltan 60 días". No console errors. Not exercised: the overnight refresh.
-- Pending: emulator check.
+- 2026-11-13: delivered to `main` (`1b94cb6`, fast-forward, pushed); all other branches deleted, see Delivery.
+- Pending: emulator check, now against `main`.
