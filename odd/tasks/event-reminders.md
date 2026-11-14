@@ -72,4 +72,5 @@ The user (2026-11-11) wants to record things like "I recharged today, remind me 
   - `dueText` reuses `daysUntil`.
   - Left as is: server-side `remind` filter and the two overlapping web requests (2, 3), shortcut keeping the end time on multi-day events (7, known limit), chip staying active with the switch off (8).
   - Checks: native typecheck and lint clean, `npm test` 95 of 95 suites, 1093 tests; RED first for the pull and tomorrow-on tests (2 and 3 failures). Web `npm run build` ok; throwaway node script: today excluded, tomorrow 1, 2026-11-11 + 60 = 2027-01-10.
-- Pending: emulator and browser checks.
+- 2026-11-13: browser check (headless Chromium via Playwright against `npm run dev` + local backend and compose Postgres, seeded through the API). Dashboard: "Renovar seguro, Mañana", "Recarga, Faltan 29 días"; the flagged event due today shows only under "Eventos de hoy"; a non-flagged event is not listed. Form: "En 60 días" on 2026-11-13 set 2027-01-12, ticked "Recordar en inicio" and marked the chip pressed; after saving, the dashboard read "Recarga celular, 12 ene, Faltan 60 días". No console errors. Not exercised: the overnight refresh.
+- Pending: emulator check.
