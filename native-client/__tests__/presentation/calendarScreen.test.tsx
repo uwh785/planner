@@ -178,8 +178,8 @@ describe('add an event', () => {
     ).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Delete event' })).toBeNull();
     fireEvent.changeText(screen.getByLabelText('Title'), '  Concert ');
-    fireEvent.changeText(screen.getByLabelText('Location'), ' Hall ');
-    fireEvent.changeText(screen.getByLabelText('Notes'), 'Bring tickets');
+    fireEvent.changeText(screen.getByLabelText('Location (optional)'), ' Hall ');
+    fireEvent.changeText(screen.getByLabelText('Notes (optional)'), 'Bring tickets');
     fireEvent.press(screen.getByRole('radio', { name: 'Red' }));
     fireEvent.press(screen.getByRole('button', { name: 'Save' }));
     await screen.findByRole('header', { name: 'Calendar' });
@@ -352,13 +352,13 @@ describe('edit and delete an event', () => {
   it('fills the form from the event and saves changes', async () => {
     const created = await openEdit({ description: 'Notes' });
     expect(screen.getByLabelText('Title').props.value).toBe('Dentist');
-    expect(screen.getByLabelText('Location').props.value).toBe('Clinic');
-    expect(screen.getByLabelText('Notes').props.value).toBe('Notes');
+    expect(screen.getByLabelText('Location (optional)').props.value).toBe('Clinic');
+    expect(screen.getByLabelText('Notes (optional)').props.value).toBe('Notes');
     expect(screen.getByRole('button', { name: 'Start, 14:00' })).toBeTruthy();
     expect(
       screen.getByRole('radio', { name: 'Purple' }).props.accessibilityState,
     ).toMatchObject({ selected: true });
-    fireEvent.changeText(screen.getByLabelText('Location'), 'Office');
+    fireEvent.changeText(screen.getByLabelText('Location (optional)'), 'Office');
     fireEvent.press(screen.getByRole('button', { name: 'Save' }));
     await screen.findByRole('header', { name: 'Calendar' });
     expect(await env.world.events.get(created.id)).toMatchObject({
@@ -370,7 +370,7 @@ describe('edit and delete an event', () => {
 
   it('keeps the dates of a multi-day event when only its notes change', async () => {
     const created = await openEdit({ endAt: at(9, 24, 11) });
-    fireEvent.changeText(screen.getByLabelText('Notes'), 'Pack');
+    fireEvent.changeText(screen.getByLabelText('Notes (optional)'), 'Pack');
     fireEvent.press(screen.getByRole('button', { name: 'Save' }));
     await screen.findByRole('header', { name: 'Calendar' });
     expect(await env.world.events.get(created.id)).toMatchObject({
