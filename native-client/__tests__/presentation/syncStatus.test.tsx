@@ -165,7 +165,10 @@ describe('status line on the Panel', () => {
   });
 
   it('keeps its relative time fresh', async () => {
-    jest.useFakeTimers({ now: NOW });
+    // React's scheduler runs its work through setImmediate in Node: faking it
+    // leaves the render pending and the test waits forever. Only the clock
+    // and the refresh interval need to be fake here.
+    jest.useFakeTimers({ now: NOW, doNotFake: ['setImmediate'] });
     const source = new SyncStatus();
     source.update({ lastSyncAt: NOW });
     await renderHome(source);
