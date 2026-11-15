@@ -32,7 +32,6 @@
 </script>
 
 <svelte:head>
-  <title>{t('appName')}</title>
   <meta name="description" content={t('landingHeroSubtitle')} />
 </svelte:head>
 

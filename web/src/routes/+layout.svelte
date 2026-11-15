@@ -28,6 +28,25 @@
   let showNav = $derived(A.token && !bareRoutes.includes(currentPath));
   let fullBleed = $derived(currentPath === '/');
 
+  // Page name first, then the service name, so search results and tabs show both.
+  const titleKeys = [
+    ['/login', 'loginTitle'],
+    ['/dashboard', 'navDashboard'],
+    ['/tasks/new', 'taskNew'],
+    ['/tasks/', 'taskDetail'],
+    ['/tasks', 'navTasks'],
+    ['/events/new', 'eventNew'],
+    ['/events/', 'eventEdit'],
+    ['/schedule', 'navSchedule'],
+    ['/calendar', 'navCalendar'],
+    ['/config', 'navConfig']
+  ];
+  let pageTitle = $derived.by(() => {
+    if (currentPath === '/') return `${t('appName')} | ${t('landingHeroTitle')}`;
+    const match = titleKeys.find(([prefix]) => currentPath.startsWith(prefix));
+    return match ? `${t(match[1])} | ${t('appName')}` : t('appName');
+  });
+
   function handleLogout() {
     setToken('');
     goto('/');
@@ -37,6 +56,10 @@
     locale.value = locale.value === 'es' ? 'en' : 'es';
   }
 </script>
+
+<svelte:head>
+  <title>{pageTitle}</title>
+</svelte:head>
 
 <ModeWatcher themeColors={{ dark: '#000000', light: '#f2f2f7' }} />
 
