@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /$
+Allow: /login
+Disallow: /dashboard
+Disallow: /tasks
+Disallow: /events
+Disallow: /calendar
+Disallow: /schedule
+Disallow: /config
+
+Sitemap: https://planner-etr.pages.dev/sitemap.xml
