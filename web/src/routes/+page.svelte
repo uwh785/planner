@@ -39,7 +39,7 @@
   <div class="landing">
     <nav class="landing-nav">
       <a href="/" class="brand">
-        <span class="brand-mark">P</span>
+        <img class="brand-mark" src="/logo.svg" alt="" width="32" height="32" />
         <span class="brand-name">{t('appName')}</span>
       </a>
       <div class="nav-actions">
@@ -146,14 +146,7 @@
     width: 32px;
     height: 32px;
     border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 14px;
-    font-weight: 700;
-    color: var(--accent);
-    background: color-mix(in srgb, var(--accent) 12%, transparent);
-    border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+    display: block;
   }
 
   .brand-name {

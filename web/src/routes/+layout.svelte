@@ -66,7 +66,7 @@
 {#if showNav}
   <nav class="topnav">
     <div class="topnav-inner">
-      <a href="/dashboard" class="topnav-logo">{t('appName')}</a>
+      <a href="/dashboard" class="topnav-logo"><img class="topnav-mark" src="/logo.svg" alt="" width="28" height="28" />{t('appName')}</a>
       <div class="topnav-links">
         {#each navItems as item}
           <a
@@ -140,6 +140,13 @@
   }
 
   .topnav-logo:hover { text-decoration: none; }
+
+  .topnav-mark {
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    margin-right: 8px;
+  }
 
   .topnav-links {
     display: flex;
