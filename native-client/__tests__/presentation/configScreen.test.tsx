@@ -1,4 +1,5 @@
 import { act, fireEvent, screen } from '@testing-library/react-native';
+import { PlanService } from '@/application/plan/PlanService';
 import { CompletionWindow } from '@/application/planner/CompletionWindow';
 import { SyncStatus } from '@/application/sync/SyncStatus';
 import { flushAsync } from '../helpers/plannerWorld';
@@ -161,4 +162,54 @@ it('is in Spanish by default and keeps the web wording', async () => {
   expect(screen.getByText('Idioma')).toBeTruthy();
   expect(screen.getByRole('button', { name: 'Cerrar Sesión' })).toBeTruthy();
   expect(screen.getAllByRole('radio')).toHaveLength(2);
+});
+
+describe('plan usage', () => {
+  const planWith = async (json: unknown) => {
+    return new PlanService(
+      { request: jest.fn(async () => ({ status: 200, json })) },
+      'https://example.test/#pricing',
+    );
+  };
+
+  it('shows usage, flags a full resource in words and links to Pro on Free', async () => {
+    const open = jest
+      .spyOn(require('react-native').Linking, 'openURL')
+      .mockResolvedValue(true);
+    const plan = await planWith({
+      data: {
+        plan: 'free',
+        limits: { max_tasks: 50, max_lists: 5, max_tags: 10 },
+        usage: { active_tasks: 50, lists: 2, tags: 0 },
+      },
+    });
+    await openConfig({ plan });
+    await settle();
+    expect(screen.getByText('Your plan')).toBeTruthy();
+    expect(screen.getByText('50 / 50')).toBeTruthy();
+    expect(screen.getByText('You hit the limit of 50.')).toBeTruthy();
+    expect(screen.getByText('2 / 5')).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: 'See Pro' }));
+    expect(open).toHaveBeenCalledWith('https://example.test/#pricing');
+  });
+
+  it('shows Pro as unlimited with no upgrade button', async () => {
+    const plan = await planWith({
+      data: {
+        plan: 'pro',
+        limits: { max_tasks: -1, max_lists: -1, max_tags: -1 },
+        usage: { active_tasks: 7, lists: 1, tags: 0 },
+      },
+    });
+    await openConfig({ plan });
+    await settle();
+    expect(screen.getByText('Pro')).toBeTruthy();
+    expect(screen.getByText('7 · Unlimited')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'See Pro' })).toBeNull();
+  });
+
+  it('shows nothing about the plan when it could not be read', async () => {
+    await openConfig();
+    expect(screen.queryByText('Your plan')).toBeNull();
+  });
 });

@@ -1,6 +1,7 @@
 import type { AuthenticatedHttp } from './auth/AuthenticatedHttp';
 import type { SessionService } from './auth/SessionService';
 import type { ContainerSource } from './container';
+import type { PlanSource } from './plan/PlanService';
 import type { PlannerRuntime } from './planner/createPlanner';
 import type { SyncCoordinator } from './sync/SyncCoordinator';
 
@@ -17,6 +18,8 @@ export interface AppServices {
    * create their own services never sync by accident.
    */
   sync: SyncCoordinator;
+  /** The plan and its usage, shown in Settings. */
+  plan: PlanSource;
   /** Clock, timer and app lifecycle for the screens' planner services. */
   runtime: PlannerRuntime;
   /** Settles once the stored session has been restored (never rejects). */

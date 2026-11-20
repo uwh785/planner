@@ -33,3 +33,5 @@ export {
   normalizeTaskList,
 } from './validation';
 export type { ActiveSession, AuthSession, AuthUser } from './auth';
+export type { PlanResource, PlanSummary, PlanUsageLine } from './plan';
+export { PLAN_RESOURCES, UNLIMITED, parsePlan, isAtLimit } from './plan';

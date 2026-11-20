@@ -51,6 +51,7 @@ AppRegistry.registerComponent(
         session={boot.services.session}
         containers={boot.services.containers}
         sync={boot.services.sync}
+        plan={boot.services.plan}
         locale={locale}
       />
     ) : (

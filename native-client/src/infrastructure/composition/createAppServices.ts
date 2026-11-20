@@ -7,9 +7,10 @@ import type { Connectivity } from '@/application/ports/Connectivity';
 import type { Timer } from '@/application/ports/Timer';
 import type { SessionStore } from '@/application/ports/SessionStore';
 import type { AppServices } from '@/application/services';
+import { PlanService } from '@/application/plan/PlanService';
 import { SyncCoordinator } from '@/application/sync/SyncCoordinator';
 import { UserContainers } from '@/application/userContainers';
-import { currentApiBaseUrl } from '../config/apiConfig';
+import { currentApiBaseUrl, UPGRADE_URL } from '../config/apiConfig';
 import { FetchHttpClient } from '../http/FetchHttpClient';
 import { HttpAuthGateway } from '../http/HttpAuthGateway';
 import { KeychainSessionStore } from '../security/KeychainSessionStore';
@@ -94,6 +95,7 @@ export function createAppServices(
     http: authenticated,
     containers,
     sync,
+    plan: new PlanService(authenticated, UPGRADE_URL),
     runtime: { clock, timer, lifecycle },
     ready: restoring,
   };

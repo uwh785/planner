@@ -3,11 +3,13 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { InMemoryLocaleStore, LocaleService } from '@/application/i18n';
 import type { SessionService } from '@/application/auth/SessionService';
 import type { ContainerSource } from '@/application/container';
+import type { PlanSource } from '@/application/plan/PlanService';
 import type { PlannerRuntime } from '@/application/planner/createPlanner';
 import type { SyncStatusSource } from '@/application/sync/SyncStatus';
 import { I18nProvider } from './i18n/I18nProvider';
 import { SessionGate } from './screens/SessionGate';
 import { SessionProvider } from './sessionContext';
+import { PlanProvider } from './planContext';
 import { SyncProvider } from './syncContext';
 
 interface AppProps {
@@ -17,6 +19,8 @@ interface AppProps {
   containers: ContainerSource;
   /** What the sync status line reads; omit to show no line. */
   sync?: SyncStatusSource;
+  /** The plan shown in Settings; omit to show none. */
+  plan?: PlanSource;
   /** Clock, timer and app lifecycle for the screens; plain globals if omitted. */
   runtime?: PlannerRuntime;
   /** The chosen language; Spanish and not saved anywhere if omitted. */
@@ -37,6 +41,7 @@ function App({
   session,
   containers,
   sync,
+  plan,
   runtime = DEFAULT_RUNTIME,
   locale,
 }: AppProps) {
@@ -52,9 +57,11 @@ function App({
     <I18nProvider service={language}>
       <SessionProvider session={session}>
         <SyncProvider source={sync}>
-          <SafeAreaProvider>
-            <SessionGate containers={containers} runtime={runtime} />
-          </SafeAreaProvider>
+          <PlanProvider source={plan}>
+            <SafeAreaProvider>
+              <SessionGate containers={containers} runtime={runtime} />
+            </SafeAreaProvider>
+          </PlanProvider>
         </SyncProvider>
       </SessionProvider>
     </I18nProvider>

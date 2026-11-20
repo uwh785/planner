@@ -16,6 +16,8 @@ interface ConfigViewProps {
   signingOut: boolean;
   onOpenLists: () => void;
   onSignOut: () => void;
+  /** The plan and its usage; absent until it has been read. */
+  plan?: React.ReactNode;
   /** The discreet sync line. */
   sync?: React.ReactNode;
   /** Development-only controls; absent in release builds. */
@@ -51,6 +53,7 @@ export function ConfigView({
   signingOut,
   onOpenLists,
   onSignOut,
+  plan,
   sync,
   developer,
 }: ConfigViewProps) {
@@ -91,6 +94,7 @@ export function ConfigView({
             />
           </View>
         </FormSection>
+        {plan}
         {sync ? (
           <FormSection title={t('configSync')}>{sync}</FormSection>
         ) : null}

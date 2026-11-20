@@ -33,3 +33,6 @@ export function resolveApiBaseUrl(options: {
 /** The API origin of this build: the emulator alias in __DEV__, else release. */
 export const currentApiBaseUrl = (): string =>
   resolveApiBaseUrl({ dev: __DEV__, releaseUrl: RELEASE_API_BASE_URL });
+
+/** The web page that lists the plans; the app only links to it. */
+export const UPGRADE_URL = 'https://planner-etr.pages.dev/#pricing';

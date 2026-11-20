@@ -7,6 +7,7 @@ import {
   type Locale,
 } from '@/application/i18n';
 import type { ContainerSource } from '@/application/container';
+import type { PlanSource } from '@/application/plan/PlanService';
 import type { SyncStatusSource } from '@/application/sync/SyncStatus';
 import App from '@/presentation/App';
 import { active, FakeAuthGateway, InMemorySessionStore } from './authFakes';
@@ -55,6 +56,7 @@ export const NOW = new Date(2026, 9, 22, 10, 0).getTime();
 export async function renderSignedIn(
   options: {
     sync?: SyncStatusSource;
+    plan?: PlanSource;
     world?: TestWorld;
     now?: number;
     /** The saved language; English by default so most tests read plainly. */
@@ -83,6 +85,7 @@ export async function renderSignedIn(
       session={session}
       containers={containers}
       sync={options.sync}
+      plan={options.plan}
       locale={locale}
       runtime={{ clock: world.clock, timer, lifecycle }}
     />,

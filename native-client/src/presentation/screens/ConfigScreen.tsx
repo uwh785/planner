@@ -4,6 +4,8 @@ import { ScreenHeader } from '../components/molecules/ScreenHeader';
 import { ConfigView } from '../components/organisms/ConfigView';
 import { useI18n } from '../i18n/I18nProvider';
 import type { TabScreenProps } from '../navigation/routes';
+import { PlanUsage } from '../components/organisms/PlanUsage';
+import { usePlan } from '../planContext';
 import { usePlanner } from '../plannerContext';
 import { useSession } from '../sessionContext';
 import { useLeaveSignOutNotice } from '../signOutNotice';
@@ -25,6 +27,8 @@ export function ConfigScreen({ navigation }: TabScreenProps<'Config'>) {
     state.status === 'signedIn' || state.status === 'expired'
       ? state.user
       : null;
+
+  const plan = usePlan(user?.userId ?? null);
 
   async function signOut() {
     setLeaving(true);
@@ -57,6 +61,11 @@ export function ConfigScreen({ navigation }: TabScreenProps<'Config'>) {
         signingOut={leaving}
         onOpenLists={() => navigation.navigate('Lists')}
         onSignOut={signOut}
+        plan={
+          plan?.summary ? (
+            <PlanUsage summary={plan.summary} upgradeUrl={plan.upgradeUrl} />
+          ) : undefined
+        }
         sync={<SyncStatusLine />}
         developer={__DEV__ ? <DevTaskButton /> : undefined}
       />
