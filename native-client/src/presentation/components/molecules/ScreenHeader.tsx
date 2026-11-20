@@ -14,6 +14,11 @@ interface ScreenHeaderProps {
   title: string;
   onBack?: () => void;
   actions?: readonly HeaderAction[];
+  /**
+   * Keeps the title for screen readers but draws nothing, for a screen whose
+   * name is already on its tab button.
+   */
+  titleHidden?: boolean;
 }
 
 const makeStyles = (t: Theme) => ({
@@ -31,6 +36,9 @@ const makeStyles = (t: Theme) => ({
   },
   actions: { flexDirection: 'row' as const, flexWrap: 'wrap' as const },
   title: { ...t.typography.title, color: t.colors.text },
+  // 1dp tall and clipped: TalkBack still reaches it, nothing is drawn.
+  titleHidden: { height: 1, overflow: 'hidden' as const, opacity: 0 },
+  wrapHidden: { paddingTop: t.spacing.xs, paddingBottom: 0 },
 });
 
 /**
@@ -41,11 +49,12 @@ export function ScreenHeader({
   title,
   onBack,
   actions = [],
+  titleHidden = false,
 }: ScreenHeaderProps) {
   const styles = useStyles(makeStyles);
   const t = useT();
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, titleHidden ? styles.wrapHidden : null]}>
       {onBack || actions.length > 0 ? (
         <View style={styles.bar}>
           {onBack ? (
@@ -65,7 +74,10 @@ export function ScreenHeader({
           </View>
         </View>
       ) : null}
-      <Text accessibilityRole="header" style={styles.title}>
+      <Text
+        accessibilityRole="header"
+        style={[styles.title, titleHidden ? styles.titleHidden : null]}
+      >
         {title}
       </Text>
     </View>

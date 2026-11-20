@@ -14,19 +14,20 @@ interface StatTileProps {
 
 const makeStyles = (t: Theme) => ({
   tile: {
-    flexGrow: 1,
-    flexBasis: '45%' as const,
+    flex: 1,
     alignItems: 'center' as const,
-    gap: t.spacing.xxs,
-    padding: t.spacing.md,
-    borderRadius: t.radii.card,
+    paddingVertical: t.spacing.xs,
+    paddingHorizontal: t.spacing.xxs,
+    borderRadius: t.radii.control,
     borderWidth: 1,
     borderColor: t.colors.border,
     backgroundColor: t.colors.surface,
   },
-  value: { fontSize: 28, lineHeight: 34, fontWeight: '700' as const },
+  value: { fontSize: 20, lineHeight: 24, fontWeight: '700' as const },
   label: {
-    ...t.typography.caption,
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: '400' as const,
     color: t.colors.textMuted,
     textAlign: 'center' as const,
   },
@@ -37,7 +38,8 @@ const makeStyles = (t: Theme) => ({
 });
 
 /**
- * One Panel counter: the number, big, and its label. The number's color only
+ * One Panel counter: the number and its label, compact so the four sit in
+ * one row and leave the screen to what matters. The number's color only
  * reinforces the label (the web's blue, green and red, in AA-safe values);
  * the tile is read as one "label: count".
  */
@@ -51,7 +53,9 @@ export function StatTile({ label, count, tone = 'neutral' }: StatTileProps) {
       style={styles.tile}
     >
       <Text style={[styles.value, styles[tone]]}>{count}</Text>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={styles.label} numberOfLines={2}>
+        {label}
+      </Text>
     </View>
   );
 }

@@ -37,7 +37,7 @@ export function PanelScreen({ navigation }: TabScreenProps<'Panel'>) {
   const data = dashboard.status === 'loading' ? null : dashboard.data;
   const events =
     stored.status === 'loading' || !stored.data ? null : stored.data.events;
-  const header = <ScreenHeader title={t('dashboardTitle')} />;
+  const header = <ScreenHeader title={t('dashboardTitle')} titleHidden />;
 
   return (
     <Frame>

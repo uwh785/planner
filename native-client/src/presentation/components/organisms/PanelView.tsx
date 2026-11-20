@@ -55,8 +55,7 @@ const makeStyles = (t: Theme) => ({
   body: { paddingHorizontal: t.spacing.lg, gap: t.spacing.md },
   stats: {
     flexDirection: 'row' as const,
-    flexWrap: 'wrap' as const,
-    gap: t.spacing.sm,
+    gap: t.spacing.xs,
   },
   heading: {
     ...t.typography.headline,
